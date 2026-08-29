@@ -168,7 +168,7 @@ interface CodeSpec {
   starter: string;
   solution: string;
   /** Hint 1 — opt-in "how to approach it" nudge (falls back to `explanation`). */
-  hint?: string;
+  hint?: string | undefined;
   explanation: string;
   docRef: DocRef;
   /** Static structure checks. */
@@ -313,7 +313,7 @@ export function multiFileTask(spec: MultiFileSpec): MultiFileExercise {
         perFile.push({ name: f.name, result: await gradeFile(f.name, submitted[f.name] ?? "") });
       }
       const joined = spec.files.map((f) => submitted[f.name] ?? "").join("\n\n");
-      const cross = await runChecks(joined, { checks: spec.crossChecks });
+      const cross = await runChecks(joined, { checks: spec.crossChecks ?? [] });
       const passed = perFile.every((p) => p.result.passed) && cross.every((c) => c.passed);
       return { passed, perFile, cross };
     },

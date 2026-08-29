@@ -15,7 +15,7 @@ import { CodeBlock } from "./CodeBlock";
 
 export interface HintPanelProps {
   /** Hint 1 text (approach). Omitted → only the answer hint shows. */
-  approach?: string;
+  approach?: string | undefined;
   /** Hint 2 — the model code revealed on demand. */
   answer: string;
   /** highlight.js language for the answer code. */

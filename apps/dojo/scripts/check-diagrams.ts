@@ -15,7 +15,7 @@ const GUIDE_DIRS = [
 ];
 
 const KNOWN_TYPES =
-  /^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|classDiagram|erDiagram|gantt|pie|journey)\b/;
+  /^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|classDiagram|erDiagram|gantt|pie|journey|gitGraph)\b/;
 
 interface Block {
   file: string;

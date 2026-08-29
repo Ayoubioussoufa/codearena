@@ -298,8 +298,8 @@ this list is deep enough.
 - Amazon official OA prep: amazon.jobs/content/en/how-we-hire/university/sde-oa · Leadership
   Principles: amazon.jobs/en/principles
 - Dojo: [DSA problem sets](/dsa) (20 categories, 200 problems), [Aptitude & Reasoning](/practice/aptitude),
-  [CS Fundamentals](/practice/cs-fundamentals), [SQL](/practice/sql-data), the [Teacher's](/teacher)
-  mock-interview modes (Amazon behavioral, coding, system design, case, ESN French)
+  [CS Fundamentals](/practice/cs-fundamentals), [SQL](/practice/sql-data),
+  [System Design drills](/practice/system-design-drills)
 - Codingame (ESN-style tests), CodeSignal practice (BCG X-style), sqlzoo.net
 - Free cloud certs: AWS Skill Builder (CCP), Microsoft Learn (AZ-900), Oracle University (OCI
   Foundations — free exam windows)

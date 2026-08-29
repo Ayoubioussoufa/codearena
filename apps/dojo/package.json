@@ -15,7 +15,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.112.3",
     "github-slugger": "^2.0.0",
     "highlight.js": "^11.11.1",
     "mermaid": "^11.12.2",

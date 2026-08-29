@@ -7,8 +7,7 @@ the guide to presenting **CodeArena itself** — your strongest interview asset.
 
 > How to use it: find your target's archetype, read that section, then practice its stages with the
 > matching Dojo tools — [Aptitude & Reasoning](/practice/aptitude) and
-> [CS Fundamentals](/practice/cs-fundamentals) drills, the [DSA problem sets](/dsa), and the
-> [Teacher's](/teacher) mock-interview modes.
+> [CS Fundamentals](/practice/cs-fundamentals) drills, and the [DSA problem sets](/dsa).
 
 ## The three archetypes
 
@@ -38,7 +37,8 @@ long-term signal, not checklist answers.
 practice site; "medium" is its middle difficulty tier — not easy, not brutal): exactly the Dojo's DSA
 track. Arrays & Hashing, Two Pointers, Sliding Window, Trees, BFS/DFS, and Heap dominate Amazon's
 actual question pool. Senior loops add a system-design round (drill the
-[System Design guide](/guides/system-design-fundamentals) + Teacher's system-design mock) and
+[System Design guide](/guides/system-design-fundamentals) + the
+[System Design drills](/practice/system-design-drills)) and
 sometimes low-level object-oriented design ("design a parking lot / locker system").
 
 **The behavioral bar — half your loop.** Amazon interviews are built around the 16 **Leadership
@@ -59,8 +59,8 @@ hardest part?", "What did your teammate think?". A story you can't survive three
 story you don't own.
 
 **Prepare a story bank, not scripts:** 8–10 real situations, each tagged with the 2–3 principles it
-can serve. Mine CodeArena for at least half of them (see the last section). Then run the Teacher's
-**Amazon behavioral mock** until follow-ups stop surprising you.
+can serve. Mine CodeArena for at least half of them (see the last section). Then rehearse each one
+out loud, against a timer, until follow-ups stop surprising you.
 
 ## Deloitte, Capgemini, Accenture (IT services)
 
@@ -99,8 +99,8 @@ and reuse two STAR stories.
 4. **Synthesize**: "My recommendation is X, driven by A and B; risks are C; next I'd verify D."
 
 Market-sizing warm-ups ("How many coffees does Paris drink daily?") reward stated assumptions ×
-clean segmentation × round numbers. Practice with the Teacher's **case interview mock** — it feeds
-you data like a real interviewer and grades your structure.
+clean segmentation × round numbers. Practice by working prompts out loud against a timer, stating
+every assumption before you compute it.
 
 **Tech track (BCG X, McKinsey Digital).** Case-lite + real technical: a coding exercise (Dojo DSA
 easy/medium), an architecture discussion (system-design guide), and product sense ("How would you
@@ -164,7 +164,6 @@ You're ready when you can:
 - Score 80%+ on mixed [Aptitude](/practice/aptitude) sessions at ~1 minute per question.
 - Answer any [CS Fundamentals](/practice/cs-fundamentals) drill with definition + example +
   trade-off, out loud.
-- Tell 8 STAR stories (≥4 from CodeArena), each surviving three follow-up probes in the Teacher's
-  behavioral mock.
+- Tell 8 STAR stories (≥4 from CodeArena), each surviving three follow-up probes.
 - Draw CodeArena's architecture in 60 seconds and go deep on all three hard-problem stories.
 - Structure a profitability case to a recommendation in 30 minutes in the case mock.

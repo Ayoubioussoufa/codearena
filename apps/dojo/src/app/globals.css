@@ -1,0 +1,151 @@
+/*
+ * CodeArena Dojo — Tailwind v4 entry.
+ * Class-based dark mode (`.dark` on <html>), typography plugin for the
+ * rendered markdown guides.
+ */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Mermaid SVGs: never overflow their card */
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Guide TOC: slim scrollbar so long tables of contents scroll unobtrusively */
+.toc-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-300) transparent;
+}
+.dark .toc-scroll {
+  scrollbar-color: var(--color-slate-700) transparent;
+}
+
+/* ── Syntax highlighting (highlight.js token classes) ──
+   GitHub-flavoured palette, light + dark via the .dark class. Applies to
+   guide code fences (rehype-highlight), exercise blocks and the editor. */
+
+.hljs-surface,
+.prose pre {
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-800);
+}
+.dark .hljs-surface,
+.dark .prose pre {
+  background-color: #0d1424;
+  color: var(--color-slate-200);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-operator,
+.hljs-meta {
+  color: #d73a49;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #22863a;
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable {
+  color: #005cc5;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section,
+.hljs-name {
+  color: #6f42c1;
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #e36209;
+}
+.hljs-attribute,
+.hljs-selector-id {
+  color: #005cc5;
+}
+.hljs-deletion {
+  color: #b31d28;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8b949e;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-operator,
+.dark .hljs-meta {
+  color: #ff7b72;
+}
+.dark .hljs-string,
+.dark .hljs-regexp,
+.dark .hljs-addition {
+  color: #7ee787;
+}
+.dark .hljs-number,
+.dark .hljs-literal,
+.dark .hljs-symbol,
+.dark .hljs-attr,
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #79c0ff;
+}
+.dark .hljs-title,
+.dark .hljs-title.function_,
+.dark .hljs-title.class_,
+.dark .hljs-section,
+.dark .hljs-name {
+  color: #d2a8ff;
+}
+.dark .hljs-type,
+.dark .hljs-built_in,
+.dark .hljs-builtin-name,
+.dark .hljs-selector-class,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-pseudo {
+  color: #ffa657;
+}
+.dark .hljs-attribute,
+.dark .hljs-selector-id {
+  color: #79c0ff;
+}
+.dark .hljs-deletion {
+  color: #ffa198;
+}

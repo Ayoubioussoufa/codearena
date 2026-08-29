@@ -1,0 +1,32 @@
+/**
+ * src/app/leaderboard/page.tsx — Leaderboard route (server component)
+ * TODOs: none here — the practice gaps live in
+ * components/leaderboard/LeaderboardTable.tsx.
+ *
+ * Data is fetched on the server and handed to the client table, so the client
+ * component can focus purely on DERIVED state (its skill target) — fetching
+ * with hooks is the problems page's job, not this one's.
+ */
+import type { Metadata } from "next";
+import { getLeaderboard } from "@/lib/api";
+import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
+
+export const metadata: Metadata = { title: "Leaderboard" };
+
+export default async function LeaderboardPage() {
+  const entries = await getLeaderboard();
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Global leaderboard
+        </h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Season 3 · rankings update after every ranked duel.
+        </p>
+      </header>
+      <LeaderboardTable entries={entries} />
+    </div>
+  );
+}

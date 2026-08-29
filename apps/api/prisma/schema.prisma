@@ -4,10 +4,140 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  // This app is CommonJS (no "type":"module" in package.json).
+  // Without these, Prisma 7 emits ESM and Node fails with
+  // "exports is not defined in ES module scope".
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Language {
+  TYPESCRIPT
+  PYTHON
+  CPP
+  JAVA
+}
+
+enum Verdict {
+  PENDING
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT
+  RUNTIME_ERROR
+  COMPILE_ERROR
+}
+
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  username     String @unique
+  passwordHash String // NEVER a column called `password`
+  role         Role   @default(USER)
+
+  // Glicko-2 rating fields — added now so Week 5 needs no migration
+  rating          Float @default(1500)
+  ratingDeviation Float @default(350)
+  volatility      Float @default(0.06)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions   Submission[]
+  refreshTokens RefreshToken[]
+}
+
+model Problem {
+  id          Int        @id @default(autoincrement()) // frontend contract: a NUMBER
+  slug        String     @unique
+  title       String
+  difficulty  Difficulty
+  description String[] // array of paragraphs
+  constraints String[]
+  starterCode Json // language -> code map
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examples    ProblemExample[]
+  testCases   TestCase[]
+  submissions Submission[]
+  tags        Tag[]
+
+  @@index([difficulty]) // list page filters by difficulty
+}
+
+model ProblemExample {
+  id          Int     @id @default(autoincrement())
+  problemId   Int
+  problem     Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  input       String
+  output      String
+  explanation String?
+  order       Int
+
+  @@index([problemId]) // FK — always indexed
+}
+
+model Tag {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  problems Problem[]
+}
+
+model TestCase {
+  id        Int     @id @default(autoincrement())
+  problemId Int
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  input     String
+  expected  String
+  isSample  Boolean @default(false)
+  order     Int
+
+  @@index([problemId])
+}
+
+model Submission {
+  id        String   @id @default(cuid()) // never a guessable id for user data
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId Int
+  problem   Problem  @relation(fields: [problemId], references: [id])
+  language  Language
+  verdict   Verdict  @default(PENDING)
+  code      String
+  runtimeMs Int?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)]) // profile history, cursor-paginated
+  @@index([problemId, verdict]) // acceptance-rate stats
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // the HASH, never the token itself
+  family    String // rotation: reuse kills the whole family
+  revokedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId, family]) // rotation lookup
 }

@@ -49,7 +49,9 @@ export default async function PracticeTopicPage({ params }: PracticeTopicProps) 
           ← All topics
         </Link>
       </div>
-      <PracticeSession topicId={topic} bridge={bridge} />
+      {/* `bridge` is omitted rather than passed as undefined: under
+          exactOptionalPropertyTypes an optional prop won't accept undefined. */}
+      <PracticeSession topicId={topic} {...(bridge ? { bridge } : {})} />
     </div>
   );
 }

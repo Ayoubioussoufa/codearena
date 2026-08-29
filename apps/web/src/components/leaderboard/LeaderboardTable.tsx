@@ -187,7 +187,7 @@ export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
 
 /* ── Presentational helper (complete) ── */
 
-function StatCard({ label, value }: { label: string; value?: number | string }) {
+function StatCard({ label, value }: { label: string; value?: number | string | undefined}) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>

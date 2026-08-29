@@ -120,7 +120,7 @@ export interface CodeExercise extends ExerciseBase {
    * The prompt states the GOAL; this carries the technique. Falls back to
    * `explanation` when absent. Hint 2 is always the `solution`.
    */
-  hint?: string;
+  hint?: string | undefined;
   grade: (code: string) => Promise<CodeGradeResult>;
 }
 

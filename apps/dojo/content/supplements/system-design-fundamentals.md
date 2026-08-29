@@ -918,8 +918,8 @@ This is a real thing you built — say so, and walk your actual choices.
 
 Reading designs is not the same as *producing* them under pressure. Turn this guide into a daily rep:
 
-1. **Pick one prompt** from the rotation below (or the [Teacher's system-design mock](/teacher), which gates the
-   stages and adds a live twist).
+1. **Pick one prompt** from the rotation below (or a [System Design drill](/practice/system-design-drills),
+   which gates the stages against a timed rubric).
 2. **Set a 20-minute timer** and, from a blank page, run the framework out loud: requirements → estimation → API +
    data model → happy-path diagram → name the first bottleneck → apply ONE tool → "what breaks next?" → failure
    modes + trade-offs.
@@ -952,8 +952,8 @@ A script that works with any prompt, including the three above:
   pressure, apply ONE tool, ask "what breaks next?"
 - **30–40 min — failure modes + trade-offs**, whether or not you're asked.
 
-Practice against the [Teacher's system-design mock](/teacher) — it gates these exact stages and throws
-in the mid-design twist real interviewers love.
+Practice against the [System Design drills](/practice/system-design-drills) — timed prompts that
+gate these exact stages and hand you a rubric to self-score against.
 
 ## Mastery checklist — you can…
 

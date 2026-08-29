@@ -14,7 +14,6 @@ const NAV_LINKS = [
   { href: "/coding", label: "Coding" },
   { href: "/dsa", label: "DSA" },
   { href: "/build", label: "Build" },
-  { href: "/teacher", label: "Teacher" },
 ] as const;
 
 export function Navbar() {

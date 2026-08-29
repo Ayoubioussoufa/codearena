@@ -62,11 +62,12 @@ export function PracticeSession({
   const [codeValue, setCodeValue] = useState("");
   // Design-prompt state: scratch notes, the ticked rubric points, and the
   // countdown anchor. `designRecorded` guards the self-grade so continuing
-  // records it exactly once. `nowTick` just forces a re-render each second.
+  // records it exactly once. `now` is the clock the countdown reads — held in
+  // state and refreshed by the interval below, so render stays pure.
   const [designNotes, setDesignNotes] = useState("");
   const [rubricTicks, setRubricTicks] = useState<number[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [, setNowTick] = useState(0);
+  const [now, setNow] = useState<number | null>(null);
   const designRecorded = useRef(false);
   const [checkResults, setCheckResults] = useState<CodeCheckResult[]>([]);
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -80,7 +81,7 @@ export function PracticeSession({
   // (it keeps ticking into overtime), so the timer never blocks you.
   useEffect(() => {
     if (exercise?.kind !== "design" || phase !== "answering") return;
-    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [exercise, phase]);
 
@@ -190,6 +191,10 @@ export function PracticeSession({
     setCodeValue(ex.kind === "code" ? ex.starter : "");
     setDesignNotes("");
     setRubricTicks([]);
+    // nextExercise only ever runs from a click (the Next button, or advance()),
+    // never during render — but the compiler can't prove that for a function
+    // declared in the component body, so it flags the clock read.
+    // eslint-disable-next-line react-hooks/purity -- event-handler path only
     setStartedAt(ex.kind === "design" ? Date.now() : null);
     designRecorded.current = false;
     setCheckResults([]);
@@ -274,7 +279,9 @@ export function PracticeSession({
 
   /** mm:ss remaining against the design's budget (negative → overtime). */
   function timeLeft(minutes: number): { label: string; over: boolean } {
-    const elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+    // `now` lags by up to a second and is null until the first tick; clamping at
+    // 0 keeps a stale reading from a previous prompt from showing negative time.
+    const elapsed = startedAt && now ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
     const remaining = minutes * 60 - elapsed;
     const over = remaining < 0;
     const abs = Math.abs(remaining);

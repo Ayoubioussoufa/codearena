@@ -374,7 +374,7 @@ const oddOneOut: Generator = {
     }
     if (kind === 1) {
       const cubes = rng.sample(CUBES, 3);
-      let odd = rng.pick([30, 50, 70, 100, 120, 150, 200, 90]);
+      const odd = rng.pick([30, 50, 70, 100, 120, 150, 200, 90]);
       return choice(rng, {
         genId: "apt-odd-one-out",
         prompt: "Which number does NOT belong with the others?",

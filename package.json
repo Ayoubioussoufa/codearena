@@ -1,0 +1,38 @@
+{
+  "name": "codearena",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CodeArena — competitive programming & adaptive learning platform (pnpm monorepo)",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.25.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "unrs-resolver",
+      "prisma",
+      "@prisma/client",
+      "@prisma/engines",
+      "@nestjs/core"
+    ]
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:dojo": "pnpm --filter dojo dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "prepare": "husky",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1"
+  }
+}

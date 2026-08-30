@@ -64,16 +64,19 @@ model User {
 }
 
 model Problem {
-  id          Int        @id @default(autoincrement()) // frontend contract: a NUMBER
-  slug        String     @unique
-  title       String
-  difficulty  Difficulty
-  description String[] // array of paragraphs
-  constraints String[]
-  starterCode Json // language -> code map
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               Int        @id @default(autoincrement()) // frontend contract: a NUMBER
+  slug             String     @unique
+  title            String
+  difficulty       Difficulty
+  description      String[] // array of paragraphs
+  constraints      String[]
+  starterCode      Json // language -> code map
+  // Denormalised for now: the seed data carries them and there are no
+  // Submissions yet. Week 2 can compute these from Submission instead.
+  acceptanceRate   Float      @default(0)
+  totalSubmissions Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   examples    ProblemExample[]
   testCases   TestCase[]

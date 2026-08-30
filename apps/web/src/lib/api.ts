@@ -14,7 +14,7 @@
  *   - changePassword(…)           rejects when currentPassword is "wrongpass"
  */
 
-import { CONTESTS, CURRENT_USER, LEADERBOARD_ENTRIES, PROBLEMS } from "./data";
+import { CONTESTS, CURRENT_USER, LEADERBOARD_ENTRIES } from "./data";
 import type {
   AuthUser,
   Contest,
@@ -26,21 +26,43 @@ import type {
   UserProfile,
 } from "./types";
 
+type ProblemsResponse = {
+  items: Problem[];
+  nextCursor: number | null;
+};
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** All problems. ~700 ms latency — design a loading state for it. */
 export async function getProblems(): Promise<Problem[]> {
-  await delay(700);
-  return PROBLEMS.map((p) => ({ ...p }));
+  let cursor: number | null = null;
+  const all: Problem[] = [];
+  const base = `${process.env.NEXT_PUBLIC_API_URL}/problems?limit=100`;
+  do {
+    const url: string = cursor === null ? base : `${base}&cursor=${cursor}`
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const { items, nextCursor }: ProblemsResponse = await res.json();
+    all.push(...items);
+    cursor = nextCursor;
+  } while (cursor !== null)
+
+  return all;
 }
 
 /** One problem by slug, or null when it doesn't exist. ~400 ms latency. */
 export async function getProblem(slug: string): Promise<Problem | null> {
-  await delay(400);
-  const problem = PROBLEMS.find((p) => p.slug === slug);
-  return problem ? { ...problem } : null;
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/problems/${slug}`,
+  );
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new Error(`API ${res.status}`);
+  }
+  const body: Problem = await res.json();
+  return body;
 }
 
 /** Leaderboard entries in arbitrary order. ~600 ms latency. */

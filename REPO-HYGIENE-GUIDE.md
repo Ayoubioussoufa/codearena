@@ -672,7 +672,7 @@ git commit -m "chore(repo): enforce lint, typecheck and conventional commits"
 git add docs/adr
 git commit -m "docs(adr): add decision record directory and template"
 
-git add PROGRESS.md ROADMAP-12W.md WEEK-0.md WEEK-PLAN.md REPO-HYGIENE-GUIDE.md
+git add PROGRESS.md ROADMAP-12W.md 2-DAY-SPRINT.md WEEK-PLAN.md REPO-HYGIENE-GUIDE.md
 git commit -m "docs: 12-week roadmap and progress tracking"
 ```
 

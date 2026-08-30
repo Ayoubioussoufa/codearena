@@ -147,29 +147,28 @@ in the whole plan.
 
 ## 4. The twelve weeks
 
-### Week 0 — Thu 27 → Sun 30 Aug · RESET (4 days)
+### Week 0 — Sat 29 → Sun 30 Aug · RESET (2 days)
 
-Not a study week. A "stop the bleeding" sprint. The goal is to end August with a real
-backend heartbeat so Week 1 starts from momentum instead of guilt.
+Not a study week. A "stop the bleeding" sprint, compressed from four days into the weekend.
+Full hour-by-hour plan: [`2-DAY-SPRINT.md`](./2-DAY-SPRINT.md).
 
-- **Thu 27** — Ground truth. Open `/dsa` and `/practice`, write down your **real** solved
-  count per category and your review-queue size into `PROGRESS.md`. Then: `git init`
-  hygiene — husky pre-commit (lint + typecheck), conventional commits, GitHub Actions CI
-  (lint · typecheck · build · test). Push. *You have one commit; fix that today.*
-- **Fri 28** — `apps/api` bootstrap for real: `ConfigModule` with Zod-validated env, global
-  `ValidationPipe`, exception filter, logging interceptor, `/health` endpoint. Docker
-  Compose service wired. `apps/web` calls `/health` and renders it. **First real
-  end-to-end byte.**
-- **Sat 29** — The Prisma schema, all of it, in one sitting: `User`, `Problem`, `Tag`,
-  `TestCase`, `Submission`, `SubmissionResult`, `RefreshToken`. Migration generated,
-  **the generated `.sql` read line by line** (`docs/phase-1` Part E is the reference).
-  Seed script with ~50 problems pulled from the dojo registry.
-- **Sun 30** — Problems module end-to-end: controller → service → repository port →
-  Prisma adapter. List + detail. DTO validation. One e2e test hitting the container.
-  Point `apps/web`'s problems page at the real API — **delete those mock functions.**
-  Retro + write ADR-001 *"Why monorepo + bounded-context modules"*.
+**Already done:** ground truth (`PROGRESS.md`), repo hygiene (husky, lint-staged, commitlint,
+`docs/adr/`, 18 sliced commits), and `tsconfig.base.json` inherited by every app.
 
-> **DSA this sprint:** 2/day, whatever pattern you're mid-way through. Don't start a new one.
+- **Sat 29 — the data layer.** `apps/api` bootstrap for real: `ConfigModule` with Zod-validated
+  env, global `ValidationPipe`, exception filter, `/health` doing a genuine `SELECT 1`. Then the
+  whole Prisma schema in one sitting — `User`, `Problem`, `ProblemExample`, `Tag`, `TestCase`,
+  `Submission`, `RefreshToken` — migration generated, **the generated `.sql` read line by line**,
+  and an idempotent seed of all 333 problems from `dsa-problems.ts`.
+- **Sun 30 — the slice.** Problems module end-to-end: controller → service → repository port →
+  Prisma adapter. List + detail, cursor-paginated. Point `apps/web`'s problems page at the real
+  API — **delete those mock functions.** GitHub Actions CI until green. One e2e + one unit test.
+  Retro + ADR-000 and ADR-001.
+
+> **Cut to fit two days:** DSA blocks (→ weekday evenings), the deep Phase 0/1 re-reads
+> (→ reference while building), the logging interceptor and requestId (→ Week 1), `psql` by hand
+> (→ Saturday stretch goal), and the Phase 1 §B auth priming read (→ Monday morning, cold).
+> Sunday ends with a **named 1-hour buffer**, because two days has no slack.
 
 **✅ Gate:** `docker compose up` → real Postgres → real API → `apps/web` renders problems
 from the database. CI green on `main`. If this isn't true Sunday night, Week 1 opens by

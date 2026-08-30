@@ -15,6 +15,8 @@ type SeedProblem = {
   description: string[];
   constraints: string[];
   starterCode: Record<string, string>;
+  acceptanceRate: number;
+  totalSubmissions: number;
   tags: string[];
   examples: { input: string; output: string; explanation?: string }[];
 };
@@ -42,6 +44,8 @@ async function main() {
         description: p.description,
         constraints: p.constraints,
         starterCode: p.starterCode,
+        acceptanceRate: p.acceptanceRate,
+        totalSubmissions: p.totalSubmissions,
       },
       create: {
         id: p.id,
@@ -51,6 +55,8 @@ async function main() {
         description: p.description,
         constraints: p.constraints,
         starterCode: p.starterCode,
+        acceptanceRate: p.acceptanceRate,
+        totalSubmissions: p.totalSubmissions,
         tags: {
           connectOrCreate: p.tags.map((name) => ({
             where: { name },

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Problem" ADD COLUMN     "acceptanceRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "totalSubmissions" INTEGER NOT NULL DEFAULT 0;

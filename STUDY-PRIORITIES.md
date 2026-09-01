@@ -288,6 +288,99 @@ gate.**
 
 ---
 
+# Day 2 additions — what Sunday 30 Aug taught
+
+Sunday added five topics and deepened three you already had. Slotting them into the same tiers.
+
+## New — Tier 1
+
+### Layered architecture: ports, adapters, the dependency rule
+
+**Sits with #4 (dependency injection)** — it's the same principle, applied to whole modules.
+
+You built it: `domain/` importing nothing, a port naming a need, an adapter translating Prisma rows
+into your types, a service that never learns what a database is. The `grep -r "prisma" domain/
+application/` returning zero hits is the audit that proves it.
+
+**Why Tier 1:** this is Spring, .NET and Django too. The names change, the arrows don't.
+
+**Study:** the dojo guide
+[Backend Architecture](http://localhost:3002/guides/backend-architecture) — especially Part 5, the
+four-question procedure for deciding where code goes. Then `docs/phase-0` **§C.3** lines 779–870.
+
+## New — Tier 2
+
+### Testing strategy: unit vs e2e, and why the port makes it possible
+
+`new ProblemsService(fakeRepo)` — ten lines, no database, milliseconds. That only works because the
+service takes its dependency rather than constructing one.
+
+**The lesson:** if your unit tests are slow, your architecture leaked. Speed is a design signal, not
+just convenience.
+
+**Study:** `apps/dojo/content/supplements/testing.md` · Dojo →
+[/practice/testing](http://localhost:3002/practice/testing)
+
+### CI as the enforcement gate
+
+**Promoted from Tier 4.** You built it, and the distinction is now concrete:
+
+> Hooks are fast feedback. CI is the gate.
+
+Bypassable with `--no-verify`, not installed on a fresh clone, runs in *your* environment — three
+structural reasons a hook can never be the boundary. Also learned: pin CI to your `engines` floor
+(Node 20), not your laptop's version.
+
+**Study:** GitHub Actions docs → "Understanding GitHub Actions". Then read your own `ci.yml` and
+explain each line.
+
+### API contract design
+
+Cursor vs offset pagination · DTOs as the validation boundary · uniform error shapes · mapping
+domain enums to display strings *at the HTTP edge*.
+
+**The sharpest lesson:** offset pagination doesn't just get slow — it **duplicates rows** when data
+shifts under you. Your 4-request loop returning 333 items with **0 duplicates** is the proof that
+`skip: 1` works.
+
+**Study:** `docs/phase-1` **§A.5** lines 360–401.
+
+## Deepened
+
+### Debugging (#1) — three new lessons, all earned painfully
+
+1. **When your editor and `tsc` disagree, `tsc` is right.** The `Cannot find name 'describe'` error
+   didn't exist for the compiler — a stale TS server. The suggested fix would have had you install
+   a package you already had.
+2. **Verify you're running the new code before theorising.** A stale server held port 3001 and
+   caused three wrong diagnoses.
+3. **Read the real type, not the tutorial.** `datasourceUrl` didn't exist in Prisma 7. Opening the
+   generated `PrismaClientOptions` settled in seconds what searching couldn't.
+
+### Git (#5) — branch switching and what it touches
+
+> Switching branches rewrites **tracked** files. **Untracked** files stay put.
+
+That asymmetry cost you three files: `git commit -am` on a throwaway branch swept up real work,
+and switching back reverted it. Recovered with `git checkout <hash> -- <files>` because the commit
+was still in the object store.
+
+**Two rules from it:** never `-a` when unrelated work is in flight, and always `git diff --staged`
+before committing.
+
+### TypeScript (#7) — inference cycles
+
+`TS7022: implicitly has type 'any' because it is referenced directly or indirectly in its own
+initializer` — a genuine circular inference, where an annotation is the **correct** fix, not a
+workaround.
+
+**The distinction worth keeping:** an annotation TypeScript *verifies* is legitimate. An `as` that
+*disables* checking is the one to be suspicious of.
+
+Also: `exactOptionalPropertyTypes` makes `?: string` and `?: string | undefined` different types.
+
+---
+
 # If you only get four hours a week
 
 | Week | Focus |

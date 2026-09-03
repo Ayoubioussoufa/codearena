@@ -270,6 +270,118 @@ const prReview: Generator = {
   },
 };
 
+/* ── after the merge: syncing and deleting branches ── */
+
+const postMergeSync: Generator = {
+  id: "git-post-merge-sync",
+  title: "Syncing after a PR merge",
+  generate: (rng) => {
+    const cases = [
+      {
+        q: "You pushed a branch and opened a PR, but haven't merged it yet. You run `git switch main && git pull`. Your feature files disappear from disk. What happened?",
+        answer:
+          "Nothing was lost — `main` predates those commits, so checking it out removes files that only exist on the feature branch",
+        wrong: [
+          "`git pull` overwrote your work with the remote version of main",
+          "The files were deleted because the PR wasn't merged in time",
+          "Your commit was rejected by the remote and rolled back",
+        ],
+        why: "A checkout makes your working tree match the commit you switched to. `main` is at an older commit that never contained those files, so they're removed from disk — and restored the moment you switch back. `git pull` did nothing at all here: the PR wasn't merged, so GitHub's main hadn't moved. Files vanishing on a branch switch is normal and completely reversible.",
+      },
+      {
+        q: "You merged your PR on GitHub. Back in your terminal, `git log main` still doesn't show it. Why?",
+        answer:
+          "The merge happened on GitHub's copy of the repo; your machine learns about it only when you `git fetch` (or `pull`, which fetches first)",
+        wrong: [
+          "GitHub merges are asynchronous and can take several minutes to appear",
+          "The merge failed silently and needs to be redone",
+          "You need to run `git push` to bring the merge down to your machine",
+        ],
+        why: "Clone gives you an independent copy, not a live window. There are two repositories with two `main` branches, connected only when you explicitly sync. `origin/main` is your CACHED NOTE of where GitHub's main was the last time you looked — `git fetch` is how you look again. Nothing in Git polls the remote in the background.",
+      },
+      {
+        q: "What does `origin/main` actually represent on your machine?",
+        answer:
+          "A cached note of where GitHub's `main` pointed the last time you fetched — it can be arbitrarily stale",
+        wrong: [
+          "A live view of GitHub's main branch, updated automatically",
+          "The same thing as your local `main`, just under a different name",
+          "A read-only copy of main that Git refreshes on every command",
+        ],
+        why: "`origin/main` is a remote-TRACKING ref: a local file holding a commit hash, updated only by `fetch`/`pull`. Git never warns you that it's out of date. That's why the reliable pre-flight check before any cleanup is `git fetch && git log --oneline origin/main -1` — fetch first, then look.",
+      },
+    ] as const;
+    const c = rng.pick(cases);
+    return choice(rng, {
+      genId: "git-post-merge-sync",
+      prompt: c.q,
+      correct: c.answer,
+      wrong: [...c.wrong],
+      explanation: c.why,
+      docRef: DOC,
+    });
+  },
+};
+
+const branchDeleteSafety: Generator = {
+  id: "git-branch-delete-safety",
+  title: "What `git branch -d` actually checks",
+  generate: (rng) =>
+    choice(rng, {
+      genId: "git-branch-delete-safety",
+      prompt:
+        "You pushed `feature` to origin but never merged it into `main`. From `main`, you run `git branch -d feature`. What happens?",
+      correct:
+        "It deletes the branch with a warning — `-d` checks whether the commits are safe in the branch's UPSTREAM (or HEAD), not whether they reached `main`",
+      wrong: [
+        "It refuses, because the branch was never merged into `main`",
+        "It refuses, because the branch still exists on the remote",
+        "It deletes the branch and the commits are permanently lost",
+      ],
+      explanation:
+        "Git's actual rule: the branch must be fully merged in its upstream, or in HEAD if no upstream is set. `main` is never consulted. Because you pushed, `origin/feature` holds the commits, so Git considers the local label disposable and prints `warning: deleting branch 'feature' that has been merged to 'refs/remotes/origin/feature', but not yet merged to HEAD`. The key idea: **`-d` protects commits, not branch names.** It guarantees no commit is stranded; it promises nothing about keeping a branch you still wanted. Recover with `git switch feature` — Git recreates it from the remote.",
+      docRef: DOC,
+    }),
+};
+
+const recoverDeletedBranch: Generator = {
+  id: "git-recover-deleted-branch",
+  title: "Recover a deleted branch that was pushed",
+  generate: () =>
+    text({
+      genId: "git-recover-deleted-branch",
+      prompt:
+        "You deleted local branch `feature` but it still exists on the remote as `origin/feature`. Recreate it locally, tracking the remote, in ONE command.",
+      answers: [
+        "git switch feature",
+        "git checkout feature",
+        "git switch -c feature origin/feature",
+        "git checkout -b feature origin/feature",
+        "git switch --track origin/feature",
+      ],
+      placeholder: "git …",
+      explanation:
+        "`git switch feature` is enough. Git finds no local branch by that name, sees exactly ONE remote that has it, and creates a local branch tracking it — that's DWIM (\"do what I mean\"). It only works when the name is unambiguous; with two remotes carrying `feature`, Git refuses and you name the source explicitly: `git switch -c feature origin/feature`. Deleting a branch never destroys commits — a branch is just a 41-byte file in `.git/refs/heads/` holding a hash.",
+      docRef: DOC,
+    }),
+};
+
+const verifyMerged: Generator = {
+  id: "git-verify-merged",
+  title: "Check whether a PR actually merged",
+  generate: () =>
+    text({
+      genId: "git-verify-merged",
+      prompt:
+        "Before deleting branches, you want to confirm your PR really landed on the remote `main`. Which command refreshes your view of the remote WITHOUT touching your files?",
+      answers: ["git fetch", "git fetch origin", "git fetch --all", "git fetch -p", "git fetch --prune"],
+      placeholder: "git …",
+      explanation:
+        "`git fetch` downloads new commits and moves your remote-tracking refs (`origin/main`), leaving your branch and working tree untouched — it is always safe. Then `git log --oneline origin/main -1` shows whether your commit is on top. Contrast `git pull`, which fetches AND merges into your current branch: it changes your files and can conflict. The habit worth building: **fetch, look, then integrate** — never run cleanup commands on faith that a remote action succeeded.",
+      docRef: DOC,
+    }),
+};
+
 export const gitTopic: Topic = {
   id: "git",
   title: "Git & Workflow",
@@ -291,6 +403,10 @@ export const gitTopic: Topic = {
     forceWithLease,
     stagingArea,
     prReview,
+    postMergeSync,
+    branchDeleteSafety,
+    recoverDeletedBranch,
+    verifyMerged,
     ...gitCommandGens,
   ],
 };

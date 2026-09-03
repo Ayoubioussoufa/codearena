@@ -2,11 +2,11 @@
 
 Git is the tool you'll touch more than any other on a team, and the one an internship silently assumes you already know. Not the trivia — the *fluency*: branch without thinking, stage the right changes, rebase to tidy up, resolve a conflict calmly, undo safely, and open a pull request a reviewer enjoys reading.
 
-This guide is both halves: the **workflow** (parts 1–7) and the **complete command surface** (parts 8–15), with diagrams for every operation that moves history around.
+This guide is both halves: the **workflow** (parts 1–7) and the **complete command surface** (parts 8–16), with diagrams for every operation that moves history around.
 
 The one idea that makes everything else click: **Git stores snapshots, and commits are cheap, immutable, and identified by a hash.** Branches and tags are just movable labels pointing at commits. Almost every command is moving a label or making a new snapshot.
 
-> **Drill this guide** in [Practice → Git & Workflow](/practice/git) — 48 exercises, concept cards plus type-the-command recall.
+> **Drill this guide** in [Practice → Git & Workflow](/practice/git) — 52 exercises, concept cards plus type-the-command recall.
 
 ---
 
@@ -622,7 +622,173 @@ When a reviewer comments, treat it as **collaboration, not criticism**: address 
 
 ---
 
-# Part 13 — Setup and config
+# Part 13 — After the merge: syncing and deleting branches
+
+The single most common way a beginner *thinks* they've lost work is here — in the five minutes after a PR is merged. Almost always, nothing is lost. What's missing is a mental model of **which repository you're talking to.**
+
+## Two repos, two `main`s
+
+When you clone, you don't get a live window into GitHub. You get a **complete, independent copy**. From then on there are two histories that only touch when you explicitly tell them to.
+
+```mermaid
+flowchart LR
+    subgraph YOU["Your machine"]
+        M["main<br/>a branch you can commit to"]
+        OM["origin/main<br/>a CACHED NOTE of where<br/>GitHub's main was last fetch"]
+    end
+    subgraph GH["GitHub"]
+        GM["main<br/>the real shared branch"]
+    end
+    GM -.->|"git fetch<br/>updates the note"| OM
+    OM -->|"git merge / pull"| M
+    M -->|"git push"| GM
+```
+
+| Ref | What it actually is | Who moves it |
+| --- | --- | --- |
+| `main` | Your local branch | You — commit, merge, pull, reset |
+| `origin/main` | Your **cached note** of GitHub's `main` | Only `git fetch` (and `pull`, which fetches) |
+| GitHub's `main` | The shared truth | Your `push`, or a PR merge on the website |
+
+> **`origin/main` is not GitHub.** It's a sticky note saying *"last time I looked, GitHub's main was at this commit."* It can be hours stale and Git will never warn you. `git fetch` is how you look again.
+
+## Merging a PR happens on GitHub's copy
+
+This is the step that catches everyone. You click **Merge pull request** in the browser — and your machine learns nothing.
+
+```mermaid
+sequenceDiagram
+    participant You as Your machine
+    participant GH as GitHub
+    You->>GH: git push -u origin feature
+    Note over GH: branch published
+    Note over GH: you click "Merge pull request"
+    Note over GH: GitHub's main moves forward
+    Note over You: your main: UNCHANGED<br/>your origin/main: UNCHANGED<br/>nothing told you
+    You->>GH: git fetch
+    GH-->>You: origin/main now points at the merge
+    Note over You: git pull can finally do something
+```
+
+So when you run `git pull` **before** merging the PR, it correctly does nothing — there is nothing on GitHub to pull yet. `main` stays where it was, your feature files aren't on disk (you're standing on a commit that predates them), and it looks exactly like the work evaporated.
+
+It didn't. You're on the wrong branch, one commit away.
+
+## The correct order
+
+```bash
+# 0. PRE-FLIGHT — did the merge actually happen?
+git fetch
+git log --oneline origin/main -1     # is your commit at the top?
+```
+
+**If your commit isn't there, stop.** The merge hasn't happened and the next three commands have nothing to do.
+
+```bash
+# 1. Merge the PR on GitHub          ← in the browser
+# 2. Then sync and clean up:
+git switch main
+git pull                             # local main catches up
+git branch -d feature-name           # delete the local label
+git push origin --delete feature-name  # and the remote one (or GitHub's button)
+```
+
+The pre-flight check is the whole lesson. **Never run cleanup commands on faith that a remote action succeeded.** Ten seconds of `git fetch && git log` replaces an hour of panic.
+
+## What `git branch -d` actually checks
+
+"`-d` is the safe one, it refuses if unmerged" is the folk wisdom — and it's imprecise in a way that will surprise you. Here's Git's real rule, from the manual:
+
+> The branch must be fully merged in its **upstream** branch, or in **HEAD** if no upstream was set.
+
+Note what's absent: **`main` is not mentioned.** `-d` does not care whether you merged into `main`. It cares whether the commits exist *somewhere else that isn't about to disappear.*
+
+Verified, on a scratch repo:
+
+```console
+$ git branch -d unpushed                        # never pushed, no upstream
+error: the branch 'unpushed' is not fully merged.
+If you are sure you want to delete it, run 'git branch -D unpushed'
+
+$ git branch -d pushed                          # pushed, upstream set
+warning: deleting branch 'pushed' that has been merged to
+         'refs/remotes/origin/pushed', but not yet merged to HEAD
+Deleted branch pushed (was 282d9c8).
+```
+
+The second branch was **not** merged into `main` — and `-d` deleted it anyway, with a warning that spells out exactly why: the commits are safe on the remote, so throwing away the local label loses nothing.
+
+| | Rule | Use when |
+| --- | --- | --- |
+| `git branch -d` | Refuses unless merged into **upstream or HEAD** | Always. Let it be the judge |
+| `git branch -D` | Deletes unconditionally | You're certain the work is disposable |
+
+**`-d` protects commits, not branch names.** It guarantees you won't strand a commit with no way back. It makes no promise that you'll still have a branch you wanted to keep working on.
+
+## Branch names are sticky notes
+
+This is the idea that dissolves the whole category of panic.
+
+```mermaid
+flowchart LR
+    C1["f0b111d"] --> C2["d1d973a<br/>your 110 lines"]
+    M(["main"]) -.->|points at| C1
+    F(["feature"]) -.->|points at| C2
+    R(["origin/feature"]) -.->|points at| C2
+
+    style F stroke-dasharray: 5 5
+```
+
+A branch is a **41-byte file containing a commit hash.** That's the entire implementation — look at `.git/refs/heads/` and you'll see them.
+
+Deleting `feature` removes one sticky note. Commit `d1d973a` is untouched: it's still in `.git/objects/`, still pointed at by `origin/feature`, still findable in the reflog. **You cannot lose a commit by deleting a branch** — you can only lose the convenient name you were using to reach it.
+
+## Recovering a deleted branch — three routes
+
+**If it was pushed** (the common case), one command:
+
+```bash
+git switch feature-name
+```
+
+No `-b`, no flags. Git finds no local branch by that name, sees exactly **one** remote that has it, and recreates the local branch tracking it. That's "DWIM" — it only works when the name is unambiguous across remotes; with two remotes carrying it, Git refuses and you name one:
+
+```bash
+git switch -c feature-name origin/feature-name
+```
+
+**If it was never pushed**, the reflog remembers every commit HEAD ever pointed at:
+
+```bash
+git reflog                                   # find the hash
+git switch -c feature-name <hash>
+```
+
+**If you don't know where it went**, ask which refs contain it:
+
+```bash
+git branch -a --contains <hash>    # every local + remote branch holding this commit
+git log --oneline --graph --all    # the whole picture, all refs at once
+```
+
+## "I think I lost my work" — the diagnosis table
+
+Run `git status -sb` and `git log --oneline --all` first. Then:
+
+| Symptom | What's actually true | Fix |
+| --- | --- | --- |
+| Files gone after `switch main` | You're on a commit that predates them | `git switch <branch>` |
+| Branch missing after `branch -d` | Its commits are on the remote | `git switch <name>` (DWIM) |
+| `git pull` "did nothing" | The PR wasn't merged yet | Merge it, then pull |
+| `main` behind after merging a PR | You haven't fetched since | `git pull` |
+| Commits vanished after `reset --hard` | Still in the object store | `git reflog`, then `git reset --hard <hash>` |
+| Uncommitted edits gone | **Genuinely lost** — Git never had a copy | None. This is why you commit often |
+
+Only the last row is real loss. **Everything Git has ever committed is recoverable**; only the working tree is fragile. That asymmetry is the argument for committing early and often, even messily — you can always tidy history later with `rebase -i`, but you cannot recover a file Git never saw.
+
+---
+
+# Part 14 — Setup and config
 
 | Command | When |
 | --- | --- |
@@ -642,7 +808,7 @@ git config --global alias.lg "log --oneline --graph --all"
 
 ---
 
-# Part 14 — Cheat sheet: "I want to…"
+# Part 15 — Cheat sheet: "I want to…"
 
 | Situation | Command |
 | --- | --- |
@@ -666,10 +832,13 @@ git config --global alias.lg "log --oneline --graph --all"
 | Push a rewritten branch | `git push --force-with-lease` |
 | Stop tracking a committed file | `git rm --cached <file>` |
 | Why is my file ignored? | `git check-ignore -v <file>` |
+| Did my PR actually merge? | `git fetch && git log --oneline origin/main -1` |
+| I deleted a branch I still needed | `git switch <name>` — recreates it from the remote |
+| My `main` is behind after a PR merge | `git switch main && git pull` |
 
 ---
 
-# Part 15 — The dangerous commands
+# Part 16 — The dangerous commands
 
 Everything else in Git is recoverable. These lose work.
 
@@ -679,7 +848,7 @@ Everything else in Git is recoverable. These lose work.
 | `git clean -fd` | Deletes untracked files permanently | **Always `git clean -n` first** |
 | `git restore <file>` | Discards unstaged edits | `git stash` if unsure |
 | `git push --force` | Destroys others' commits on the remote | Use `--force-with-lease` |
-| `git branch -D` | Deletes an unmerged branch | `git reflog` usually still has it |
+| `git branch -D` | Deletes an unmerged branch | `git reflog` usually still has it. Prefer `-d`, which refuses unless the commits are safe in the **upstream or HEAD** — see Part 13 |
 | `git stash clear` | Deletes all stashes | None. Use `git stash drop` on one |
 | `git rebase` on shared branches | Breaks everyone else's history | The golden rule: never |
 
@@ -707,3 +876,8 @@ Everything else in Git is recoverable. These lose work.
 - [ ] Explain why `.gitignore` doesn't untrack an already-committed file
 - [ ] Explain why `--force-with-lease` beats `--force`
 - [ ] Open a small, well-described PR and respond to review like a teammate
+- [ ] Explain why `origin/main` can be stale, and which single command updates it
+- [ ] Say why `git pull` does nothing when you run it before merging the PR
+- [ ] State what `git branch -d` actually checks — and why it isn't `main`
+- [ ] Recover a deleted branch that was pushed, in one command
+- [ ] Name the only category of work Git genuinely cannot recover

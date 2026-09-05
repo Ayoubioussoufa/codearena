@@ -6,13 +6,19 @@ import {
   PASSWORD_HASHER,
   type PasswordHasher,
 } from '../passwordhasher/ports/password-hasher.port';
+import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
+  private readonly dummyHash: Promise<string>;
   constructor(
     private readonly users: UsersService,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
-  ) {}
+    private readonly jwt: JwtService,
+  ) {
+    this.dummyHash = this.hasher.hash(randomBytes(32).toString('hex'));
+  }
 
   async register(dto: RegisterDto) {
     const { email, username, password } = dto;
@@ -22,10 +28,18 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const { email, password } = dto;
+
     const user = await this.users.getCredentialsByEmail(email);
-    if (!user) throw new UnauthorizedException('Invalid email or password');
-    const result = await this.hasher.verify(user.passwordHash, password);
-    if (!result) throw new UnauthorizedException('Invalid email or password');
-    return { id: user.id };
+    const result = await this.hasher.verify(
+      user?.passwordHash ?? (await this.dummyHash),
+      password,
+    );
+
+    if (!user || !result)
+      throw new UnauthorizedException('Invalid email or password');
+
+    return {
+      accessToken: await this.jwt.signAsync({ sub: user.id, role: user.role }),
+    };
   }
 }

@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateUserInput, UsersRepository } from '../ports/users.repository';
 import { PrismaService } from '../../prisma/prisma.service';
-import { User } from '../domain/user.entity';
+import { Role, User } from '../domain/user.entity';
 import { Prisma } from '../../../generated/prisma/client';
 
 @Injectable()
@@ -23,12 +23,12 @@ export class PrismaUsersRepository implements UsersRepository {
 
   async findCredentialsByEmail(
     email: string,
-  ): Promise<{ id: string; passwordHash: string } | null> {
+  ): Promise<{ id: string; passwordHash: string; role: Role } | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
     if (!user) return null;
-    return { id: user.id, passwordHash: user.passwordHash };
+    return { id: user.id, passwordHash: user.passwordHash, role: user.role };
   }
 
   async findById(id: string): Promise<User | null> {

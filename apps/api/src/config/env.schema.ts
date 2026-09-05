@@ -12,6 +12,8 @@ export const envSchema = z.object({
   REDIS_HOST: z.string().min(1).default('localhost'),
 
   REDIS_PORT: z.coerce.number().int().min(1).max(65535).default(6379),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),
 });
 
 export type Env = z.infer<typeof envSchema>;

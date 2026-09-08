@@ -63,8 +63,13 @@ Three dependencies are worth naming out loud, because they're the ones people tr
 
 ### How each pattern section is laid out
 
-Always the same five beats, so you can skim to the one you need:
+Always the same beats, so you can skim to the one you need:
 
+0. **🔍 Recognise it** — the table you read *before* you know which pattern this is: the trigger
+   words that appear in the prompt, the input shape, what the **constraint** is telling you, the
+   complexity you're aiming for, and — the most useful row — **which pattern this gets confused
+   with, and the one question that separates them.** Read this row for the two candidates you're
+   torn between and the choice usually makes itself.
 1. **The idea** — in plain words, with an analogy you can hold on to.
 2. **Big-O** — time *and* space, because they always ask for both.
 3. **Reach for it when** — the signals in the prompt that mean "this one".
@@ -509,6 +514,17 @@ than any template here.
 
 ## Arrays & Hashing
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "count", "unique", "duplicate", "anagram", "group by", "two numbers that…", "frequency", "seen before" |
+| **Input shape** | an **unsorted** array or string, and the answer does not depend on order |
+| **Constraint tell** | **n ≤ 10⁵–10⁶** while the obvious solution is O(n²) → they are paying for memory to buy a single pass |
+| **Target complexity** | **O(n)** time · **O(n)** space |
+| **Confused with** | **Two Pointers** — ask: *do I need the original indices?* Yes → hash map (sorting destroys them). No, and it's sorted → two pointers, O(1) space |
+
+
 **The idea.** The most common trick in all of DSA: use a **hash map/set** to remember things you've
 seen, turning "compare everything with everything" (slow, O(n²)) into a single pass (fast, O(n)).
 Analogy: instead of re-reading the whole guest list for every arrival, you keep a *set* of names
@@ -629,6 +645,17 @@ contents; and reaching for a sort (O(n log n)) when a hash pass (O(n)) would do.
 
 ## Two Pointers
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "sorted array", "pair/triplet that sums to", "palindrome", "in place", "remove duplicates", "container/area" |
+| **Input shape** | a **sorted** array (or one you may sort), or a string read from both ends |
+| **Constraint tell** | **n ≤ 10⁵** with an O(1)-space requirement → sorting is allowed, a hash map is not |
+| **Target complexity** | **O(n)** after the sort, so **O(n log n)** overall · **O(1)** space |
+| **Confused with** | **Sliding Window** — ask: *are both pointers moving toward each other, or does the back one chase the front?* Converging → two pointers. Chasing → window |
+
+
 **The idea.** Walk two index "fingers" over the data — usually starting at both ends and moving
 **inward** — to collapse a slow O(n²) search into a fast O(n) one. This works only when the data is
 **sorted** (or has some ordered property), because the sortedness is what tells you *which* finger to
@@ -721,6 +748,17 @@ smallest and even paired with the largest it's too small); de-duplicating result
 equal neighbours; and accidentally mutating the input when a copy was expected.
 
 ## Sliding Window
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "longest/shortest **substring/subarray**", "contiguous", "at most k", "all distinct", "contains all of" |
+| **Input shape** | a **contiguous** run inside an array or string. **If the pieces need not be adjacent, this is not a window** — think DP or hashing |
+| **Constraint tell** | **n ≤ 10⁵–10⁶** → each index must be touched a constant number of times |
+| **Target complexity** | **O(n)** time · **O(k)** space for the window map |
+| **Confused with** | **Prefix sum + hash map** — ask: *can the values be negative?* Yes → the window breaks (shrinking no longer helps) and you need prefix sums |
+
 
 **The idea.** A "window" is a stretch `[l, r]` of the array you slide along. You **grow** it on the
 right and **shrink** it on the left, keeping a running summary (a sum, a count, a set) as you go — so
@@ -837,6 +875,17 @@ to a rule); recomputing the summary from scratch instead of nudging it as you ad
 "minimum window" flavor — grow until *good enough*, then shrink to *smallest still-good*.
 
 ## Linked List
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "reverse", "merge two lists", "nth from the end", "detect a cycle", "reorder", "palindrome list" |
+| **Input shape** | the input **is** a `ListNode` — no indices, no random access, you can only walk forward |
+| **Constraint tell** | usually **O(1) extra space** stated outright — that phrase is the whole hint. It bans copying into an array |
+| **Target complexity** | **O(n)** time · **O(1)** space |
+| **Confused with** | **Two Pointers** — same fast/slow idea, different data structure. On a list you also have to *rewire* `next` pointers, which is where the bugs live |
+
 
 **The idea.** It's all **pointer surgery** — rewiring the `.next` arrows from §0. Three tools cover
 most problems: a **dummy head** (a fake node before the real first one, so you never special-case the
@@ -1000,6 +1049,17 @@ merge) for reorder/palindrome problems.
 
 ## Stack
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "valid parentheses", "matching", "nesting", "evaluate expression", "undo", "innermost", "decode string" |
+| **Input shape** | **pairs that must nest** — brackets, tags, open/close — or an expression in postfix form |
+| **Constraint tell** | **n ≤ 10⁵–10⁶** → one linear pass, each element pushed and popped at most once |
+| **Target complexity** | **O(n)** time · **O(n)** space |
+| **Confused with** | **Monotonic Stack** — ask: *am I matching pairs, or comparing sizes?* Matching → plain stack. "Next greater/smaller" → monotonic |
+
+
 **The idea.** A **stack** (pile of plates, LIFO) holds things whose turn hasn't come yet — the top is
 always "what to handle next". It's perfect for **nesting** (brackets, tags) because the most recent
 opener is the first you must close. A **monotonic** stack (kept sorted) answers "next greater/smaller
@@ -1067,6 +1127,17 @@ decreasing); and adding a fake final element ("sentinel") to flush anything stil
 (Largest Rectangle).
 
 ## Monotonic Stack & Queue
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "next greater/smaller element", "days until warmer", "largest rectangle", "span", "max of every window", "remove k digits" |
+| **Input shape** | for **each** element you need the nearest one on a side that beats it — the brute force is a nested loop |
+| **Constraint tell** | **n ≤ 10⁵+** while the naive answer is O(n²) → they want amortised linear |
+| **Target complexity** | **O(n)** amortised · **O(n)** space |
+| **Confused with** | **Heap** — ask: *do old elements ever become relevant again?* No, they can be discarded forever → monotonic. Yes → heap |
+
 
 **The idea.** Keep a stack or **deque** *sorted* by throwing out every element the newcomer beats.
 Because each element enters and leaves at most once, "for every element, find the next bigger/smaller"
@@ -1146,6 +1217,17 @@ Subarray Minimums needs strict on one side, non-strict on the other, or equal va
 store *indices* whenever age/position matters; and remember popped elements can carry info out with them.
 
 ## Binary Search
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "sorted", "first/last position", "rotated sorted array", "**minimum** X such that…", "**maximum** capacity/speed so that…" |
+| **Input shape** | either a sorted array, or a **monotone yes/no answer space** — once a candidate works, every larger one works too |
+| **Constraint tell** | **n ≤ 10⁹ or larger**, or a huge value range with a small array → the `log` is the only thing that fits. Also: n ≤ 10⁵ with an O(n) *check* inside → O(n log n) total |
+| **Target complexity** | **O(log n)** · **O(1)** space — × the cost of the feasibility check when searching the answer |
+| **Confused with** | **Two Pointers** — ask: *am I searching a value, or scanning a range?* Halving a search space → binary search |
+
 
 **The idea.** Repeatedly cut the search space in **half**. On a sorted array you check the middle and
 throw away the wrong half — 1,000,000 items → ~20 checks. The powerful twist: it works on any
@@ -1335,6 +1417,17 @@ range. That pairing is load-bearing — `l < r` with `r = m` terminates, `l <= r
 
 ## Recursion & Backtracking
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "return **all**", "generate **every**", "all combinations/permutations/subsets", "n-queens", "word search", "partition into" |
+| **Input shape** | you must **list the possibilities**, not count them. The output is an array of arrays |
+| **Constraint tell** | **n ≤ 10–20.** Such a tiny bound has only one explanation: the answer is exponential and that is intended |
+| **Target complexity** | **O(2ⁿ)** subsets · **O(n!)** permutations · **O(n)** recursion depth |
+| **Confused with** | **Dynamic Programming** — ask: *do I need every answer, or just the best/the count?* Every → backtracking. Best or count → DP |
+
+
 **The idea.** Build an answer one choice at a time: **choose → recurse → un-choose** (that undo is the
 "backtrack"). You're walking a tree of possibilities, abandoning any branch that can't lead to a valid
 answer. Analogy: exploring a maze — take a turn, and if it dead-ends, walk back and try the next turn.
@@ -1516,6 +1609,17 @@ de-duplicating with "sort, then skip equal siblings at the same depth"; and rest
 
 ## Sorting & Selection
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "k-th largest/smallest", "median", "sort by", "custom order", "values are between 1 and n" |
+| **Input shape** | order itself is the tool — either the answer needs it, or sorting unlocks two-pointers or a greedy sweep |
+| **Constraint tell** | **n ≤ 10⁵** → O(n log n) is affordable and probably intended. **Small integer values** → counting sort, and complexity moves from `n` to the value range |
+| **Target complexity** | **O(n log n)** comparison sort · **O(n)** average for quickselect · **O(n + k)** counting sort |
+| **Confused with** | **Heap** — ask: *do I need the k-th element, or the whole order?* Just k-th → quickselect O(n) beats a full sort |
+
+
 **The idea.** You'll rarely be asked to *implement* a sort — but you're constantly asked to reason
 about one, and three of them appear inside other answers often enough to be worth knowing cold.
 Sorting is also the cheapest way to *unlock* a pattern: sorted input turns hashing into two pointers,
@@ -1612,6 +1716,17 @@ place** and returns the same array, which surprises callers who still needed the
 
 
 ## Trees
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "binary tree", "BST", "depth/height", "root-to-leaf path", "symmetric", "lowest common ancestor", "validate" |
+| **Input shape** | a `TreeNode` root. **BST** in the prompt is a strong extra hint — it means sorted order is available for free |
+| **Constraint tell** | **n ≤ 10⁴–10⁵** → one visit per node. If recursion depth could reach 10⁵, they want iteration |
+| **Target complexity** | **O(n)** time · **O(h)** space, `h` = height — O(log n) balanced, **O(n) worst case** |
+| **Confused with** | **BFS vs DFS** — ask: *does the answer care about levels?* "Level by level", "right side view" → BFS. Path, depth, subtree → DFS |
+
 
 **The idea.** A tree is a hierarchy, and the natural way to work on it is **recursion**: solve a node
 using its children's answers. Analogy: to count everyone under you in a company org chart, ask each
@@ -1768,6 +1883,17 @@ level by level: `1`, then `2, 3`, then `4, 5`.
 
 ## DFS (Depth-First Search)
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "flood fill", "island/region", "can you reach", "does a path exist", "all paths", "connected component" |
+| **Input shape** | a grid or graph where you need **existence or structure**, not distance |
+| **Constraint tell** | **rows × cols ≤ 10⁶**, or V + E ≤ 10⁵–10⁶ → every cell/edge visited once |
+| **Target complexity** | **O(V + E)** time · **O(depth)** space for the stack |
+| **Confused with** | **BFS** — ask: *do I need the SHORTEST path?* Yes → BFS. DFS finds *a* path, and it is usually not the shortest |
+
+
 **The idea.** "Go as deep as you can, then back up and try the next branch." The recursion (or an
 explicit stack) *is* your to-do list. Crucial habit: mark a spot **visited before** you descend, so you
 never loop back onto it. Analogy: exploring a cave system by always taking the next unexplored tunnel,
@@ -1845,6 +1971,17 @@ the visited-marker but forgetting to restore it when the caller still needs the 
 backtracking mark-and-restore); and the DFS/BFS choice: "any path" = DFS, "shortest path" = BFS.
 
 ## BFS (Breadth-First Search)
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "**shortest** path", "**fewest** steps/moves/mutations/turns", "minimum operations", "nearest X for every cell", "level order" |
+| **Input shape** | a graph with **equal-cost edges**. The states may be invisible — words, lock combinations, gene strings are all "a state plus one-step moves" |
+| **Constraint tell** | **V + E ≤ 10⁵–10⁶**, or a grid up to ~10⁶ cells |
+| **Target complexity** | **O(V + E)** time · **O(V)** space for the widest ring |
+| **Confused with** | **Dijkstra** — ask: *do all moves cost the same?* Yes → BFS. Different weights → Dijkstra with a heap. Using BFS on a weighted graph is a classic wrong answer |
+
 
 **The idea.** Explore in **rings** using a queue (FIFO): everything 1 step away, then everything 2 steps
 away, and so on. Because you reach nearer things first, **the first time BFS hits a target, it's via a
@@ -1926,6 +2063,17 @@ leaf".
 
 ## Tries
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "starts with", "prefix", "autocomplete", "dictionary", "word search II", "maximum XOR pair" |
+| **Input shape** | **many** strings queried against **many** prefixes. One string against one pattern does not need a trie |
+| **Constraint tell** | total characters ≤ ~10⁶, and the naive answer is words × queries |
+| **Target complexity** | build **O(total chars)** · query **O(query length)** · space **O(total chars)** |
+| **Confused with** | **Hash set** — ask: *do I need whole-word lookup, or prefixes?* Whole words only → a `Set` is simpler and faster. Prefixes → trie |
+
+
 **The idea.** A **trie** ("try", a prefix tree) is a tree with one node per *prefix*: each node points
 to children by letter, plus a flag "a word ends here". All words sharing a prefix share one path, so
 "does anything start with `pre`?" costs O(length of `pre`), *no matter how many words* are stored.
@@ -1964,6 +2112,17 @@ line apart); and when searching a grid for many words (Word Search II), carry th
 the recursion so a missing child prunes an entire branch instantly.
 
 ## Strings & Pattern Matching
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "find the pattern in the text", "count occurrences", "repeated substring", "shortest palindrome", "period" |
+| **Input shape** | one long text, one pattern, and you must not re-scan characters |
+| **Constraint tell** | **|text| ≤ 10⁵–10⁶** where naive O(n·m) would be 10¹⁰ → they want linear |
+| **Target complexity** | **O(n + m)** with KMP or Z-function · **O(m)** space |
+| **Confused with** | **Sliding Window** — ask: *is the target a fixed known string, or a property (all distinct, at most k)?* Fixed string → KMP. Property → window |
+
 
 **The idea.** Most "string problems" are really array problems wearing a costume — anagram counting
 is hashing, palindromes are two pointers, longest-substring is a sliding window. What's genuinely
@@ -2025,6 +2184,17 @@ points while `str[i]` indexes code *units*.
 
 
 ## Heaps and Priority Queues
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "k largest/smallest/closest/most frequent", "**median** of a stream", "merge k sorted lists", "cheapest next", "schedule by priority" |
+| **Input shape** | you repeatedly need **the current extreme** from a set that keeps changing |
+| **Constraint tell** | **n ≤ 10⁵–10⁶ with k ≪ n** → O(n log k) beats sorting everything. A *stream* also rules out sorting |
+| **Target complexity** | push/pop **O(log n)** · peek **O(1)** · top-k **O(n log k)** time, **O(k)** space |
+| **Confused with** | **Sorting** — ask: *is the data arriving over time, or all present?* Streaming → heap. All present and you need only the k-th → quickselect |
+
 
 **The idea.** A **heap** is the "magic bucket" from §0: it always gives you the smallest (min-heap) or
 largest (max-heap) item next, in O(log n), while items keep arriving. It's *the* tool for "I keep
@@ -2129,6 +2299,17 @@ the trade-off out loud in interviews); and remembering heap-order only relates p
 siblings.
 
 ## Graphs
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "islands/regions", "prerequisites", "dependencies", "course schedule", "network/connections", "are these in the same group" |
+| **Input shape** | explicit nodes and edges, an adjacency list, or a grid you treat as a graph |
+| **Constraint tell** | **V + E ≤ 10⁵–10⁶** → linear traversal. Repeated "same group?" queries → Union-Find, near-O(1) each |
+| **Target complexity** | **O(V + E)** traversal · **O(V)** space · Union-Find **O(α(n))** ≈ O(1) per operation |
+| **Confused with** | **Topological sort vs cycle detection** — both walk a DAG. Ask: *do I need an ORDER, or just "is it possible"?* Order → topological sort. Possible → cycle detection |
+
 
 **The idea.** Nodes joined by edges, explored with **DFS** (deep) or **BFS** (in rings). Remember from
 §0: a **grid is a graph** (each cell linked to its 4 neighbours), and a tree is a graph too. One special
@@ -2378,6 +2559,17 @@ extra "in-progress vs done" colouring needed to detect cycles in a *directed* gr
 
 ## Intervals
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "overlapping", "merge intervals", "meeting rooms", "insert interval", "non-overlapping", "[start, end]" |
+| **Input shape** | the input is literally an array of `[start, end]` pairs |
+| **Constraint tell** | **n ≤ 10⁵** → the sort dominates and is intended |
+| **Target complexity** | **O(n log n)** time (the sort) · **O(n)** space |
+| **Confused with** | **Greedy** — they overlap. Sorting by *end* time and taking greedily is the standard "remove fewest to de-overlap" answer. Sort by **start** to merge, by **end** to schedule |
+
+
 **The idea.** Given `[start, end]` ranges, **sort them by one endpoint, then sweep through once** —
 merging overlaps or counting how many are active. The sort is the magic: once ranges are in order, a
 single left-to-right pass is correct. Analogy: merging overlapping calendar events by lining them up by
@@ -2462,6 +2654,17 @@ and ends, then sweep) which is secretly a heap.
 
 ## Greedy
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "minimum number of", "maximum you can", "can you reach", "gas station", "jump game", "assign/schedule" |
+| **Input shape** | there is an obvious **best next move**, and taking it never blocks a better future |
+| **Constraint tell** | **n ≤ 10⁵–10⁶** with a DP that would be O(n²) → the setter expects the shortcut |
+| **Target complexity** | **O(n)**, or **O(n log n)** if a sort sets up the order · **O(1)** space |
+| **Confused with** | **Dynamic Programming** — ask: *can I build a small counter-example where the greedy choice loses?* If yes, it is DP. If you can argue an **exchange argument** (swapping in the greedy choice never makes the result worse), greedy is safe |
+
+
 **The idea.** At each step, grab the choice that looks best *right now* and never look back. Fast and
 simple — **when** the greedy choice is provably safe. The whole difficulty is the proof (or finding the
 counter-example that says "no, you need DP"). Analogy: filling a bag by always adding the highest
@@ -2489,6 +2692,17 @@ grabs 4+1+1 = 3 coins, but the best is 3+3 = 2 coins. Always sanity-check with a
 frequent need to sort first to expose the safe order.
 
 ## Bit Manipulation
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "appears once, the rest twice", "count set bits", "without using + or -", "**O(1) extra space**", "subsets of at most 32/26 items" |
+| **Input shape** | numbers treated as bit-strings, or a **small universe** (≤ 32 items, 26 letters) packed into one integer |
+| **Constraint tell** | **n ≤ 20-ish → think in bits.** Nothing else explains such a tiny bound. This is the strongest single signal in the whole table |
+| **Target complexity** | **O(1)** per operation · **O(32)** = O(1) for a bit loop · **O(2ⁿ · n)** for bitmask DP |
+| **Confused with** | **Hash map** — ask: *is O(1) extra space demanded?* Yes → XOR tricks. Otherwise a map is clearer and just as fast |
+
 
 **The idea.** A number is secretly **32 on/off switches** (bits). Three tricks do most of the work: XOR
 cancels pairs (`x ^ x = 0`), `n & (n - 1)` erases the lowest "on" switch, and `1 << i` flips switch `i`
@@ -2534,6 +2748,17 @@ arithmetically (`res * 2 + bit`). Elements appearing in *triples* defeat plain X
 bit-counting trick.
 
 ## Dynamic Programming
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "**number of ways**", "**minimum/maximum** cost/length", "**can** it be done", "longest subsequence", "take it or leave it" |
+| **Input shape** | overlapping subproblems — the same smaller question is asked many times — and choices that pile up |
+| **Constraint tell** | **n ≤ 5,000 → O(n²) is INTENDED**, not a fallback. Do not burn 20 minutes hunting an O(n log n) trick. **n ≤ 20** → bitmask DP |
+| **Target complexity** | **states × work-per-state** — 1-D → O(n) · 2-D grid → O(n²) · bitmask → O(2ⁿ · n) |
+| **Confused with** | **Backtracking** — ask: *do I need to LIST the answers or COUNT/optimise them?* List → backtracking. Count or best → DP. Also **Greedy**: if a counter-example exists, it is DP |
+
 
 **The idea.** **DP** = solve a big problem by combining answers to smaller overlapping subproblems, and
 **never solve the same subproblem twice** (that's the whole win). It applies when the problem has
@@ -2741,6 +2966,17 @@ state; collapse the memory when only the last few states matter.
 
 ## Math & Geometry
 
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "digits", "primes", "powers", "modulo 10⁹+7", "rotate the matrix", "spiral", "points on a line", "overflow" |
+| **Input shape** | the problem is about number properties or a grid walked in a fixed geometric pattern |
+| **Constraint tell** | **n ≤ 10⁹ or 10¹⁸** with no array → a closed-form formula or O(log n) fast power. "Modulo 10⁹+7" always means the answer is astronomically large |
+| **Target complexity** | digit loop **O(log₁₀ n)** · sieve **O(n log log n)** · fast power **O(log n)** |
+| **Confused with** | **Simulation** — before you simulate, ask what the process **secretly counts**. Bulb Switcher secretly counts divisors, so the answer is `floor(sqrt(n))` — one line, no loop |
+
+
 **The idea.** Less a single template, more a toolbox: the **digit loop** (`n % 10` peels off the last
 digit, `n / 10 | 0` drops it), sieve-style batch precomputation of primes, **fast exponentiation**
 (squaring to compute `x^p` in O(log p)), careful matrix walking with shrinking boundaries, and
@@ -2842,6 +3078,17 @@ sizes, but performing the check is still your job); in-place matrix edits needin
 fractions with gcd and normalize the sign instead.
 
 ## Game Theory & Brain Teasers
+
+### 🔍 Recognise it
+
+| | |
+|---|---|
+| **Trigger words** | "**both play optimally**", "who wins", "can the first player force a win", "Nim", "stones/coins taken in turns" |
+| **Input shape** | two players alternating, or a puzzle that smells like it has a slick one-line answer |
+| **Constraint tell** | **n ≤ 20** → bitmask over states. **n up to 10⁹** → there is a formula, find the invariant |
+| **Target complexity** | state-space DP **O(states × moves)** · bitmask games **O(2ⁿ · n)** · invariant answers **O(1)** |
+| **Confused with** | **DP** — game theory *is* DP over states, with the twist that you **minimise the opponent's best reply**. If n is huge, stop coding and hunt for the pattern by hand on n = 1, 2, 3, 4 |
+
 
 **The idea.** Two smart players take turns. Label each position **winning** (some move hands the
 opponent a *losing* position) or **losing** (every move hands them a *winning* one), and compute that

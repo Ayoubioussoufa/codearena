@@ -8,12 +8,15 @@ import {
 } from '../passwordhasher/ports/password-hasher.port';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
+import { RefreshTokenService } from './refresh-token.service';
+import { RefreshDto } from '../http/dto/refresh.dto';
 
 @Injectable()
 export class AuthService {
   private readonly dummyHash: Promise<string>;
   constructor(
     private readonly users: UsersService,
+    private readonly refreshTokenService: RefreshTokenService,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly jwt: JwtService,
   ) {
@@ -38,8 +41,10 @@ export class AuthService {
     if (!user || !result)
       throw new UnauthorizedException('Invalid email or password');
 
-    return {
-      accessToken: await this.jwt.signAsync({ sub: user.id, role: user.role }),
-    };
+    return this.refreshTokenService.issueForLogin(user.id, user.role);
+  }
+
+  async refresh(dto: RefreshDto) {
+    return this.refreshTokenService.rotate(dto.refreshToken);
   }
 }

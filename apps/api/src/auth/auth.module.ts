@@ -7,12 +7,20 @@ import { AuthService } from './application/auth.service';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env.schema';
+import { RefreshTokenService } from './application/refresh-token.service';
+import { PrismaRefreshTokenRepository } from './adapters/prisma-refresh-token.repository';
+import { REFRESH_TOKEN_REPOSITORY } from './ports/refresh-token.repository';
 
 @Module({
   controllers: [AuthController],
   providers: [
     AuthService,
     { provide: PASSWORD_HASHER, useClass: Argon2Hasher },
+    RefreshTokenService,
+    {
+      provide: REFRESH_TOKEN_REPOSITORY,
+      useClass: PrismaRefreshTokenRepository,
+    },
   ],
   imports: [
     UsersModule,

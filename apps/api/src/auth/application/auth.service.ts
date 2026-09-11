@@ -9,7 +9,6 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import { RefreshTokenService } from './refresh-token.service';
-import { RefreshDto } from '../http/dto/refresh.dto';
 
 @Injectable()
 export class AuthService {
@@ -44,7 +43,13 @@ export class AuthService {
     return this.refreshTokenService.issueForLogin(user.id, user.role);
   }
 
-  async refresh(dto: RefreshDto) {
-    return this.refreshTokenService.rotate(dto.refreshToken);
+  async refresh(refreshToken: string | undefined) {
+    if (!refreshToken) throw new UnauthorizedException();
+    return this.refreshTokenService.rotate(refreshToken);
+  }
+
+  async logout(token: string | undefined): Promise<void> {
+    if (!token) return;
+    await this.refreshTokenService.revokeSession(token);
   }
 }

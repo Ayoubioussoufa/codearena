@@ -9,12 +9,14 @@
   "packageManager": "pnpm@10.25.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "sharp",
-      "unrs-resolver",
-      "prisma",
+      "@nestjs/core",
       "@prisma/client",
       "@prisma/engines",
-      "@nestjs/core"
+      "argon2",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
     ]
   },
   "scripts": {

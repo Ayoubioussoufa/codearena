@@ -18,10 +18,10 @@
  * controls "combine" for free and never reset each other.
  * ─────────────────────────────────────────────────────────────────────────
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { getProblems } from "@/lib/api";
-import type { Difficulty, Problem } from "@/lib/types";
+import { useProblems } from "@/hooks/use-problems";
+import type { Difficulty } from "@/lib/types";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 
 type DifficultyFilter = "All" | Difficulty;
@@ -36,10 +36,11 @@ const SORTS: { key: SortKey; label: string }[] = [
 ];
 
 export default function ProblemsPage() {
-  // 👉 REVIEW: `undefined` is the loading signal — no separate `loading`
-  // boolean needed. One source of truth (your guide, section 8). Before the
-  // fetch resolves, `problems` is undefined and we render a skeleton.
-  const [problems, setProblems] = useState<Problem[]>();
+  // 👉 REVIEW: this replaced useState + useEffect + an unmount guard. The
+  // cache is shared, so navigating away and back is a HIT, not a refetch —
+  // watch it happen in the Devtools panel. `data` is undefined while loading,
+  // exactly like the old state, so the skeleton below is unchanged.
+  const { data: problems, isError } = useProblems();
 
   // One state per control. They're independent, so they naturally combine.
   const [search, setSearch] = useState("");
@@ -47,18 +48,9 @@ export default function ProblemsPage() {
   const [tag, setTag] = useState<string | null>(null); // selected algorithm/topic
   const [sort, setSort] = useState<SortKey>("id");
 
-  // 👉 REVIEW: the unmount guard. getProblems() resolves after ~700 ms; if the
-  // user navigates away first, `alive` stops us from setting state on a gone
-  // component (and, once you add deps, from letting a stale response win).
-  useEffect(() => {
-    let alive = true;
-    getProblems().then((data) => {
-      if (alive) setProblems(data);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // 👉 REVIEW: no unmount guard needed any more. TanStack owns the request
+  // lifecycle, so a response arriving after you navigate away updates the
+  // cache rather than a dead component.
 
   // 👉 REVIEW: derive the topic list from the DATA, not a hardcoded array.
   // Add problems (or dojo categories) and these counts update themselves —
@@ -92,16 +84,21 @@ export default function ProblemsPage() {
       });
   }, [problems, search, difficulty, tag, sort]);
 
-  const loading = problems === undefined;
+  // With a cache there are now three states, not two: loading, failed, loaded.
+  // The old code could not distinguish "still fetching" from "the request
+  // died" — both left `problems` undefined forever.
+  const loading = problems === undefined && !isError;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Problems</h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          {loading
-            ? "Loading the problem set…"
-            : `${problems.length} problems · ${visible.length} shown`}
+          {isError
+            ? "Could not reach the API."
+            : loading
+              ? "Loading the problem set…"
+              : `${problems?.length ?? 0} problems · ${visible.length} shown`}
         </p>
       </header>
 

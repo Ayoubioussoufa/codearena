@@ -7,13 +7,14 @@
  * The markup, styling, and the <FieldError>/<FormBanner> helpers below are
  * complete — your work is purely the state and event logic.
  *
- * Useful pieces already available:
- *   - authenticate(mode, { email, password, username }) from "@/lib/api"
- *   - useRouter from "next/navigation" for the post-success redirect
+ * Now wired to the REAL API through useLogin/useRegister (TanStack mutations).
+ * The refresh token never appears here — it arrives as an httpOnly cookie the
+ * browser stores and sends on its own; only the access token comes back in the
+ * body, and it goes into memory. See docs/adr/004-*.md
  */
 'use client';
 
-import { authenticate } from '@/lib/api';
+import { useLogin, useRegister } from '@/hooks/use-auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -44,9 +45,14 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ── #2 per-field errors: ONE object, key per field (empty = no error) ──
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  // ── #3 form-level state: API rejection banner + pending flag ──
+  // ── #3 form-level state: API rejection banner ──
   const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  // The mutation owns the pending flag now — no hand-rolled `submitting`
+  // boolean, and no try/finally to remember to reset it.
+  const login = useLogin();
+  const register = useRegister();
+  const submitting = login.isPending || register.isPending;
 
   // Clear one field's error as the user fixes it (updater form + spread so the
   // other fields' errors survive). Returns a change handler for that field.
@@ -66,8 +72,12 @@ export function AuthForm({ mode }: AuthFormProps) {
     // #2 — run EVERY rule (no early return), collecting failures per field.
     const next: FieldErrors = {};
     if (!EMAIL_RE.test(email)) next.email = 'Enter a valid email address.';
-    if (password.length < 8)
-      next.password = 'Password must be at least 8 characters.';
+    // Matches RegisterDto's @MinLength(12). Client validation must not be
+    // LOOSER than the server's, or the user gets a 400 they can't explain.
+    if (isRegister && password.length < 12)
+      next.password = 'Password must be at least 12 characters.';
+    if (!isRegister && password.length === 0)
+      next.password = 'Enter your password.';
     if (isRegister) {
       if (username.length < 3 || username.length > 20)
         next.username = 'Username must be 3–20 characters.';
@@ -80,23 +90,18 @@ export function AuthForm({ mode }: AuthFormProps) {
     // Any key present → at least one field failed → stop before the network.
     if (Object.keys(next).length > 0) return;
 
-    // #3 — call the fake API with a loading + error + redirect path.
-    setSubmitting(true);
+    // #3 — the real API. Register then log in, so a new user lands signed in.
     try {
-      await authenticate(mode, {
-        email,
-        password,
-        // username is register-only; leave it off for login.
-        ...(isRegister ? { username } : {}),
-      });
+      if (isRegister) {
+        await register.mutateAsync({ email, username, password });
+      }
+      await login.mutateAsync({ email, password });
       router.push('/problems');
     } catch (err) {
-      // authenticate rejects with a user-safe message (see lib/api.ts).
-      setFormError(
-        err instanceof Error ? err.message : 'Something went wrong.',
-      );
-    } finally {
-      setSubmitting(false);
+      // The API returns one message for every credential failure on purpose —
+      // telling the user WHICH half was wrong would tell an attacker which
+      // emails are registered. Show it as-is.
+      setFormError(err instanceof Error ? err.message : 'Something went wrong.');
     }
   }
 

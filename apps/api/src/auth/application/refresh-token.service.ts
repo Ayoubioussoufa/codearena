@@ -136,4 +136,11 @@ export class RefreshTokenService {
     await this.tokens.revoke(row.id);
     return this.issue(row.userId, user.role, row.family);
   }
+
+  async revokeSession(token: string): Promise<void> {
+    const row = await this.tokens.findByHash(this.hash(token));
+    if (row) {
+      await this.tokens.revokeFamily(row.family);
+    }
+  }
 }

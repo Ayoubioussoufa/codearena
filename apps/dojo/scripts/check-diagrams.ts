@@ -12,6 +12,7 @@ const GUIDE_DIRS = [
   path.join(REPO_ROOT, "apps/dojo/content/supplements"),
   path.join(REPO_ROOT, "apps/dojo/content/dsa"),
   path.join(REPO_ROOT, "docs"),
+  REPO_ROOT, // root-level plans and workbooks (WEEK-*.md, NESTJS-REVISION.md)
 ];
 
 const KNOWN_TYPES =

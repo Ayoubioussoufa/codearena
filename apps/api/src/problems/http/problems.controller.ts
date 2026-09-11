@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ProblemsService } from '../application/problems.service';
 import { ListProblemsDto } from './list-problems.dto';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../../common/decorators/public.decorator';
 
 const DISPLAY: Record<string, string> = {
   EASY: 'Easy',
@@ -8,6 +10,8 @@ const DISPLAY: Record<string, string> = {
   HARD: 'Hard',
 };
 
+@SkipThrottle()
+@Public()
 @Controller('problems')
 export class ProblemsController {
   constructor(private readonly problems: ProblemsService) {}

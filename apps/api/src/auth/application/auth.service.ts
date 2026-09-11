@@ -6,7 +6,6 @@ import {
   PASSWORD_HASHER,
   type PasswordHasher,
 } from '../passwordhasher/ports/password-hasher.port';
-import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -17,7 +16,6 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly refreshTokenService: RefreshTokenService,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
-    private readonly jwt: JwtService,
   ) {
     this.dummyHash = this.hasher.hash(randomBytes(32).toString('hex'));
   }

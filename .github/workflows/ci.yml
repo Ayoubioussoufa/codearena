@@ -33,6 +33,44 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm build
 
+      # Unit tests only: no database, no argon2, no Nest container. They run
+      # against fakes behind the ports, so they need nothing from this job.
+      - run: pnpm --filter api test
+
+  api-e2e:
+    name: API end-to-end
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: codearena
+          POSTGRES_PASSWORD: codearena
+          POSTGRES_DB: codearena
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://codearena:codearena@localhost:5432/codearena?schema=public
+      JWT_SECRET: ci-only-secret-at-least-32-characters-long
+      JWT_ACCESS_TTL: '900'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter api exec prisma migrate deploy
+      - run: pnpm --filter api exec prisma generate
+      # The suite that proves rotation and reuse detection against a real
+      # database. The script itself passes --runInBand: the suites share one
+      # Postgres, so parallel workers would race on the same rows.
+      - run: pnpm --filter api test:e2e
+
   dojo-content:
     name: Dojo content checks
     runs-on: ubuntu-latest

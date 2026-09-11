@@ -1,10 +1,13 @@
 /**
- * src/lib/api.ts — fake async API (simulated latency + failure cases)
- * TODOs: none — fully implemented scaffold.
+ * src/lib/api.ts — what is still MOCKED, and nothing else.
  *
- * Every function returns a Promise that resolves after a realistic delay, so
- * loading states are actually visible. Swap these for real fetch() calls to
- * the NestJS API (NEXT_PUBLIC_API_URL) in a later phase.
+ * Problems and auth have moved to real endpoints:
+ *   - src/hooks/use-problems.ts   (client, cached by TanStack Query)
+ *   - src/lib/server-api.ts       (server components)
+ *   - src/hooks/use-auth.ts       (login / register / logout)
+ *
+ * Everything left below has no endpoint yet. Each function is deleted the week
+ * its real route lands; when this file is empty, delete the file.
  *
  * Deliberate failure triggers (for practising error states):
  *   - authenticate("login", …)    rejects when the password is  "wrongpass"
@@ -16,7 +19,6 @@
 
 import { CONTESTS, CURRENT_USER, LEADERBOARD_ENTRIES } from "./data";
 import type {
-  AuthUser,
   Contest,
   Language,
   LeaderboardEntry,
@@ -26,43 +28,9 @@ import type {
   UserProfile,
 } from "./types";
 
-type ProblemsResponse = {
-  items: Problem[];
-  nextCursor: number | null;
-};
-
+/** Simulated latency, so loading states stay visible while these are mocks. */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** All problems. ~700 ms latency — design a loading state for it. */
-export async function getProblems(): Promise<Problem[]> {
-  let cursor: number | null = null;
-  const all: Problem[] = [];
-  const base = `${process.env.NEXT_PUBLIC_API_URL}/problems?limit=100`;
-  do {
-    const url: string = cursor === null ? base : `${base}&cursor=${cursor}`
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const { items, nextCursor }: ProblemsResponse = await res.json();
-    all.push(...items);
-    cursor = nextCursor;
-  } while (cursor !== null)
-
-  return all;
-}
-
-/** One problem by slug, or null when it doesn't exist. ~400 ms latency. */
-export async function getProblem(slug: string): Promise<Problem | null> {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/problems/${slug}`,
-  );
-  if (!res.ok) {
-    if (res.status === 404) return null;
-    throw new Error(`API ${res.status}`);
-  }
-  const body: Problem = await res.json();
-  return body;
 }
 
 /** Leaderboard entries in arbitrary order. ~600 ms latency. */
@@ -78,36 +46,6 @@ export interface AuthInput {
   username?: string;
 }
 
-/**
- * Fake auth endpoint (~900 ms). Resolves with the signed-in user.
- * Rejects with an Error whose .message is safe to show to the user:
- *   - login    + password "wrongpass"          → "Invalid email or password."
- *   - register + email "taken@codearena.dev"   → "An account with this email already exists."
- */
-export async function authenticate(
-  mode: "login" | "register",
-  input: AuthInput,
-): Promise<AuthUser> {
-  await delay(900);
-  if (mode === "login" && input.password === "wrongpass") {
-    throw new Error("Invalid email or password.");
-  }
-  if (mode === "register" && input.email === "taken@codearena.dev") {
-    throw new Error("An account with this email already exists.");
-  }
-  return {
-    id: "u_" + Math.random().toString(36).slice(2, 10),
-    username: input.username ?? input.email.split("@")[0] ?? "coder",
-    email: input.email,
-  };
-}
-
-/**
- * Mock judge (~1.1 s). Not a real interpreter — it only simulates outcomes:
- *   - empty / whitespace-only code      → status "error"
- *   - code containing "return"/"print"  → all example tests pass
- *   - anything else                     → last test fails
- */
 export async function runCode(
   problem: Problem,
   language: Language,

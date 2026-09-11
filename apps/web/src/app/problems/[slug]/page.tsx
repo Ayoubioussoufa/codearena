@@ -6,7 +6,7 @@
  * Note the Next 16 convention: `params` is a Promise and must be awaited.
  */
 import { notFound } from "next/navigation";
-import { getProblem } from "@/lib/api";
+import { getProblem } from "@/lib/server-api";
 import { ProblemWorkspace } from "@/components/workspace/ProblemWorkspace";
 
 interface ProblemPageProps {

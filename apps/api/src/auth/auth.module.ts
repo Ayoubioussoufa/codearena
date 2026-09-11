@@ -34,5 +34,6 @@ import { REFRESH_TOKEN_REPOSITORY } from './ports/refresh-token.repository';
       }),
     }),
   ],
+  exports: [JwtModule],
 })
 export class AuthModule {}

@@ -25,6 +25,14 @@ export default tseslint.config(
     },
   },
   {
+    // `expect(fake.method)` hands Jest a reference it inspects, never calls,
+    // so unbound-method is a false positive throughout the test suites.
+    files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',

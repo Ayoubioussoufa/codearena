@@ -70,6 +70,7 @@ export type User = {
     prompt:
       "Write an `Email` value object. It has no id — two emails with the same text ARE the same email. Construction must fail for anything without an `@`, and the stored value must be lowercased. Use a factory function, not a bare type alias.",
     language: "typescript",
+    given: `// Nothing is in scope. domain/ imports nothing, by design.`,
     starter: `// domain/email.value.ts
 
 export class Email {
@@ -118,8 +119,9 @@ export class Email {
     prompt:
       "Define the port your application layer uses to reach users: an interface with `findById` and `create`, plus the injection token. Nothing here may mention Prisma, SQL or any database.",
     language: "typescript",
+    given: `import type { User } from '../domain/user.entity';
+// User = { id, email, username, role }`,
     starter: `// ports/users.repository.ts
-import type { User } from '../domain/user.entity';
 
 export interface UsersRepository {
   // TODO: findById — returns the user, or null when absent
@@ -129,7 +131,6 @@ export interface UsersRepository {
 // TODO: the DI token
 `,
     solution: `// ports/users.repository.ts
-import type { User } from '../domain/user.entity';
 
 export type CreateUserInput = Omit<User, 'id' | 'role'> & {
   passwordHash: string;
@@ -170,10 +171,13 @@ export const USERS_REPOSITORY = Symbol('UsersRepository');
     prompt:
       "This adapter compiles and is wrong. Fix `findById` so the database row can never escape into the rest of the app — and so adding a column to the table cannot silently widen your API.",
     language: "typescript",
-    starter: `// adapters/prisma-users.repository.ts
-import { Injectable } from '@nestjs/common';
+    given: `import { Injectable } from '@nestjs/common';
 import type { User } from '../domain/user.entity';
 import type { UsersRepository } from '../ports/users.repository';
+
+// the row Prisma hands back has EVERY column:
+// { id, email, username, role, passwordHash, createdAt, updatedAt, ... }`,
+    starter: `// adapters/prisma-users.repository.ts
 
 @Injectable()
 export class PrismaUsersRepository implements UsersRepository {
@@ -187,9 +191,6 @@ export class PrismaUsersRepository implements UsersRepository {
 }
 `,
     solution: `// adapters/prisma-users.repository.ts
-import { Injectable } from '@nestjs/common';
-import type { User } from '../domain/user.entity';
-import type { UsersRepository } from '../ports/users.repository';
 
 @Injectable()
 export class PrismaUsersRepository implements UsersRepository {
@@ -292,17 +293,20 @@ export class UsersService {
     prompt:
       "Write an in-memory `UsersRepository` for tests. Same port, no database. It should store users in a `Map` and behave correctly for a missing id.",
     language: "typescript",
-    starter: `// test support
-import type { User } from '../domain/user.entity';
+    given: `import type { User } from '../domain/user.entity';
 import type { UsersRepository } from '../ports/users.repository';
+
+// interface UsersRepository {
+//   findById(id: string): Promise<User | null>;
+//   create(input: CreateUserInput): Promise<User>;
+// }`,
+    starter: `// test support
 
 export class InMemoryUsersRepository implements UsersRepository {
   // TODO
 }
 `,
     solution: `// test support
-import type { User } from '../domain/user.entity';
-import type { UsersRepository } from '../ports/users.repository';
 
 export class InMemoryUsersRepository implements UsersRepository {
   private readonly rows = new Map<string, User>();
@@ -350,9 +354,12 @@ export class InMemoryUsersRepository implements UsersRepository {
     prompt:
       "An `Order` must never have zero lines, and its total must always equal the sum of its lines. Write the factory so neither can be violated — including by a caller who forgets.",
     language: "typescript",
+    given: `interface Line {
+  sku: string;
+  price: number;
+  quantity: number;
+}`,
     starter: `// domain/order.entity.ts
-
-interface Line { sku: string; price: number; quantity: number; }
 
 export class Order {
   private constructor(
@@ -367,8 +374,6 @@ export class Order {
 }
 `,
     solution: `// domain/order.entity.ts
-
-interface Line { sku: string; price: number; quantity: number; }
 
 export class Order {
   private constructor(
@@ -446,6 +451,12 @@ export class InsufficientFunds extends Error {
     prompt:
       "Prisma throws `P2002` for a unique-constraint violation. Catch it in the adapter and translate it into something the application layer understands — without letting a Prisma type escape.",
     language: "typescript",
+    given: `import { Prisma } from '@prisma/client';
+import { EmailAlreadyTaken } from '../domain/errors';
+
+// Prisma.PrismaClientKnownRequestError  — has a \`.code\` string
+// 'P2002'                               — unique constraint violated
+// new EmailAlreadyTaken(email)          — your domain error`,
     starter: `async create(input: CreateUserInput): Promise<User> {
   const row = await this.prisma.user.create({ data: input });
   return { id: row.id, email: row.email, username: row.username, role: row.role };
@@ -485,6 +496,8 @@ export class InsufficientFunds extends Error {
     prompt:
       "Your service needs two writes to succeed or fail together, but it must not import Prisma to get a transaction. Define the port that gives it atomicity without naming a database.",
     language: "typescript",
+    given: `// The adapter will implement this with prisma.$transaction(...).
+// This file must not know that.`,
     starter: `// ports/unit-of-work.ts
 
 export interface UnitOfWork {
@@ -627,6 +640,8 @@ export interface ProblemsRepository {
     prompt:
       "This `catch` turns every failure into 'user not found', including a database being down. Fix it so only the case you can actually handle is handled.",
     language: "typescript",
+    given: `// this.prisma.user.findUnique(...)  — returns the row, or null
+// this.toDomain(row)                — maps a row to your User type`,
     starter: `async findByEmail(email: string): Promise<User | null> {
   try {
     const row = await this.prisma.user.findUnique({ where: { email } });
@@ -719,6 +734,11 @@ export class Rating {
     prompt:
       "This controller has business logic in it. Move everything that is not HTTP out, leaving only: take the request, call one thing, shape the response.",
     language: "typescript",
+    given: `import { Body, HttpCode, HttpStatus, Post } from '@nestjs/common';
+
+// this.orders — an OrdersService, already injected
+//   placeOrder(dto: CreateOrderDto): Promise<Order>
+//   ...which enforces the rules and does the writing`,
     starter: `@Post()
 async create(@Body() dto: CreateOrderDto) {
   if (dto.lines.length === 0) {
@@ -820,16 +840,19 @@ async create(@Body() dto: CreateOrderDto) {
     prompt:
       "You have an `argon2` adapter for the `PasswordHasher` port. Write a second adapter — a fast, obviously-insecure one for tests — implementing the same port.",
     language: "typescript",
-    starter: `// ports/password-hasher.port.ts (given)
+    given: `import type { PasswordHasher } from '../ports/password-hasher.port';
+
 // export interface PasswordHasher {
 //   hash(plain: string): Promise<string>;
 //   verify(hash: string, plain: string): Promise<boolean>;
-// }
+// }`,
+    starter: `// adapters/fake-password.hasher.ts — TEST ONLY
 
-// adapters/fake-password.hasher.ts — TEST ONLY
+export class FakePasswordHasher {
+  // TODO
+}
 `,
     solution: `// adapters/fake-password.hasher.ts — TEST ONLY
-import type { PasswordHasher } from '../ports/password-hasher.port';
 
 export class FakePasswordHasher implements PasswordHasher {
   async hash(plain: string): Promise<string> {
@@ -859,19 +882,16 @@ export class FakePasswordHasher implements PasswordHasher {
     prompt:
       "Write the module that tells the container which implementation stands behind `USERS_REPOSITORY`, and makes `UsersService` — but not the repository — available to other modules.",
     language: "typescript",
-    starter: `import { Module } from '@nestjs/common';
-
-@Module({
+    given: `import { Module } from '@nestjs/common';
+import { USERS_REPOSITORY } from './ports/users.repository';
+import { PrismaUsersRepository } from './adapters/prisma-users.repository';
+import { UsersService } from './application/users.service';`,
+    starter: `@Module({
   // TODO
 })
 export class UsersModule {}
 `,
-    solution: `import { Module } from '@nestjs/common';
-import { USERS_REPOSITORY } from './ports/users.repository';
-import { PrismaUsersRepository } from './adapters/prisma-users.repository';
-import { UsersService } from './application/users.service';
-
-@Module({
+    solution: `@Module({
   providers: [
     UsersService,
     { provide: USERS_REPOSITORY, useClass: PrismaUsersRepository },

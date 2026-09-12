@@ -67,6 +67,20 @@ export function GuideExercise({ exercise }: { exercise: Exercise }) {
         {exercise.prompt}
       </p>
 
+      {exercise.given && (
+        <details
+          open
+          className="border-b border-slate-200 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-900/40"
+        >
+          <summary className="cursor-pointer select-none px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+            Already in scope — you don&rsquo;t need to type these
+          </summary>
+          <div className="px-4 pb-3">
+            <CodeBlock code={exercise.given} language={exercise.language} />
+          </div>
+        </details>
+      )}
+
       <div className="border-b border-slate-200 dark:border-slate-700">
         <CodePracticeEditor
           value={code}

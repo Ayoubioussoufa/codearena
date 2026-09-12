@@ -17,6 +17,16 @@ everything else as it comes up.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Twelve exercises are embedded below**, at the end of the section that teaches each one.
+
+Almost every React bug is one of three things: reading a **stale value from a closure**, **storing
+what you could compute**, or reaching for an **effect where no effect is needed**. Ten of the twelve
+are repairs of exactly those.
 ## 0. The five words the rest of this guide stands on
 
 Before any rules, five plain definitions. Re-read them once; everything below leans on them.
@@ -123,6 +133,11 @@ the two ideas: *batching* decides **when** the re-render happens; the *updater f
 
 ---
 
+
+```exercise
+updater-function
+```
+
 ## 3. Effects: reaching outside React to the real world
 
 Most of your code just turns state into JSX — that stays inside React. But sometimes you must touch
@@ -178,6 +193,11 @@ cleaned up, throw this answer away." (That's the same idea a Run button needs wh
 
 ---
 
+
+```exercise
+effect-cleanup
+```
+
 ## 4. Stale closures — the classic timer bug (and what a "closure" even is)
 
 First, the missing word. A **closure** is just this: *a function remembers the variables that were
@@ -214,6 +234,11 @@ memorizing whole.
 
 ---
 
+
+```exercise
+stale-closure
+```
+
 ## 5. Keys: how React tells list items apart across renders
 
 When you render a list, React needs to match each *old* item to the corresponding *new* item so it can
@@ -238,6 +263,11 @@ the fire is silently wrong UI after a sort. (Index keys are fine *only* for a li
 reorders, filters, or has items inserted — a static list.)
 
 ---
+
+
+```exercise
+list-keys
+```
 
 ## 6. Controlled inputs: who owns the text in the box?
 
@@ -266,6 +296,11 @@ actions (`useActionState` + `<form action>`) are a modern take on this uncontrol
 > uncontrolled). Pick an owner on purpose.
 
 ---
+
+
+```exercise
+controlled-input
+```
 
 ## 7. Context: handing a value to deep children without passing it down every level
 
@@ -399,6 +434,11 @@ Three things that matter:
 
 ---
 
+
+```exercise
+context-split
+```
+
 ## 8. useMemo & derived state: cache a calculation, and don't store what you can compute
 
 Two ideas, one section, because they're the same instinct: **don't redo work, and don't duplicate
@@ -440,6 +480,15 @@ can never disagree with itself.
 > from one source; add `useMemo` **only** if you measure a real cost.
 
 ---
+
+
+```exercise
+derived-state
+```
+
+```exercise
+effect-not-needed
+```
 
 ## Part II — the rest of the hooks
 
@@ -507,6 +556,11 @@ stale-closure bug from section 4.
 > render.
 
 ---
+
+
+```exercise
+rules-of-hooks
+```
 
 ## 10. `useRef` — the box that isn't a photograph
 
@@ -642,6 +696,11 @@ mounts. Handy for measuring, or for a list of nodes. In React 19 that function m
 
 ---
 
+
+```exercise
+useref-vs-state
+```
+
 ## 11. `useCallback` and `React.memo` — when a function's *identity* is the bug
 
 Straight from section 1's Consequence 1: **every render creates brand-new function objects.** Usually
@@ -708,6 +767,11 @@ allocating one closure, which is free. **Don't wrap everything.**
 > — and the first two are pointless unless something downstream compares identities.*
 
 ---
+
+
+```exercise
+usecallback-memo
+```
 
 ## 12. `useReducer` — every transition in one place
 
@@ -857,6 +921,11 @@ makes the component readable — not on principle.
 > **Memory hook:** *a custom hook is a recipe, not a shared pot.* Each caller cooks its own.
 
 ---
+
+
+```exercise
+custom-hook
+```
 
 ## 14. `useLayoutEffect` — the effect that runs *before* the browser paints
 

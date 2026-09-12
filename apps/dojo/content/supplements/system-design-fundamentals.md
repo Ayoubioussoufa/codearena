@@ -15,6 +15,16 @@ to reason.** Interviewers grade your reasoning, not a magic diagram.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Ten exercises are embedded below.** System design is answered out loud, so most of these are
+reasoning drills: estimate, choose, and justify.
+
+**The number is never the point** — reaching one and defending the trade-off behind it is. Several
+have more than one defensible answer, and the model answer says which trade-off each one buys.
 ## 0. The words that scare people (they're simple)
 
 Read these once. Every later section reuses them. The running analogy is a **restaurant**, because
@@ -108,6 +118,11 @@ That's 100 million requests/day. Divide by 100k seconds → **~1,000 QPS average
 
 ---
 
+
+```exercise
+envelope-estimate
+```
+
 ## Latency numbers every programmer should know
 
 Different kinds of storage and network hops are *wildly* different speeds — and knowing the rough
@@ -143,6 +158,11 @@ The three ratios that actually decide designs:
 > rung?" answers most latency questions.
 
 ---
+
+
+```exercise
+latency-ordering
+```
 
 ## Availability: measuring uptime in "nines"
 
@@ -241,6 +261,11 @@ named patterns, and knowing the trade-offs is a strong interview signal:
 > cache-aside; reach for the others only when a specific pressure demands it.
 
 ---
+
+
+```exercise
+cache-strategy
+```
 
 ## Load balancing & stateless services
 
@@ -431,6 +456,11 @@ modern":
 
 ---
 
+
+```exercise
+sql-or-nosql
+```
+
 ## Consistency & the CAP theorem
 
 First, three definitions:
@@ -464,6 +494,11 @@ flowchart TD
 ```
 
 ---
+
+
+```exercise
+cap-tradeoff
+```
 
 ## Consistency patterns (weak → eventual → strong)
 
@@ -558,6 +593,15 @@ Two refinements on the queue idea that come up constantly:
 
 ---
 
+
+```exercise
+queue-backpressure
+```
+
+```exercise
+idempotency-key
+```
+
 ## Rate limiting
 
 **Rate limiting** = capping how many requests one client (or API key) may make in a window, to protect
@@ -572,6 +616,11 @@ you from abuse and overload. ("Max 100 requests per minute.")
   smoother but more complex. Start with token bucket and name the trade-off.
 
 ---
+
+
+```exercise
+rate-limit-algorithm
+```
 
 ## Communication: how the pieces talk to each other
 
@@ -618,6 +667,11 @@ This is why "a client times out and retries POST /charge" needs an **idempotency
 limiter and worker sections): POST isn't idempotent, so the key is what makes the retry safe.
 
 ---
+
+
+```exercise
+communication-choice
+```
 
 ## CDNs & consistent hashing
 
@@ -704,6 +758,11 @@ Multiple regions? Read replicas per region — and since codes never change, rep
 brand-new links, it can never corrupt an existing one.
 
 ---
+
+
+```exercise
+url-shortener
+```
 
 ## Worked design #2 — a code-submission judge (your CodeArena story)
 

@@ -84,3 +84,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter dojo test:generators
       - run: pnpm --filter dojo test:diagrams
+      # Every model answer must pass its own checks, every starter must fail,
+      # and every ```exercise id in a guide must resolve. A broken check tells
+      # the learner correct code is wrong, which is worse than no check.
+      - run: pnpm --filter dojo test:guide-exercises

@@ -9,6 +9,8 @@ import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import rehypeHighlight from "rehype-highlight";
 import { MermaidDiagram } from "./MermaidDiagram";
+import { GuideExercise } from "./GuideExercise";
+import { getGuideExercise } from "@/lib/guide-exercises";
 
 function textOf(node: ReactNode): string {
   if (typeof node === "string") return node;
@@ -25,7 +27,14 @@ function rewriteHref(href: string): string {
   return href;
 }
 
-export function MarkdownView({ markdown }: { markdown: string }) {
+export function MarkdownView({
+  markdown,
+  guideSlug,
+}: {
+  markdown: string;
+  /** Enables ```exercise fences, which are looked up per guide. */
+  guideSlug?: string;
+}) {
   return (
     <div className="prose prose-slate max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-pre:overflow-x-auto">
       <Markdown
@@ -44,6 +53,19 @@ export function MarkdownView({ markdown }: { markdown: string }) {
               };
               if (className?.includes("language-mermaid")) {
                 return <MermaidDiagram code={textOf(children).trim()} />;
+              }
+              // ```exercise fences hold an exercise id; the definition lives in
+              // src/lib/guide-exercises so its checks can be real code and the
+              // whole set can be verified by a script.
+              if (className?.includes("language-exercise") && guideSlug) {
+                const id = textOf(children).trim();
+                const exercise = getGuideExercise(guideSlug, id);
+                if (exercise) return <GuideExercise exercise={exercise} />;
+                return (
+                  <pre className="not-prose rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                    Unknown exercise: {guideSlug}:{id}
+                  </pre>
+                );
               }
             }
             return <pre {...props} />;

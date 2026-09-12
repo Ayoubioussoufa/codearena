@@ -65,7 +65,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
 
       <div className="flex gap-10">
         <article className="min-w-0 flex-1">
-          <MarkdownView markdown={guide.markdown} />
+          <MarkdownView markdown={guide.markdown} guideSlug={guide.slug} />
 
           {siblings.length > 0 && (
             <nav className="mt-10 rounded-xl border border-slate-200 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-900/40">

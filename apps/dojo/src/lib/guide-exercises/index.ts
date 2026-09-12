@@ -19,6 +19,8 @@ import { gitWorkflowExercises } from "./git-workflow";
 import { phase0Exercises } from "./phase-0";
 import { phase1Exercises } from "./phase-1";
 import { phase2Exercises } from "./phase-2";
+import { reactExercises } from "./react-fundamentals";
+import { systemDesignExercises } from "./system-design";
 
 const BY_GUIDE: Record<string, GuideExercise[]> = {
   "backend-architecture": backendArchitectureExercises,
@@ -29,6 +31,8 @@ const BY_GUIDE: Record<string, GuideExercise[]> = {
   "phase-0-foundations": phase0Exercises,
   "phase-1-auth-data-frontend": phase1Exercises,
   "phase-2-execution-sandboxing": phase2Exercises,
+  "react-fundamentals": reactExercises,
+  "system-design-fundamentals": systemDesignExercises,
 };
 
 export function getGuideExercise(

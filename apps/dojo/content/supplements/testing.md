@@ -4,6 +4,19 @@ Testing is the skill that separates "it works on my machine" from "it works, and
 
 The through-line: **test behaviour, not implementation.** A good test says "given this input, the user sees this output" — and survives every refactor that doesn't change that promise.
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Eight exercises are embedded below.** The theme runs through all of them:
+
+> **A test that passes when the code is broken is worse than no test**, because it buys false
+> confidence.
+
+Most are repairs of assertions that look right and prove nothing — a `toBeTruthy` that a wrong
+answer satisfies, a `.resolves` with no `await`, a `toHaveBeenCalled` that passes when the function
+returns nothing.
 ## Why test at all
 
 Three payoffs, in order of how much they matter day to day:
@@ -21,6 +34,10 @@ Not all tests cost the same. The **pyramid** is a shape for a healthy suite:
 - **End-to-end tests (the narrow top).** The real app in a real browser, driven like a user. Seconds to minutes each, occasionally flaky, but the highest confidence. Keep a *few*, for critical journeys (login, checkout, submit).
 
 The anti-pattern is the **ice-cream cone**: mostly E2E, few units. Symptoms are a 40-minute CI run and tests that fail ~10% of the time for no code reason. The fix is almost always to **push logic down** — verify a behaviour with a fast component test instead of a full browser run, and reserve E2E for end-to-end wiring. Confidence per second is the metric.
+```exercise
+which-layer
+```
+
 
 ## Vitest: the anatomy of a test
 
@@ -58,6 +75,10 @@ expect(makeUser("Ada")).toEqual({ name: "Ada", role: "user" });
 - **`toStrictEqual`** goes further: it also cares about `undefined` properties and class-vs-plain-object. Reach for it when that distinction matters.
 
 Other everyday matchers: `toContain`, `toHaveLength`, `toBeTruthy`/`toBeNull`, `toThrow`, and `.not` to invert any of them.
+```exercise
+tobe-vs-toequal
+```
+
 
 ## Testing async code
 
@@ -71,6 +92,14 @@ test("resolves to the name", async () => {
 ```
 
 `.resolves` / `.rejects` unwrap a promise and fail with a useful message if it settles the wrong way — but they're inert without the `await`.
+```exercise
+async-await
+```
+
+```exercise
+test-the-negative
+```
+
 
 ## React Testing Library: test what the user sees
 
@@ -126,6 +155,10 @@ expect(screen.getByText("1")).toBeInTheDocument();
 ```
 
 Skip the `await` and your assertion runs against the pre-render DOM. Use regex names (`/increment/i`) to stay resilient to casing and surrounding text.
+```exercise
+rtl-query
+```
+
 
 ## Test doubles: spy, stub, mock
 
@@ -150,6 +183,14 @@ To isolate the unit under test from slow or non-deterministic boundaries (networ
   ```
 
 Reset doubles between tests (`vi.clearAllMocks()` in `beforeEach`) so recorded calls don't leak across cases. For time-dependent code, freeze the clock: `vi.useFakeTimers()` + `vi.setSystemTime(...)`.
+```exercise
+fake-over-mock
+```
+
+```exercise
+deterministic-time
+```
+
 
 ## Playwright: end-to-end in a real browser
 
@@ -173,6 +214,10 @@ await expect(page.getByText("Saved")).toBeVisible(); // auto-waits — no sleep
 ```
 
 Keep E2E for critical journeys and let the framework wait; push everything else down to cheaper unit/component tests.
+```exercise
+e2e-setup-parity
+```
+
 
 ## Flakiness: the four usual suspects
 

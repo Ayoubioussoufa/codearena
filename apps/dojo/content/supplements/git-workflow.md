@@ -10,6 +10,18 @@ The one idea that makes everything else click: **Git stores snapshots, and commi
 
 ---
 
+---
+
+## ⌨️ This guide is interactive
+
+**Twelve exercises are embedded below.** Git drills are command recall and scenario reasoning, so
+most ask you to write the command you would actually type, or to say what one did.
+
+They are weighted toward the situations that **feel like lost work and are not** — a branch switch
+that seems to delete your edits, `branch -d` succeeding on an unmerged branch, `reset --hard`
+twice. Three of those cost real hours in this project. Only one row in the final triage exercise is
+genuine loss.
+
 # Part 1 — The mental model
 
 ## The four places your code lives
@@ -41,6 +53,14 @@ flowchart LR
 **Why the index exists:** it lets you commit *some* of your changes. You fixed a bug and also left a debug print — stage the fix, commit it, keep the print. Without staging you'd commit both or neither.
 
 `git status` tells you where everything sits. Run it constantly.
+```exercise
+four-places
+```
+
+```exercise
+commit-am-trap
+```
+
 
 ## The everyday loop
 
@@ -263,6 +283,10 @@ flowchart TD
 Rebase creates *new* commits with new hashes, so the originals your teammates based work on effectively vanish — their history and yours diverge and everyone fights conflicts. Rebase private work; merge public work.
 
 A common workflow: **rebase your feature branch onto `main` to tidy it before opening the PR**, then **merge the PR**.
+```exercise
+rebase-golden-rule
+```
+
 
 ## `git rebase -i` — the history editor
 
@@ -327,6 +351,10 @@ flowchart TD
 | `git rebase --abort` | Same, for a rebase |
 
 **⚠️ During a rebase, "ours" and "theirs" are swapped** relative to intuition, because rebase replays *your* commits onto *their* base. Check with `git status` rather than trusting the name.
+```exercise
+conflict-resolution
+```
+
 
 ---
 
@@ -388,6 +416,10 @@ gitGraph
 
 > **Not pushed → `reset`. Already pushed → `revert`.**
 
+```exercise
+reset-vs-revert
+```
+
 ## `git restore` — file-level undo
 
 ```bash
@@ -420,6 +452,10 @@ A log of **everywhere HEAD has been**, including commits you "deleted". Entries 
 **Reflog is why almost nothing committed is truly lost.** It's local-only, and it cannot recover work that was never committed — that's the real dividing line:
 
 > **Commit-level mistakes are recoverable. Working-tree mistakes are not.**
+
+```exercise
+recover-reset-hard
+```
 
 ---
 
@@ -493,6 +529,10 @@ Set rebase as your pull default: `git config --global pull.rebase true`.
 | `--force-with-lease` | "Replace it, **only if nothing changed since I last fetched**." Aborts otherwise |
 
 A compare-and-swap instead of a blind write. It costs nothing and it's the habit you want before the day it matters.
+```exercise
+force-with-lease
+```
+
 
 > **Caveat:** the lease compares your remote-*tracking* ref, which a background fetch (including your IDE's) can silently update. The airtight form names the hash: `--force-with-lease=main:<hash>`.
 
@@ -546,6 +586,14 @@ git bisect reset           # done
 ```
 
 **It only works if you have many small commits.** One giant commit gives it nothing to search — a concrete reason to commit in slices.
+```exercise
+find-the-breakage
+```
+
+```exercise
+find-deleted-code
+```
+
 
 ---
 
@@ -694,6 +742,10 @@ git push origin --delete feature-name  # and the remote one (or GitHub's button)
 ```
 
 The pre-flight check is the whole lesson. **Never run cleanup commands on faith that a remote action succeeded.** Ten seconds of `git fetch && git log` replaces an hour of panic.
+```exercise
+post-merge-sync
+```
+
 
 ## What `git branch -d` actually checks
 
@@ -722,6 +774,10 @@ The second branch was **not** merged into `main` — and `-d` deleted it anyway,
 | --- | --- | --- |
 | `git branch -d` | Refuses unless merged into **upstream or HEAD** | Always. Let it be the judge |
 | `git branch -D` | Deletes unconditionally | You're certain the work is disposable |
+```exercise
+branch-d-rule
+```
+
 
 **`-d` protects commits, not branch names.** It guarantees you won't strand a commit with no way back. It makes no promise that you'll still have a branch you wanted to keep working on.
 
@@ -853,6 +909,10 @@ Everything else in Git is recoverable. These lose work.
 | `git rebase` on shared branches | Breaks everyone else's history | The golden rule: never |
 
 **The pattern:** anything touching the **working tree** is genuinely dangerous, because Git never had a copy. Anything touching **commits** is usually recoverable via `git reflog`.
+```exercise
+lost-work-triage
+```
+
 
 ---
 

@@ -12,9 +12,13 @@
  */
 import type { GuideExercise } from "./types";
 import { backendArchitectureExercises } from "./backend-architecture";
+import { nestjsExercises } from "./nestjs";
+import { typescriptExercises } from "./typescript";
 
 const BY_GUIDE: Record<string, GuideExercise[]> = {
   "backend-architecture": backendArchitectureExercises,
+  nestjs: nestjsExercises,
+  typescript: typescriptExercises,
 };
 
 export function getGuideExercise(

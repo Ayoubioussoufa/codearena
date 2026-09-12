@@ -13,6 +13,21 @@ This guide is the mechanics.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Fourteen exercises are embedded in the text**, each under the section that teaches it. You write
+the code; the guide names which ideas you got and which you missed:
+
+> ✅ `imports` holds the module · ❌ never puts a SERVICE in `imports`
+
+Imports and surrounding context are given to you in an **Already in scope** panel — you never guess
+a path. There's a hint, and a **👁 Show answer** on every one.
+
+Several are repairs of code that **compiles and fails at boot**, which is the failure mode NestJS
+specialises in and the one that costs whole afternoons.
 ## Contents
 
 | Part | |
@@ -226,6 +241,14 @@ Two failure modes, and you will hit both:
 
 **`imports` takes modules. `providers` takes classes.** Mixing them up is the single most common
 beginner error.
+```exercise
+module-wiring
+```
+
+```exercise
+invalid-module
+```
+
 
 ### Example — two modules talking
 
@@ -315,6 +338,10 @@ JwtModule.registerAsync({
 
 You need this whenever a module's options come from injected values — which is **exactly your
 Week 1 JWT setup**, because the secret lives in validated config, not a literal.
+```exercise
+dynamic-module
+```
+
 
 ---
 
@@ -375,6 +402,10 @@ line.
 ```
 
 Two tokens, **one instance**. Rare, but useful for renaming without duplicating.
+```exercise
+custom-provider
+```
+
 
 ## Tokens — and why TypeScript needs them
 
@@ -498,6 +529,10 @@ create() { return { ok: true }; }
 
 **Whatever you return is serialised to JSON.** You don't touch the response object — that's Nest's
 job, and staying out of it is what keeps controllers testable.
+```exercise
+status-codes
+```
+
 
 ---
 
@@ -615,6 +650,10 @@ export class ListProblemsDto {
 
 ⚠️ **Booleans are a trap.** `Boolean("false")` is `true`. Use
 `@Transform(({ value }) => value === 'true')`, never `@Type(() => Boolean)`.
+```exercise
+dto-coercion
+```
+
 
 ## The decorators you'll actually use
 
@@ -627,6 +666,10 @@ export class ListProblemsDto {
 | Optional | `@IsOptional()` — **without it every field is required** |
 | Arrays | `@IsArray()` `@ArrayMinSize()` `@ValidateNested({ each: true })` |
 | Nested | `@ValidateNested()` + `@Type(() => ChildDto)` |
+```exercise
+login-dto
+```
+
 
 ---
 
@@ -675,6 +718,10 @@ flowchart TD
 
 > **Cross-cutting concerns live in the pipeline, never in your business logic.** Your service should
 > never contain `if (!user) throw`.
+```exercise
+pipeline-order
+```
+
 
 ---
 
@@ -783,6 +830,14 @@ means a route is *over*-protected — which fails loudly and safely.
 
 A guard returning `false` produces **403** by default. For a missing token you usually want 401, so
 throw `new UnauthorizedException()` instead of returning `false`.
+```exercise
+auth-guard
+```
+
+```exercise
+global-guard
+```
+
 
 ---
 
@@ -871,6 +926,10 @@ Register it: `app.useGlobalFilters(new AllExceptionsFilter());`
 
 > **Writing the filter does nothing until you register it.** If your 404s still look like Nest's
 > defaults, that's the missing line.
+```exercise
+exception-filter
+```
+
 
 ---
 
@@ -941,6 +1000,10 @@ export const Auth = (...roles: string[]) =>
 @Delete(':id')
 remove() {}
 ```
+```exercise
+custom-decorators
+```
+
 
 ---
 
@@ -1035,6 +1098,10 @@ only because the service *declares* its dependencies instead of constructing the
 
 > If your unit tests need `Test.createTestingModule`, ask whether you actually need the framework —
 > usually you don't.
+```exercise
+unit-test-no-nest
+```
+
 
 ## Integration test — with the container
 
@@ -1141,6 +1208,10 @@ the whole point, and the pipeline is what makes it possible.
 4. **Check `AppModule`** — is this module reachable at all?
 5. **Check the startup log** — `Mapped {/problems, GET} route` lines tell you exactly which routes
    exist
+```exercise
+resolve-dependencies
+```
+
 
 ---
 

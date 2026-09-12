@@ -13,6 +13,17 @@ inference up to conditional types.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Twelve exercises are embedded below**, each under the section that teaches it. You write the code;
+the guide names what you got and what you missed. Imports and context are given — you never guess.
+
+Four of them are the errors that look like the compiler being difficult when it is being correct:
+`TS7022` circular inference, `strictPropertyInitialization` on a DTO, `exactOptionalPropertyTypes`,
+and the excess-property rule that lets `return row` leak a password hash.
 ## 0. Five words the rest of this guide stands on
 
 - **Type** — a description of the *shape* of a value (`string`, `number[]`, `{ id: number }`).
@@ -50,6 +61,10 @@ know a type, use `unknown` (which forces you to narrow before use).
 
 **The bug it prevents.** A function that quietly returns `undefined` on some path, discovered three calls away
 instead of at the definition.
+```exercise
+annotate-boundaries
+```
+
 
 ---
 
@@ -71,6 +86,10 @@ check that's stricter, to catch typos).
 
 **The bug it prevents.** Over-engineering with classes and `instanceof` when a plain shape would do — and
 fighting the compiler about "types that are the same but named differently."
+```exercise
+structural-typing
+```
+
 
 ---
 
@@ -117,6 +136,18 @@ about runtime reality.
 
 **The bug it prevents.** Reading `r.message` on a success result (won't compile with a discriminated union),
 and `Cannot read properties of undefined` from an unchecked variant.
+```exercise
+discriminated-union
+```
+
+```exercise
+type-guard
+```
+
+```exercise
+unknown-not-any
+```
+
 
 ---
 
@@ -138,6 +169,10 @@ type-safe replacement for a string enum, and you can still iterate `STATUSES` at
 
 **The bug it prevents.** A hand-written `type Status = "todo" | "doing"` that silently drifts out of sync the day
 someone edits the array.
+```exercise
+as-const
+```
+
 
 ---
 
@@ -170,6 +205,10 @@ accepts anything with a numeric `length` (strings, arrays…) while preserving t
 
 **The bug it prevents.** Losing type information through a helper (`any` in, `any` out), and passing a key that
 doesn't exist.
+```exercise
+generic-function
+```
+
 
 ---
 
@@ -217,6 +256,10 @@ adding a status to the union lights up every incomplete map in red.
 
 **The bug it prevents.** Re-declaring a slightly-different copy of an interface that drifts from the original —
 derive it instead, and it can't drift.
+```exercise
+utility-types
+```
+
 
 ---
 
@@ -285,6 +328,22 @@ implementation. Use overloads when the return type genuinely depends on the argu
 
 **The bug it prevents.** A config object that loses its literal keys to widening (no autocomplete, typos slip
 through), and a function whose return type is a vague union when it could be exact.
+```exercise
+satisfies
+```
+
+```exercise
+ts7022
+```
+
+```exercise
+definite-assignment
+```
+
+```exercise
+exact-optional
+```
+
 
 ---
 

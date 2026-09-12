@@ -9,6 +9,13 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Four exercises are embedded below — the plagiarism pipeline where each step defeats a different disguise, and the observability trio where reaching for the wrong pillar is why investigations stall.**
+
 ## Table of contents
 
 1. [Part A — Analytics & materialized views](#part-a)
@@ -72,6 +79,11 @@ is *supposed* to lag; investigate whether the refresh ran, not whether the query
 
 <a name="part-b"></a>
 # Part B — Plagiarism detection: Winnowing
+
+
+```exercise
+materialized-view
+```
 
 ## B.1 Why the naive approaches fail
 
@@ -194,6 +206,11 @@ under ~50 lines is statistically noisy. So:
 <a name="part-c"></a>
 # Part C — Observability: the three pillars
 
+
+```exercise
+plagiarism-pipeline
+```
+
 ## C.1 What observability is (and isn't)
 
 **Monitoring** answers *questions you knew to ask* ("is CPU high?"). **Observability** is the
@@ -226,6 +243,11 @@ graph TB
 The skill is knowing which pillar answers which question. "p95 latency doubled" → a **metric** told
 you. "*Which step* got slow?" → a **trace**. "*Why* did that step fail for this input?" → a **log**.
 You use all three, in that order, to go from symptom to cause.
+
+
+```exercise
+three-pillars
+```
 
 ## C.3 A worked debugging story
 
@@ -285,6 +307,11 @@ Three rules that separate useful logs from noise:
 
 <a name="part-d"></a>
 # Part D — Distributed tracing & OpenTelemetry
+
+
+```exercise
+structured-logging
+```
 
 ## D.1 Spans and traces
 

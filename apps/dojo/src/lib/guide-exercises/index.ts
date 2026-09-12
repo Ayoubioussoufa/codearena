@@ -24,6 +24,12 @@ import { systemDesignExercises } from "./system-design";
 import { javascriptExercises } from "./javascript";
 import { nextjsExercises } from "./nextjs";
 import { javaSpringExercises } from "./java-spring-boot";
+import {
+  phase3Exercises,
+  phase4Exercises,
+  phase5Exercises,
+  phase6Exercises,
+} from "./phase-3-6";
 
 const BY_GUIDE: Record<string, GuideExercise[]> = {
   "backend-architecture": backendArchitectureExercises,
@@ -39,6 +45,10 @@ const BY_GUIDE: Record<string, GuideExercise[]> = {
   javascript: javascriptExercises,
   nextjs: nextjsExercises,
   "java-spring-boot": javaSpringExercises,
+  "phase-3-rating-mastery-math": phase3Exercises,
+  "phase-4-recommendation-engine": phase4Exercises,
+  "phase-5-contests-cqrs-leaderboard": phase5Exercises,
+  "phase-6-analytics-anticheat-observability": phase6Exercises,
 };
 
 export function getGuideExercise(

@@ -11,6 +11,17 @@ build up routing, data, mutations, and the hooks React alone doesn't give you.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Six exercises are embedded below.** Every one turns on the question this guide opens with:
+**where does this code run?**
+
+Almost every App Router mistake is that question answered without being asked — a secret inlined
+into a bundle, a whole page dragged client-side by one button, a spinner where there never needed
+to be one.
 ## 0. The one idea everything hangs on: where does this run?
 
 In the App Router, every component is a **Server Component by default**. It runs on the server, never ships to the
@@ -34,6 +45,11 @@ leaf that actually needs a button or `useState` — a chart, a search box — no
 or shipping your whole page (and its data-fetching secrets) to the browser by marking the top `"use client"`.
 
 ---
+
+
+```exercise
+where-does-it-run
+```
 
 ## 1. Routing is the file system
 
@@ -66,6 +82,11 @@ while the async page streams in. **`error.tsx`** catches errors in that segment.
 the shell in each page instead of a shared `layout`.
 
 ---
+
+
+```exercise
+client-boundary
+```
 
 ## 2. Fetching data — on the server, with `await`
 
@@ -112,6 +133,11 @@ from not choosing a caching strategy.
 
 ---
 
+
+```exercise
+server-component-fetch
+```
+
 ## 3. Mutations — Server Actions and forms
 
 A **Server Action** is a function marked `"use server"` that runs on the server but is callable from the client —
@@ -157,6 +183,11 @@ update after a create because nothing revalidated the cache.
 
 ---
 
+
+```exercise
+server-action
+```
+
 ## 4. Route handlers — when you do need an endpoint
 
 For webhooks, third-party callbacks, or non-form APIs, a `route.ts` exports functions **named after HTTP verbs**;
@@ -177,6 +208,11 @@ export async function GET() {
 need a public endpoint) — or vice versa, trying to make a form post to a Server Component.
 
 ---
+
+
+```exercise
+loading-error-boundaries
+```
 
 ## 5. The client hooks React alone doesn't have
 
@@ -234,6 +270,11 @@ flowchart TD
 - **External API in** → `route.ts` handler.
 
 ---
+
+
+```exercise
+secret-leak
+```
 
 ## Mastery checklist — you can…
 

@@ -21,6 +21,9 @@ import { phase1Exercises } from "./phase-1";
 import { phase2Exercises } from "./phase-2";
 import { reactExercises } from "./react-fundamentals";
 import { systemDesignExercises } from "./system-design";
+import { javascriptExercises } from "./javascript";
+import { nextjsExercises } from "./nextjs";
+import { javaSpringExercises } from "./java-spring-boot";
 
 const BY_GUIDE: Record<string, GuideExercise[]> = {
   "backend-architecture": backendArchitectureExercises,
@@ -33,6 +36,9 @@ const BY_GUIDE: Record<string, GuideExercise[]> = {
   "phase-2-execution-sandboxing": phase2Exercises,
   "react-fundamentals": reactExercises,
   "system-design-fundamentals": systemDesignExercises,
+  javascript: javascriptExercises,
+  nextjs: nextjsExercises,
+  "java-spring-boot": javaSpringExercises,
 };
 
 export function getGuideExercise(

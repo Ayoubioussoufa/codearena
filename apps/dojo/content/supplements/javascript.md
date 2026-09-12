@@ -12,6 +12,16 @@ write a function and call it, you're ready.
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Eight exercises are embedded below** — the language's sharp edges, in the order they cut:
+reference semantics, coercion, `this`, and the event loop.
+
+Two are predictions rather than code. Getting those wrong on paper is cheap; getting them wrong in
+a debugger costs an afternoon.
 ## 0. Five words the rest of this guide stands on
 
 - **Value** — a piece of data: a number, a string, a boolean.
@@ -52,6 +62,11 @@ shared). This copy-don't-mutate discipline is exactly what React relies on to de
 over one object. It wasn't a copy — it was a second reference.
 
 ---
+
+
+```exercise
+reference-semantics
+```
 
 ## 2. `const`, `let`, `var` — and why `var` is retired
 
@@ -127,6 +142,11 @@ reached for `||` when they needed `??`.
 
 ---
 
+
+```exercise
+coercion-predict
+```
+
 ## 4. Functions, arrows, and the two returns
 
 Three ways to make a function; the differences matter:
@@ -186,6 +206,11 @@ closed over it at definition time, not call time.
 
 ---
 
+
+```exercise
+closure-counter
+```
+
 ## 6. `this` — decided by the call, not the definition
 
 For a **regular** function, `this` is whatever is to the LEFT of the dot when you call it — so a bare callback
@@ -221,6 +246,11 @@ The rule: **methods that need their own `this` stay regular functions; callbacks
 
 ---
 
+
+```exercise
+this-binding
+```
+
 ## 7. Destructuring, spread, and rest
 
 Pull fields out by name (objects) or position (arrays), with defaults:
@@ -248,6 +278,11 @@ you spread at each level.
 a new value with spread/`map`/`filter` — leaving React blind to the change.
 
 ---
+
+
+```exercise
+optional-chaining
+```
 
 ## 8. The array-method toolbox
 
@@ -280,6 +315,11 @@ is the odd one: it mutates and returns the same array, so sort a *copy*.
 a `.sort()` you thought was pure.
 
 ---
+
+
+```exercise
+array-toolbox
+```
 
 ## 9. Async — the event loop, promises, and `async/await`
 
@@ -328,6 +368,15 @@ Promise; you must `await` it (or `.then`).
 `[object Promise]` showing up where you expected data (a missing `await`).
 
 ---
+
+
+```exercise
+event-loop-order
+```
+
+```exercise
+await-in-loop
+```
 
 ## 10. Modules — `import` / `export`
 

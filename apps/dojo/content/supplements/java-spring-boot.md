@@ -18,6 +18,17 @@ build, test, and defend in an interview.
 > class that talks to the database. **DTO** ("Data Transfer Object") = a plain shape for data crossing
 > the boundary (the JSON in/out). **Entity** = a class mapped to a database table.
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Eight exercises are embedded below**, written for someone arriving from NestJS: each names the
+concept you already own, then Spring's word for it.
+
+The genuinely new material is the **persistence context** — an entity that saves itself with no
+`save()` call, and silently saves nothing when you forget `@Transactional`. Two exercises cover it,
+because it is the biggest conceptual jump from Prisma.
 ## 1. The mental model: you already know Spring
 
 Spring is built from the same parts as NestJS, under different names. Skim this map; the rest of the
@@ -50,6 +61,11 @@ flowchart LR
 Read the diagram as the life of one request: it enters, passes the **security gate**, hits your
 **controller**, which calls a **service** (your logic), which calls a **repository** (the database),
 and if anything throws, the **advice** turns it into a clean error response. That's a Spring app.
+
+
+```exercise
+nest-to-spring
+```
 
 ## 2. Java for the TypeScript brain
 
@@ -90,6 +106,11 @@ Map<String, List<Integer>> scores = new HashMap<>();
 scores.computeIfAbsent("amani", k -> new ArrayList<>()).add(95);
 ```
 
+
+```exercise
+java-optional
+```
+
 ## 3. Collections you must know cold
 
 **Collections** are Java's built-in data structures (see [DSA Patterns §0](/guides/dsa-patterns) for
@@ -128,6 +149,11 @@ Map<String, Long> byCity = users.stream()
 `User::name` is a **method reference** — shorthand for `u -> u.name()`. The intermediate steps
 (`filter`, `map`) are *lazy* (they do nothing until the terminal step). One rule of taste: **don't
 over-stream in interviews** — a plain `for` loop you can explain beats a clever pipeline you can't.
+
+
+```exercise
+streams
+```
 
 ## 5. Project setup: Maven and Spring Initializr
 
@@ -186,6 +212,11 @@ class ApiErrors {
         .body(ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage()));
   }
 }
+```
+
+
+```exercise
+spring-controller
 ```
 
 ## 7. Data with Spring Data JPA
@@ -325,6 +356,19 @@ Four rules follow directly from the picture, and they are the interview answers:
 > you don't need them), while `@OneToMany` is LAZY. This surprises everyone — override the fetch type
 > deliberately, as shown above.
 
+
+```exercise
+jpa-entity
+```
+
+```exercise
+persistence-context
+```
+
+```exercise
+jpa-n-plus-one
+```
+
 ## 8. Security in one page
 
 **Spring Security** puts a chain of gatekeepers (**servlet filters** — code that runs before your
@@ -373,6 +417,11 @@ void rejectsPastStartDate() {
 
 Testcontainers is a differentiator: *"my integration tests run against a real Postgres container"* is a
 sentence very few intern candidates can say.
+
+
+```exercise
+spring-test
+```
 
 ## 10. The worked feature slice — every file, annotated
 

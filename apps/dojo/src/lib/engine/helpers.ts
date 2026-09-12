@@ -188,14 +188,14 @@ function classesOf(code: string): Set<string> {
 }
 
 /** The gradable part of a code spec — shared by single- and multi-file tasks. */
-interface Checkable {
+export interface Checkable {
   checks?: StaticCheck[];
   fn?: { name: string; tests: FnTest[] };
   classTask?: { required: string[]; forbidden?: string[] };
 }
 
 /** Runs one file's static checks, class checks and fn tests against `code`. */
-async function runChecks(code: string, spec: Checkable): Promise<CodeCheckResult[]> {
+export async function runChecks(code: string, spec: Checkable): Promise<CodeCheckResult[]> {
   const results: CodeCheckResult[] = [];
 
   for (const check of spec.checks ?? []) {
@@ -225,7 +225,7 @@ async function runChecks(code: string, spec: Checkable): Promise<CodeCheckResult
 }
 
 /** A code exercise passes only when it has at least one check and all pass. */
-function verdict(results: CodeCheckResult[]): CodeGradeResult {
+export function verdict(results: CodeCheckResult[]): CodeGradeResult {
   return { passed: results.length > 0 && results.every((r) => r.passed), results };
 }
 

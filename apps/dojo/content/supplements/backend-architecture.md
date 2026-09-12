@@ -15,6 +15,23 @@ Everything else is a consequence.
 
 ---
 
+## ⌨️ This guide is interactive
+
+**Twenty exercises are embedded in the text**, each sitting under the paragraph that teaches it.
+You write the code; the guide tells you which ideas you got and which you missed — by name, not as
+a single red cross:
+
+> ✅ maps `id` explicitly · ❌ does not `return row`
+
+There is a **👁 Show answer** button on every one. Use it: being stuck for twenty minutes on a drill
+is not the kind of stuck that teaches you anything. Take the hint first, then the answer, then
+**reset and type it again from blank** — that last step is the one that sticks.
+
+**Reading this guide takes an hour. Doing it takes three.** The three-hour version is the one you
+still have in a month.
+
+---
+
 # Part 0 — A story about a codebase that ate itself
 
 Let me tell you about `OrderService`.
@@ -229,6 +246,10 @@ no `beforeEach`.
 
 > **The domain test:** could you explain this file to a domain expert who has never programmed? If
 > yes, it's domain. If explaining it requires saying "well, the ORM…", it isn't.
+```exercise
+domain-entity
+```
+
 
 ### The trap: a `domain/` with only types
 
@@ -242,6 +263,10 @@ just scattered somewhere they can't be tested cheaply.
 
 The fix is not ceremony. It's noticing that `if (user.failedAttempts > 5)` is a *business rule*
 wearing an `if` costume, and giving it a name and a home.
+```exercise
+anaemic-domain
+```
+
 
 ## `ports/` — what you need, not how
 
@@ -259,6 +284,10 @@ export const PROBLEMS_REPOSITORY = Symbol('ProblemsRepository');
 
 Notice what's absent: no SQL, no `where` clause, no `include`, no Prisma type. It states *what you
 need done*, never *how*.
+```exercise
+port-interface
+```
+
 
 **Ports aren't only for databases.** Every outside system gets one:
 
@@ -289,6 +318,7 @@ if (this.clock.now() > token.expiresAt) throw new Error('expired');
 non-deterministic is an outside dependency, even though it feels like a language feature. **You'll
 need this in Week 1** for refresh-token expiry.
 
+
 ## `application/` — use cases
 
 One class (or function) per thing a user can **do**. It *orchestrates*; it does not do the work
@@ -306,6 +336,10 @@ async getBySlug(slug: string): Promise<Problem> {
 Read it aloud: *"fetch it; if it isn't there, that's a not-found."* That's a use case.
 
 > **If you cannot read a service method aloud as a sentence, it's doing too much.**
+```exercise
+service-depends-on-port
+```
+
 
 A longer one still reads as a sentence — a compound one:
 
@@ -368,6 +402,10 @@ a **spread** skips the check entirely. So `createdAt`, `updatedAt`, internal fla
 
 > **If your adapter isn't naming fields one by one, you don't have a boundary. You have a type
 > annotation and a false sense of security.**
+```exercise
+adapter-maps
+```
+
 
 Every `find*` in your users repository names four fields explicitly, and that omission of
 `passwordHash` is a **security control**, not a style choice.
@@ -389,6 +427,10 @@ logic must not know about display strings) and not in the schema (that would con
 model to suit one consumer).
 
 > **A controller containing an `if` about business rules is a controller doing the service's job.**
+```exercise
+http-thin
+```
+
 
 ---
 
@@ -413,6 +455,10 @@ one can stop checking. You've made the invalid state *unrepresentable* rather th
 
 You don't have value objects yet, and you don't need them yet. Recognise the concept; reach for it
 when you notice the same validation repeated in five places.
+```exercise
+value-object
+```
+
 
 ## Invariants — the thing that must always be true
 
@@ -427,6 +473,10 @@ danger is an invariant enforced in *one* code path — because the second code p
 someone else, won't know about it.
 
 That's the deep argument for aggregates.
+```exercise
+invariant
+```
+
 
 ## Aggregates — a cluster with one door
 
@@ -503,6 +553,10 @@ different, so accidental collisions are impossible.
 **In Java or C# the interface survives to runtime**, so DI matches on it directly and no token is
 needed. The layering is identical; only this plumbing differs. That's worth knowing before a Spring
 interview.
+```exercise
+di-binding
+```
+
 
 ## The rule people get backwards
 
@@ -516,6 +570,10 @@ interview.
 
 An adapter injecting the port it implements is asking DI for itself. That's infinite recursion, and
 it's the single most common first mistake with this pattern.
+```exercise
+two-adapters
+```
+
 
 ---
 
@@ -535,6 +593,11 @@ flowchart TD
     Q4 -->|yes| P["ports/"]
     Q4 -->|no| R["You haven't decided<br/>what it is yet"]
 ```
+
+```exercise
+where-does-it-go
+```
+
 
 ## Sixteen real cases
 
@@ -570,6 +633,10 @@ business logic's vocabulary and the boundary is gone — regardless of how the f
 
 Put it in CI once you trust it. A folder structure nothing enforces is a folder structure that
 decays.
+```exercise
+audit-command
+```
+
 
 ---
 
@@ -589,6 +656,10 @@ a React component and everybody is sad.
 The third kind is the one people mishandle. A bug is not a case to `catch` — it's a case to **log
 loudly and return 500**. Catching it and returning something friendly hides the bug and makes it
 permanent.
+```exercise
+domain-error
+```
+
 
 ## Translate at each boundary
 
@@ -636,6 +707,14 @@ And when you do catch selectively, **rethrow the rest**:
 if (isP2002(e)) throw new ConflictException(...);
 throw e;                                          // ← without this, a DB outage becomes "409"
 ```
+```exercise
+translate-at-boundary
+```
+
+```exercise
+silent-catch
+```
+
 
 ---
 
@@ -662,6 +741,11 @@ export interface UnitOfWork {
 
 The service says **what must be atomic**. The adapter knows **how** (`prisma.$transaction`,
 `BEGIN/COMMIT`, whatever). Your business logic states the constraint and stays vendor-free.
+
+```exercise
+unit-of-work
+```
+
 
 ## The thing nobody tells juniors
 
@@ -783,6 +867,10 @@ split it.
 | A test needs elaborate setup | Too much coupling; a port is missing |
 | You scroll to understand one method | Extract |
 | Two people always conflict in it | It has two responsibilities and two owners |
+```exercise
+god-service
+```
+
 
 ## Where "helper" functions go
 
@@ -853,6 +941,10 @@ That was the right call, and here's the reasoning to record: `auth` cares about 
 `users` owns identity; Week 5's ratings and profiles will need users **without** caring about
 passwords. Nesting users under auth would have forced a ratings feature to import from an auth
 module — which reads wrong because it *is* wrong.
+```exercise
+bounded-context
+```
+
 
 **How they talk:** `auth` imports `UsersModule` and uses `UsersService`. The arrow points one way.
 The day it points both ways, you have a circular dependency and a design problem.
@@ -984,6 +1076,10 @@ service declares its dependencies instead of building them.
 
 > **If your unit tests are slow, the architecture leaked.** Speed is a design signal, not a
 > convenience.
+```exercise
+fake-repository
+```
+
 
 ## Don't unit-test adapters with mocked drivers
 
@@ -1028,6 +1124,10 @@ findBySlug(slug: string): Promise<Prisma.ProblemGetPayload<{ include: { tags: tr
 ```
 Not a port. Prisma with extra steps.
 **Fix:** ports return **your** types, always.
+```exercise
+leaky-port
+```
+
 
 ## The Utils Junk Drawer
 `utils/` with 40 unrelated functions. Part 10.

@@ -12,7 +12,8 @@
     "test:scheduling": "pnpm dlx tsx scripts/check-scheduling.ts",
     "test:dsa": "pnpm dlx tsx scripts/check-dsa.ts",
     "test:diagrams": "pnpm dlx tsx scripts/check-diagrams.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:guide-exercises": "pnpm dlx tsx scripts/check-guide-exercises.ts"
   },
   "dependencies": {
     "github-slugger": "^2.0.0",

@@ -47,10 +47,17 @@ for (const { guide, exercise } of allGuideExercises()) {
 
 /* Every ```exercise fence must resolve, and every definition must be used —
    otherwise a rename silently leaves a broken box in the middle of a guide. */
-const GUIDE_DIR = path.join(REPO_ROOT, "apps/dojo/content/supplements");
+// Guides come from two places: the dojo's own supplements, and the repo's
+// phase docs. Both render through /guides/[slug], so both can hold exercises.
+const GUIDE_DIRS = [
+  path.join(REPO_ROOT, "apps/dojo/content/supplements"),
+  path.join(REPO_ROOT, "docs"),
+];
 for (const guide of new Set(allGuideExercises().map((e) => e.guide))) {
-  const file = path.join(GUIDE_DIR, `${guide}.md`);
-  if (!fs.existsSync(file)) {
+  const file = GUIDE_DIRS.map((d) => path.join(d, `${guide}.md`)).find((f) =>
+    fs.existsSync(f),
+  );
+  if (!file) {
     console.log(`❌ ${guide} — has exercises but no guide file`);
     failures++;
     continue;

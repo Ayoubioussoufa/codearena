@@ -8,6 +8,13 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Three exercises are embedded below. The arithmetic is deliberately small — the point is knowing which direction a number moves and why, not reproducing a formula.**
+
 ## Table of contents
 
 1. [Part A — The math toolkit you need first](#part-a)
@@ -64,6 +71,11 @@ Read the picture:
 
 Every "strength difference → win probability" and "ability minus difficulty → success probability"
 step in this phase is a sigmoid. If you understand this one S-curve, the rest is bookkeeping.
+
+
+```exercise
+sigmoid-intuition
+```
 
 ## A.3 Odds, log-odds, and why ratings are "points"
 
@@ -149,6 +161,11 @@ ascent (A.5) on a sigmoid model (A.2).
 express that, so it over-reacts to the veteran's games and under-reacts to the newcomer's. Fixing
 this is the entire point of Glicko.
 
+
+```exercise
+elo-update
+```
+
 ## B.2 Glicko — add an uncertainty number
 
 **Glicko** (Mark Glickman) keeps the rating `R` but adds **RD**, the **Rating Deviation** — the
@@ -227,6 +244,11 @@ their RD drops (they just gained evidence). The 1700 player loses a bit and thei
 
 <a name="part-c"></a>
 # Part C — Item Response Theory (IRT)
+
+
+```exercise
+glicko-rd
+```
 
 ## C.1 The idea: rate *people* and *questions* on the same scale
 

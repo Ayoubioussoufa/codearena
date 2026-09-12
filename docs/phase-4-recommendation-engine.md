@@ -9,6 +9,13 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Two exercises are embedded below, both on the theme that makes this design defensible: a recommender you can debug and explain beats one that ranks marginally better and says nothing.**
+
 ## Table of contents
 
 1. [Part A — What a recommender is, and the one idea that ruins most of them](#part-a)
@@ -236,6 +243,11 @@ expert's numbers are bigger.
 <a name="part-f"></a>
 # Part F — Explore vs. exploit: multi-armed bandits
 
+
+```exercise
+linear-score
+```
+
 ## F.1 The dilemma
 
 **Exploit** = recommend what you're already confident is good. **Explore** = occasionally try
@@ -314,6 +326,11 @@ serve the cached list for a minute, recompute after. Concepts you must know:
 # Part H — Measuring a ranker
 
 You cannot improve what you don't measure, and "it feels good" is not measurement. Two ideas.
+
+
+```exercise
+explore-exploit
+```
 
 ## H.1 NDCG — the top-K ranking metric
 

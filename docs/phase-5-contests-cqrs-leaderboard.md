@@ -9,6 +9,13 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Two exercises are embedded below. Both turn on the same question: do reads and writes here want the same shape? When they do, this whole phase is complexity with no payoff.**
+
 ## Table of contents
 
 1. [Part A — State machines: modeling a contest's life](#part-a)
@@ -142,6 +149,11 @@ first place where one model genuinely can't serve both — so CQRS earns its kee
 <a name="part-c"></a>
 # Part C — Events and projections
 
+
+```exercise
+cqrs-split
+```
+
 ## C.1 Events
 
 An **event** is an immutable record that *something happened*, in the past tense: `SubmissionJudged`,
@@ -268,6 +280,11 @@ rules describe, from one `ZADD` per update.
 
 You compute the packed score in the projector; for very tight requirements a Lua script (E.4) keeps
 read-compute-write atomic.
+
+
+```exercise
+redis-leaderboard
+```
 
 ## E.3 Persistence: RDB vs AOF
 

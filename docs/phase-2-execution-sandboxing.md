@@ -7,6 +7,17 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Eight exercises are embedded below**, at the end of the section that teaches each one.
+
+Everything in this phase is adversarial or concurrent, so the failures are the ones a passing test
+will not show you: a container that looks isolated and is not, a job that runs twice, a retry that
+makes an outage worse. Two of the exercises are repairs of code that works perfectly until it
+doesn't.
 ## Table of contents
 
 1. [Part A — The trust problem: what "run untrusted code" really means](#part-a)
@@ -44,6 +55,11 @@ you *execute it*. Assume the author is actively malicious and ask what they'd tr
 The mindset shift Phase 2 demands: **the submission is the enemy, and the boundary around it is the
 only thing you trust.** Everything below is about building a boundary strong enough that all eight
 rows fail harmlessly.
+
+
+```exercise
+hostile-submission
+```
 
 ## A.2 The trust boundary
 
@@ -239,6 +255,11 @@ above is the right first stop; know the upgrade path exists and *why* (defensibl
 answer: "hardened containers share the host kernel; when the threat model demands kernel-level
 separation, move to gVisor or Firecracker").
 
+
+```exercise
+docker-run-hardened
+```
+
 ## C.3 Why a *separate* worker process (not an `@Injectable()` in the API)
 
 The judging runs in a dedicated worker app, not inside your API server. Reasons, each defensible:
@@ -287,6 +308,11 @@ sequenceDiagram
 A **queue** is a durable list of pending work items (**jobs**) that **producers** add to and
 **consumers** (workers) pull from. It decouples *accepting* work from *doing* work, absorbs bursts
 (a spike becomes a longer queue, not a meltdown), and lets you scale consumers independently.
+
+
+```exercise
+why-a-worker
+```
 
 ## D.2 BullMQ — a queue built on Redis
 
@@ -389,6 +415,15 @@ id twice while one is pending is ignored. That reduces duplicates; it does not e
 the handler still has to be idempotent. "Treat BullMQ as at-least-once; make the handler idempotent
 on submissionId" is both the rule and the interview answer.
 
+
+```exercise
+idempotent-worker
+```
+
+```exercise
+at-least-once
+```
+
 ## D.4 Why BullMQ over Kafka / RabbitMQ / SQS (for now)
 
 - **Kafka** is a distributed *event log* for high-throughput streaming with replay and many
@@ -472,6 +507,11 @@ Distributed systems *fail partially and constantly* — the Docker daemon hiccup
 OOM-killed, the network blips. Reliability isn't "no failures"; it's "failures handled
 gracefully." Three tools:
 
+
+```exercise
+websocket-rooms
+```
+
 ## F.1 Retries with exponential backoff
 
 Transient failures (a momentary daemon glitch) should be retried — but retrying *immediately and
@@ -479,6 +519,11 @@ forever* creates a **thundering herd** that kicks the system while it's down. **
 backoff** spaces retries out — 1s, 2s, 4s, 8s — giving the dependency room to recover, ideally with
 **jitter** (a small random offset) so many failed jobs don't all retry in lockstep. Cap the
 attempts; not everything is transient.
+
+
+```exercise
+retry-backoff
+```
 
 ## F.2 Dead-letter queue (DLQ)
 
@@ -488,6 +533,11 @@ separate holding area for "jobs that couldn't be processed", where a human (or a
 them without blocking live traffic. The mailroom analogy: undeliverable letters go to a dead-letter
 office, not back into the delivery loop forever. Never silently drop failures — a DLQ makes failure
 *visible and recoverable*.
+
+
+```exercise
+dlq
+```
 
 ## F.3 The failure scenarios to design for (and the quiz)
 

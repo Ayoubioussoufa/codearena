@@ -10,6 +10,17 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Eight exercises are embedded below**, at the end of the section that teaches each one. You write
+the code; the guide names what you got and what you missed, with a hint and a **👁 Show answer** on
+every one.
+
+These are the load-bearing ideas — everything in Phase 1 and after assumes them. If one of these
+does not click, it will cost you three times over later.
 ## Table of contents
 
 1. [Part A — TypeScript: from types to type-level programming](#part-a)
@@ -110,6 +121,11 @@ This matters when objects get serialized (JSON has no `undefined`) or diffed.
 > `exactOptionalPropertyTypes` check in this repo and had to be fixed.)
 
 ---
+
+
+```exercise
+strict-null
+```
 
 ## A.2 Generics — functions that take *types* as parameters
 
@@ -429,6 +445,11 @@ else (the framework) reads the note later and acts on it. `@Injectable()` on a N
 almost nothing at runtime except *record* "this class participates in dependency injection, and
 here are its constructor parameter types". (That answer is quiz question #1.)
 
+
+```exercise
+decorator-metadata
+```
+
 ## B.2 Dependency Injection — the *why*, from zero
 
 ### Step 1: the problem, with no framework in sight
@@ -560,6 +581,11 @@ constructor(@Inject(MAILER) private mailer: Mailer) {}
 Other recipes you'll meet: `useValue` (a ready-made object — perfect for config or test doubles)
 and `useFactory` (a function that builds the value, possibly async, possibly using *other* injected
 things).
+
+
+```exercise
+di-constructor
+```
 
 ## B.3 Modules — just labeled boxes of providers
 
@@ -719,6 +745,11 @@ Two words you need precisely:
 The entire discipline of architecture is one sentence: **maximize cohesion, minimize coupling, so
 that change stays cheap.** Every pattern below is a tool for that sentence.
 
+
+```exercise
+coupling-smell
+```
+
 ## C.2 SOLID — five principles, five tiny examples
 
 *(None of these examples are web code on purpose — the principles predate the web.)*
@@ -774,6 +805,11 @@ graph LR
     A2[OrderService] --> I2[OrderRepository interface]
     B2[MySqlOrderRepository] -->|implements| I2
   end
+```
+
+
+```exercise
+solid-dip
 ```
 
 ## C.3 Hexagonal architecture (ports & adapters)
@@ -867,6 +903,11 @@ class SqlLoanRepository      implements LoanRepository { /* SQL; used in prod */
 
 The `BorrowBook` test needs no database, no HTTP, no mocking library — just the in-memory adapter.
 *That test speed is not a nicety; it's what makes refactoring safe enough to do daily.*
+
+
+```exercise
+layer-placement
+```
 
 ## C.4 The repository pattern — precisely
 
@@ -983,6 +1024,11 @@ command in one package. That's 90% of what you need.
 *Why not Turborepo yet?* Turborepo adds build **caching and orchestration** ("don't rebuild what
 didn't change"). With 2–3 packages, plain pnpm is simpler and builds are fast anyway; adopt a build
 cache when waiting starts to hurt. Defaults should earn their complexity.
+
+
+```exercise
+monorepo-filter
+```
 
 ## D.2 Docker in fifteen lines
 
@@ -1250,6 +1296,11 @@ and the console logs the notification. Trace what happened against the Part B pi
 and a real `MenuService`, and asserts the total and the notification — no HTTP, no container, in
 milliseconds. If you can explain why that test is possible *because* of the constructor injection,
 you own the DI concept.
+
+
+```exercise
+docker-compose
+```
 
 ## Mastery checklist — you're ready to build Phase 0 when you can…
 

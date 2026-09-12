@@ -7,6 +7,18 @@
 
 ---
 
+
+---
+
+## ⌨️ This guide is interactive
+
+**Thirteen exercises are embedded below**, each at the end of the section that teaches it. You write
+the code; the guide names what you got and what you missed, and there is a hint and a
+**👁 Show answer** on every one.
+
+Most are the things that are wrong in ways a passing test will not show you — an index whose column
+order cannot answer your query, pagination that silently duplicates rows, a login whose *timing*
+leaks which emails are registered.
 ## Table of contents
 
 1. [Part A — Relational databases & PostgreSQL, from zero to EXPLAIN](#part-a)
@@ -313,6 +325,11 @@ Three properties to remember:
   "Karims" in a book sorted by surname). Leftmost-prefix rule; it will decide your key layouts
   forever.
 
+
+```exercise
+index-column-order
+```
+
 ## A.4 EXPLAIN ANALYZE — reading the query plan
 
 The **query planner** turns your SQL into an execution strategy. `EXPLAIN` shows the plan;
@@ -399,6 +416,11 @@ LIMIT 20;
   Trade-off to defend honestly: you lose "jump to page 37" — which infinite-scroll UIs never
   needed anyway.
 
+
+```exercise
+cursor-pagination
+```
+
 ## A.6 The N+1 problem
 
 Display 50 blog posts *with author names*. The innocent code:
@@ -428,6 +450,11 @@ N+1 hides easily behind ORMs and lazy loading — it's the most common real-worl
 CRUD apps. Detection habit: log SQL in development; if one page load prints a waterfall of
 identical-shaped queries, you found one.
 
+
+```exercise
+n-plus-one
+```
+
 ## A.7 Migrations — version control for your schema
 
 A **migration** is a script that transforms the schema from version N to N+1
@@ -448,6 +475,15 @@ the typed client. You review the generated SQL like any code.
 Vocabulary first: **authentication** ("authn") = *who are you?* — verifying identity.
 **Authorization** ("authz") = *what may you do?* — permissions. A bouncer checking your ID is
 authenticating; checking the guest list is authorizing.
+
+
+```exercise
+schema-constraints
+```
+
+```exercise
+transaction-atomicity
+```
 
 ## B.1 Passwords: why hashing, why salt, why bcrypt
 
@@ -486,6 +522,11 @@ $2b$12$N9qo8uLOickgx2ZMRZoMye.IjefY135Nf7uD1v9pIGSOZDGGuUeS6
 
 Everything fits in one string in one column. Verify with `bcrypt.compare(attempt, stored)`.
 
+
+```exercise
+timing-attack
+```
+
 ## B.2 The stateless problem: sessions vs tokens
 
 HTTP is **stateless** — every request arrives with amnesia. After login, how does request #2 prove
@@ -521,6 +562,11 @@ Three facts people get wrong constantly:
 3. **It cannot be un-issued.** There's no lookup, so there's nothing to delete. A stolen JWT is
    valid until `exp` (its expiry claim). This is THE weakness the whole next section exists to
    manage.
+
+
+```exercise
+jwt-payload
+```
 
 ## B.3 Access + refresh tokens, and rotation
 
@@ -569,6 +615,11 @@ Details that are actually the interview answers:
   for weeks.
 - **Idempotent logout**: logging out twice (double-click, retried request) must succeed both times
   — "delete if exists", never "error if already gone".
+
+
+```exercise
+rotation-order
+```
 
 ## B.4 Where the client stores tokens — XSS vs CSRF
 
@@ -625,6 +676,15 @@ tab close, never persisted anywhere stealable), re-obtained via refresh on page 
 client needs a **refresh interceptor**: a wrapper around `fetch` that catches a 401, calls
 `/auth/refresh` once, then transparently retries the original request — otherwise users are
 "randomly logged out" every 15 minutes (this is the #1 rookie auth bug).
+
+
+```exercise
+cookie-flags
+```
+
+```exercise
+xss-vs-csrf
+```
 
 ## B.5 RBAC — role-based access control
 
@@ -689,6 +749,11 @@ Same discipline for configuration: parse `process.env` through a Zod schema at b
 (`PORT: z.coerce.number()`, `DATABASE_URL: z.string().url()`), so a typo'd env var crashes the app
 at startup with a named error instead of at 3 a.m. with a mystery.
 
+
+```exercise
+env-validation
+```
+
 ## C.2 The auth building blocks assembled
 
 How the pieces you now know click together in one request:
@@ -745,6 +810,11 @@ refetch on focus); unmount during flight → "setState on unmounted component"; 
 deduplication; every component re-implements loading/error. `useState` for server data isn't
 *wrong syntax* — it's the wrong *ownership model*: it treats a cache of someone else's data as if
 it were local truth.
+
+
+```exercise
+server-state
+```
 
 ## D.2 The TanStack Query mental model
 
@@ -807,6 +877,11 @@ const like = useMutation({
 ```
 
 The pattern is always the same trio: **snapshot → apply guess → (rollback | reconcile)**.
+
+
+```exercise
+refresh-interceptor
+```
 
 ## D.3 Virtualized lists (concept)
 

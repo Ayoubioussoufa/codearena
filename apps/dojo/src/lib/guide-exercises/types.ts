@@ -23,6 +23,15 @@ export interface GuideExercise {
   prompt: string;
   /** highlight.js language key. */
   language: string;
+  /**
+   * What is already in scope — imports, given types, the port you're
+   * implementing. Shown read-only above the editor so you never have to guess
+   * a path or an exported name, and never have to type an import to do an
+   * exercise that isn't about imports.
+   *
+   * Omit it when the imports ARE the exercise (the dependency-rule ones).
+   */
+  given?: string;
   /** What the editor starts with — usually a skeleton with TODOs. */
   starter: string;
   /** Revealed by the "show me" button, and after a pass. */

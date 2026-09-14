@@ -4,7 +4,7 @@ export default {
     'scope-enum': [
       2,
       'always',
-      ['api', 'web', 'dojo', 'shared', 'docs', 'adr', 'repo', 'infra', 'deps'],
+      ['api', 'worker', 'web', 'dojo', 'shared', 'docs', 'adr', 'repo', 'infra', 'deps'],
     ],
   },
 };

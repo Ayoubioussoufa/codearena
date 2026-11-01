@@ -37,8 +37,5 @@ generated/
 package-lock.json
 yarn.lock
 
-# local editor settings
-.claude/settings.local.json
-
 # next.js regenerates this every build
 next-env.d.ts

@@ -135,8 +135,7 @@ extra reps — they are not required to finish the roadmap.
 
 ## The 3–4 month schedule
 
-Aligns with your `WEEK-PLAN.md`: DSA runs at 1–2 problems/day on normal weeks, with **travel week as a
-DSA immersion**. Do the patterns in the order above; each "week" is a focus, not a hard boundary.
+DSA runs at 1–2 problems/day on normal weeks, with **travel week as a DSA immersion**. Do the patterns in the order above; each "week" is a focus, not a hard boundary.
 
 | Weeks | Focus patterns | Available | Cumulative | Milestone |
 |---|---|---|---|---|

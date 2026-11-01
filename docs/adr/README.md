@@ -16,4 +16,8 @@ Each file records one decision: what we chose, what we rejected, and why.
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| - | _none yet_ | - |
+| [002](002-argon2id-for-passwords.md) | Hash passwords with Argon2id | Accepted |
+| [003](003-refresh-token-rotation.md) | Access + refresh tokens, with rotation and reuse detection | Accepted |
+| [004](004-token-storage-cookie-vs-memory.md) | Refresh token in an httpOnly cookie, access token in memory | Accepted |
+| [005](005-per-ip-rate-limiting.md) | Rate-limit the credential endpoints per IP | Accepted |
+| [006](006-leetcode-codeforces-hybrid.md) | A LeetCode–Codeforces hybrid, judged through stdin/stdout | Proposed |

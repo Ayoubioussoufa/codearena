@@ -26,9 +26,13 @@ can…") → an answered self-quiz → hands-on exercises → the original readi
 | [Phase 5 — Contests, CQRS & Leaderboard](./phase-5-contests-cqrs-leaderboard.md) | State machines; the read/write tension & CQRS; events & projections; eventual consistency; Redis sorted sets (O(log N)); delta protocol; WebSocket fan-out; frozen scoreboard; batch rating updates; clock skew. Worked example: a leaderboard projector | Phase 5 |
 | [Phase 6 — Analytics, Anti-Cheat & Observability](./phase-6-analytics-anticheat-observability.md) | Materialized views; plagiarism detection (AST tokens → k-grams → Winnowing → Jaccard); the three observability pillars; distributed tracing & OpenTelemetry; trace-context propagation; Prometheus cardinality; RED/USE; alerting. Worked example: a Winnowing fingerprinter | Phase 6 |
 
-The full plan (all phases day-by-day, plus the 12-month horizon) lives in the merged roadmap on your
-Desktop: **`CodeArena_Master_Roadmap.docx`**. These guides go deep on the *knowledge* each phase
-assumes; the roadmap gives the *schedule* and the reading list each guide draws from.
+The schedule lives outside this repo, in `~/bcgx-prep/SPRINT.md`. Next to these guides:
+
+- [`revision/`](./revision/README.md): the refresher week. Questions about the code you actually
+  built, with the answers folded underneath.
+- [`adr/`](./adr/README.md): the decisions and what they rejected.
+  [ADR-006](./adr/006-leetcode-codeforces-hybrid.md) turns CodeArena into a LeetCode–Codeforces
+  hybrid, which brings Phase 3 (rating) and Phase 5 (contests, standings) back into scope.
 
 ## Can I complete a phase just by reading its guide?
 

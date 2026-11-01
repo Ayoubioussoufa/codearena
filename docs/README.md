@@ -28,8 +28,10 @@ can…") → an answered self-quiz → hands-on exercises → the original readi
 
 The schedule lives outside this repo, in `~/bcgx-prep/SPRINT.md`. Next to these guides:
 
-- [`revision/`](./revision/README.md): the refresher week. Questions about the code you actually
-  built, with the answers folded underneath.
+- [`revision/`](./revision/README.md): the refresher material. Questions about the code you
+  actually built, with the answers folded underneath, and the issues found in it.
+- [`weeks/`](./weeks/week-2-the-judge.md): each sprint week's guide (steps, decisions, the tests to
+  write first, traps), with that week's revision folded in.
 - [`adr/`](./adr/README.md): the decisions and what they rejected.
   [ADR-006](./adr/006-leetcode-codeforces-hybrid.md) turns CodeArena into a LeetCode–Codeforces
   hybrid, which brings Phase 3 (rating) and Phase 5 (contests, standings) back into scope.

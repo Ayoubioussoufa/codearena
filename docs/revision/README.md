@@ -157,6 +157,11 @@ From SPRINT.md's week 1, the CodeArena parts:
 
 Then send **`start week of 2 Nov`**.
 
+> **Update, 1 Nov:** the CodeArena half of this week didn't happen, so the revision now runs
+> **inside week 2**, one part a day, right before the build that depends on it. Follow
+> [week 2's guide](../weeks/week-2-the-judge.md). These five parts stay the material; Upsolve is
+> shelved until after the sprint.
+
 ## The shelf
 
 | Resource | For |

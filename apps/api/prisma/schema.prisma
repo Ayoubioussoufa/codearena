@@ -4,13 +4,17 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../generated/prisma"
+  provider            = "prisma-client"
+  output              = "../generated/prisma"
   // This app is CommonJS (no "type":"module" in package.json).
   // Without these, Prisma 7 emits ESM and Node fails with
   // "exports is not defined in ES module scope".
-  moduleFormat = "cjs"
-  runtime      = "nodejs"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
+  // Generated Prisma client stays inside the src directory
+  // Compatibility with Jest (CommonJS environment)
+  // No .js extension conflicts during testing
+  runtime             = "nodejs"
 }
 
 datasource db {

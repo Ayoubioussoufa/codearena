@@ -5,8 +5,8 @@ through a **pipeline**: checks on your laptop, a pull request, a clean machine t
 it, a reviewer, and rules on GitHub that nobody can skip. Each layer catches what it can, as early
 as it can.
 
-CodeArena already has most of that pipeline, and you used every layer this autumn, often without
-seeing it. This guide shows you each layer: **what it catches, how it works, how to set it up from
+CodeArena has every layer of that pipeline except protection, and you used them all this autumn,
+often without seeing it. This guide shows you each layer: **what it catches, how it works, how to set it up from
 zero, and how to explain it in an interview.**
 
 > **Where this fits.** [Git — Workflow & Command Reference](/guides/git-workflow) teaches the
@@ -49,7 +49,7 @@ flowchart LR
 | `pre-commit` hook | your laptop | `git commit`, before the message | lint-staged: ESLint `--fix` on the staged files, then a typecheck of each app you touched | seconds | yes: `--no-verify`, `HUSKY=0` |
 | `commit-msg` hook | your laptop | right after you write the message | commitlint: Conventional Commits, plus your list of scopes | instant | yes: `--no-verify` |
 | Pull request | GitHub | when you open it | the template asks: What, Why, How I tested it, Security notes | — | a lazy description |
-| CI | a fresh machine on GitHub | every push to a PR, and to `main` | lint, typecheck, build, API unit tests; API e2e against Postgres; dojo content checks | minutes | only if `main` isn't protected |
+| CI | a fresh machine on GitHub | every push to a PR, and to `main` | lint, typecheck, build, unit tests; API e2e against Postgres; dojo content checks; commit messages, the PR title, a secret scan | minutes | only if `main` isn't protected |
 | Review | a person | before merging | design, correctness, security, naming: what tools can't judge | hours | when you work alone, it's you |
 | Protection | GitHub | at merge time | a PR is required, CI is green, the branch is up to date, no force-push | instant | no, when nobody is on the bypass list |
 
@@ -365,8 +365,9 @@ The name in brackets is the rule. Find it in the table above, and fix one ✖ at
 pnpm exec commitlint --from origin/main --to HEAD
 ```
 
-This checks **every commit on your branch**. It's what CI can run, so that a commit made with
-`--no-verify` can't reach `main` unchecked. The lab proves it (part 13, step 7).
+This checks **every commit on your branch**. CodeArena's CI runs it on every PR (part 14, fix 7),
+so a commit made with `--no-verify` can't reach `main` unchecked. The lab proves why it's needed
+(part 13, step 7).
 
 ```exercise
 read-commitlint-output
@@ -386,16 +387,28 @@ read-commitlint-output
 | runner | the machine | `ubuntu-latest`, brand new for every job |
 | step | one command (`run:`) or one reusable action (`uses:`) | `uses: actions/checkout@v4`, `run: pnpm lint` |
 | service | a container running next to the job | Postgres 16, for the e2e job |
-| check | a job's result, shown on the PR | `Lint, typecheck, build`, `API end-to-end`, `Dojo content checks` |
+| check | a job's result, shown on the PR | `Lint, typecheck, build`, `API end-to-end`, `Dojo content checks`, `Commit messages`, `Secret scan`, `PR title` |
 
-### Your workflow, job by job
+### Your workflows, job by job
+
+Two files, six checks, all on Node 24 (since 2 Nov, part 14).
+
+`ci.yml`, on every PR and every push to `main`:
 
 - **Lint, typecheck, build:** checkout → pnpm and Node → `pnpm install --frozen-lockfile` →
-  `prisma generate` → `pnpm lint` → `pnpm -r typecheck` → `pnpm build` → the API unit tests.
+  `prisma generate` → `pnpm lint` → `pnpm -r typecheck` → `pnpm build` → the API unit tests → the
+  worker's tests (`--if-present`).
 - **API end-to-end:** a Postgres service with a health check → install →
   `prisma migrate deploy` → `prisma generate` → `pnpm --filter api test:e2e`.
 - **Dojo content checks:** the generators, the diagrams, and the guide exercises (including the
   eleven in this guide).
+- **Commit messages** (PRs only): commitlint on every commit the PR brings onto `main`.
+- **Secret scan:** gitleaks over the whole history.
+
+`pr-title.yml`, on every PR, again whenever its title is edited:
+
+- **PR title:** commitlint on the title, because a squash merge turns it into the commit on
+  `main`.
 
 The steps that look odd, explained:
 
@@ -595,7 +608,7 @@ review-comments
 | Button | What lands on `main` | Use it when | Watch out for |
 |---|---|---|---|
 | **Create a merge commit** | every commit on the branch, plus a merge commit | the branch's own history matters | a busy graph; impossible if you require a linear history |
-| **Squash and merge** | **one** commit, titled with the PR title plus `(#N)` | the branch's commits are noise (`wip`, `fix test`) | the PR title **becomes** the commit message, and no hook ever checks it (part 14) |
+| **Squash and merge** | **one** commit, titled with the PR title plus `(#N)` | the branch's commits are noise (`wip`, `fix test`) | the PR title **becomes** the commit message, and no hook ever sees it: only CI's *PR title* check does (part 14) |
 | **Rebase and merge** | each commit, replayed on top of `main`, with new hashes | every commit is clean and meaningful on its own | each commit should make sense alone |
 
 From your history: `a9a86cb fix(api): generate the Prisma client without .js import extensions (#3)`
@@ -838,22 +851,129 @@ the right button (part 9).
 
 ---
 
-## 14. CodeArena's pipeline: what's missing
+## 14. Problems and how to fix each one
 
-Found on 2 Nov. Fix each one through an issue and a PR, like a team would. This guide gives hints,
-not fixes.
+Every GitHub and pipeline problem CodeArena had on 2 Nov, how each one was fixed, and how to check
+the fix yourself. The fixes are in PR #4 (`ci: harden the pipeline and check commits, titles and
+secrets`), except where a row says otherwise. Read this part when you want the details; you don't
+need it to build.
 
-| # | Gap | Why it matters | Hint |
-|---|---|---|---|
-| 1 | `apps/worker` has no lint-staged entry | worker commits skip lint and typecheck on your laptop | part 4: copy the *pattern* of the other apps (week 2, Monday's build) |
-| 2 | CI will run none of the worker's tests | the worker gets its first tests this week | part 6: one more step in the build job |
-| 3 | Commit messages and PR titles are checked only on laptops | `--no-verify`, and every squash title, reach `main` unchecked | part 5's `--from`/`--to`, and the lab's step 8 |
-| 4 | `ci.yml` declares no `permissions:` | the token's power depends on a setting nobody sees in review | part 6, security |
-| 5 | CI runs on **Node 20**, which reached end of life on 30 April 2026 | no more security fixes. And your commitlint and lint-staged need Node 22 or newer, so gap 3's fix will fail on Node 20. The root `package.json` still says `"node": ">=20"` | read the `engines` field in `node_modules/@commitlint/cli/package.json` |
-| 6 | `main` isn't protected | one slip lands untested | part 10, and the decision it needs |
-| 7 | No secret scan in CI | a leak would only be noticed if you ran gitleaks yourself | part 12 (optional, week 4) |
+### 1. Your September work wasn't on GitHub's `main`
 
-Gaps 3, 4 and 5 are all CI configuration, and they're related: one `ci:` PR can fix them together.
+- **The problem.** GitHub's `main` still held the August history. A PR from any September branch
+  would have carried 24 commits instead of one.
+- **The fix.** A force-push with a lease, after checking with `git cherry` that every commit on the
+  old `main` already existed in September as an identical change:
+  `git push --force-with-lease=main:<old hash> origin <new hash>:refs/heads/main`. Then the two old
+  branches were deleted.
+- **Check it.** `git rev-list --left-right --count origin/main...<your branch>` prints `0 1` for a
+  one-commit branch.
+
+### 2. CI was red on `main` (I-1)
+
+- **The problem.** Every e2e suite failed before running a test:
+  `Cannot find module './internal/class.js'`. `tsc` maps `.js` to the `.ts` file; Jest's resolver
+  doesn't.
+- **The fix.** Yours, in PR #3: `importFileExtension = ""` in the Prisma generator, so the
+  generated client imports without extensions.
+- **Check it.** `gh run list --branch main --limit 1` says `success`.
+
+### 3. No PR template
+
+- **The problem.** Every description started empty, so nothing asked for the testing or the
+  security notes.
+- **The fix.** `.github/pull_request_template.md`: What · Why · How I tested it · Security notes, an
+  instruction comment under each, and a four-box checklist (part 7).
+- **Check it.** For any new branch, **Compare & pull request** opens with the template filled in.
+
+### 4. Every merge button was enabled, and merged branches stayed forever
+
+- **The fix.** Settings → General → Pull Requests (part 9): merge commits off, squash and rebase
+  on, the **Update branch** button, merged branches deleted automatically:
+
+  ```bash
+  gh repo edit --enable-merge-commit=false --enable-squash-merge --enable-rebase-merge \
+    --squash-merge-commit-message pr-title-commits --allow-update-branch --delete-branch-on-merge
+  ```
+
+- **Check it.**
+  `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,deleteBranchOnMerge`
+  prints `false`, `true`, `true`, `true`.
+
+### 5. The worker was missing from lint-staged
+
+- **The problem.** A commit touching `apps/worker` skipped ESLint and the typecheck on your
+  laptop.
+- **The fix.** The same pair as the other apps, in `.lintstagedrc.mjs`:
+
+  ```js
+  'apps/worker/**/*.ts': [
+    'pnpm --filter worker exec eslint --fix',
+    () => 'pnpm --filter worker run typecheck',
+  ],
+  ```
+
+- **Check it.** Stage a file in `apps/worker/` and commit: the hook output lists
+  `apps/worker/**/*.ts`.
+
+### 6. CI would never run the worker's tests
+
+- **The problem.** The build job ran only the API's unit tests, and the worker gets its first tests
+  this week.
+- **The fix.** One step: `pnpm --filter worker run --if-present test`. With no `test` script yet,
+  `--if-present` makes it a no-op. The day you add the script, CI runs it, with no edit to the
+  workflow.
+- **Check it.** The build job's log shows the step. Once the worker has tests, it shows them
+  running.
+
+### 7. Commit messages and PR titles were only checked on laptops
+
+- **The problem.** `--no-verify` skips the `commit-msg` hook, and a squash merge's title never
+  passes through any hook: GitHub writes that commit on its own servers.
+- **The fix.** Two checks that nobody can skip:
+  - the **Commit messages** job runs `commitlint --from <base sha> --to <head sha>` on every commit
+    the PR brings in. It checks out with `fetch-depth: 0`, because the default one-commit checkout
+    has no range to lint.
+  - **`pr-title.yml`** lints the title, and runs again whenever it's edited. The title reaches the
+    shell through an environment variable, never through `${{ }}` inside the script: a title is
+    user input, and pasting it into a shell command would let a crafted title run commands.
+- **Check it.** On PR #4, the job logs show both commits linted, `found 0 problems`.
+
+### 8. The workflow declared no permissions
+
+- **The problem.** The job token's power depended on a repository setting that nobody sees in
+  review.
+- **The fix.** `permissions: contents: read` at the top of both workflows. Every job only reads the
+  code.
+- **Check it.** Read the top of `.github/workflows/ci.yml`.
+
+### 9. CI ran Node 20, which reached end of life on 30 April 2026
+
+- **The problem.** No more security fixes, and commitlint 21 and lint-staged 17 need Node 22.12 and
+  22.22 or newer. Fix 7 would have failed on Node 20.
+- **The fix.** `node-version: 24` in every job, and `"node": ">=24"` in the root `package.json`,
+  which matches your laptop.
+- **Check it.** `node -e "console.log(require('./node_modules/@commitlint/cli/package.json').engines)"`
+  prints the minimum version commitlint needs.
+
+### 10. Nothing scanned for secrets
+
+- **The fix.** The **Secret scan** job runs gitleaks over the whole history on every push. The two
+  findings it reported were reviewed and are listed by fingerprint in `.gitleaksignore`, one line
+  each, so only those exact findings are ignored:
+  - an expired example JWT in an old study note;
+  - a placeholder badge token in Nest's boilerplate README.
+- **Check it.** The job's log ends with `no leaks found`.
+
+### 11. `main` isn't protected, and can't be yet
+
+- **The problem.** On a free plan, rulesets and branch protection only exist for public
+  repositories. For CodeArena, GitHub's API answers
+  `Upgrade to GitHub Pro or make this repository public`.
+- **The options.** Make the repository public, or get GitHub Pro (free with the Student Developer
+  Pack). The settings to pick are in part 10.
+- **Until then.** Nothing reaches `main` except through a PR, and nothing merges while CI is red.
+  The template's checklist reminds you on every PR.
 
 ---
 

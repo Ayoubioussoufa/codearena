@@ -6,7 +6,9 @@ This guide is both halves: the **workflow** (parts 1–7) and the **complete com
 
 The one idea that makes everything else click: **Git stores snapshots, and commits are cheap, immutable, and identified by a hash.** Branches and tags are just movable labels pointing at commits. Almost every command is moving a label or making a new snapshot.
 
-> **Drill this guide** in [Practice → Git & Workflow](/practice/git) — 52 exercises, concept cards plus type-the-command recall.
+> **Drill this guide** in [Practice → Git & Workflow](/practice/git) — 62 exercises, concept cards plus type-the-command recall.
+>
+> **Next:** [Team Workflow — Hooks, CI & Pull Requests](/guides/team-workflow) covers the system around these commands: hooks, commitlint, CI, pull requests, review and protection.
 
 ---
 

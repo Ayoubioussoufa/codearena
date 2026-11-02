@@ -16,6 +16,7 @@ import { nestjsExercises } from "./nestjs";
 import { typescriptExercises } from "./typescript";
 import { testingExercises } from "./testing";
 import { gitWorkflowExercises } from "./git-workflow";
+import { teamWorkflowExercises } from "./team-workflow";
 import { phase0Exercises } from "./phase-0";
 import { phase1Exercises } from "./phase-1";
 import { phase2Exercises } from "./phase-2";
@@ -37,6 +38,7 @@ const BY_GUIDE: Record<string, GuideExercise[]> = {
   typescript: typescriptExercises,
   testing: testingExercises,
   "git-workflow": gitWorkflowExercises,
+  "team-workflow": teamWorkflowExercises,
   "phase-0-foundations": phase0Exercises,
   "phase-1-auth-data-frontend": phase1Exercises,
   "phase-2-execution-sandboxing": phase2Exercises,

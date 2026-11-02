@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Every job only reads the repository. Declared here so the token's power is
+# visible in review instead of depending on a repository setting.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Lint, typecheck, build
@@ -15,9 +20,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      # Node 24: Node 20 reached end of life in April 2026, and commitlint and
+      # lint-staged need 22 or newer. Matches "engines" in package.json.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -36,6 +43,10 @@ jobs:
       # Unit tests only: no database, no argon2, no Nest container. They run
       # against fakes behind the ports, so they need nothing from this job.
       - run: pnpm --filter api test
+
+      # The worker has no test script yet. --if-present makes this a no-op
+      # until it does, then runs its tests without anyone editing CI.
+      - run: pnpm --filter worker run --if-present test
 
   api-e2e:
     name: API end-to-end
@@ -61,7 +72,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter api exec prisma migrate deploy
@@ -79,7 +90,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter dojo test:generators
@@ -88,3 +99,41 @@ jobs:
       # and every ```exercise id in a guide must resolve. A broken check tells
       # the learner correct code is wrong, which is worse than no check.
       - run: pnpm --filter dojo test:guide-exercises
+
+  commits:
+    name: Commit messages
+    # The commit-msg hook runs on laptops, and --no-verify skips it. This is the
+    # check nobody can skip: every commit the PR would bring onto main.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # The default checkout is one commit deep; commitlint needs the range.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      # commitlint needs no native builds, so no install script gets to run.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: >-
+          pnpm exec commitlint --verbose
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      # The whole history, not just the tip: a secret deleted in a later commit
+      # is still in the repository.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Reviewed false positives live in .gitleaksignore, one fingerprint each.
+      - name: Scan the history with gitleaks
+        run: >-
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -w /repo
+          zricethezav/gitleaks:v8.30.1 git . --redact --verbose

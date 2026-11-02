@@ -1,0 +1,32 @@
+name: PR title
+
+# With squash merging, the PR title becomes the commit message on main, and no
+# hook ever sees it: GitHub writes that commit on its own servers. A separate
+# workflow so that editing the title re-runs only this check.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # The title is user input. It reaches the shell through an environment
+      # variable, never through ${{ }} inside the script, which would let a
+      # crafted title run commands on the runner.
+      - name: Lint the title with commitlint
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$TITLE" | pnpm exec commitlint --verbose

@@ -4,7 +4,7 @@
   "private": true,
   "description": "CodeArena — competitive programming & adaptive learning platform (pnpm monorepo)",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "packageManager": "pnpm@10.25.0",
   "pnpm": {

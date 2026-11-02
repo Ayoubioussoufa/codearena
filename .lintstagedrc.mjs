@@ -3,6 +3,10 @@ export default {
     'pnpm --filter api exec eslint --fix',
     () => 'pnpm --filter api run typecheck',
   ],
+  'apps/worker/**/*.ts': [
+    'pnpm --filter worker exec eslint --fix',
+    () => 'pnpm --filter worker run typecheck',
+  ],
   'apps/web/**/*.{ts,tsx}': [
     'pnpm --filter web exec eslint --fix',
     () => 'pnpm --filter web run typecheck',

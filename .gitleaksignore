@@ -1,0 +1,7 @@
+# Findings reviewed on 2 Nov 2026 and confirmed false positives. Each line is a
+# gitleaks fingerprint (commit:file:rule:line), so only that exact finding is ignored.
+
+# An expired example JWT in an old study note, not a key.
+2e7ee553b2c53eccb7b1ccef6df17ce858e774c4:WEEK-1-KNOWLEDGE.md:jwt:170
+# A placeholder badge token in Nest's boilerplate README.
+377f63d5c23bd45806c83713aa9d996c8d55e01b:apps/api/README.md:generic-api-key:5

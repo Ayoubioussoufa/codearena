@@ -8,6 +8,7 @@
 import { choice, text } from "../helpers";
 import type { Generator, Topic } from "../types";
 import { gitCommandGens } from "./git-commands";
+import { teamWorkflowGens } from "./team-workflow";
 
 const DOC = { slug: "git-workflow", label: "Dojo guide — Git & collaborative workflow" };
 
@@ -387,7 +388,7 @@ export const gitTopic: Topic = {
   title: "Git & Workflow",
   icon: "🌿",
   blurb:
-    "Version control an internship assumes: branching, staging, rebase vs merge, resolving conflicts, undoing safely, force-with-lease, and pull-request etiquette \u2014 plus the full command surface (diff, stash, reflog, bisect, cherry-pick, rebase -i). Concept cards plus type-the-command recall.",
+    "Version control an internship assumes: branching, staging, rebase vs merge, resolving conflicts, undoing safely, force-with-lease, and pull-request etiquette \u2014 plus the full command surface (diff, stash, reflog, bisect, cherry-pick, rebase -i), and the team pipeline around it (hooks, commitlint, CI, pull requests, protection). Concept cards plus type-the-command recall.",
   docSlug: "git-workflow",
   docTitle: "Git & collaborative workflow",
   generators: [
@@ -408,5 +409,6 @@ export const gitTopic: Topic = {
     recoverDeletedBranch,
     verifyMerged,
     ...gitCommandGens,
+    ...teamWorkflowGens,
   ],
 };

@@ -27,6 +27,7 @@ const KNOWN_SLUGS = new Set([
   "morocco-internship-playbook",
   "testing",
   "git-workflow",
+  "team-workflow",
   "python",
 ]);
 

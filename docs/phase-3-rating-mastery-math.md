@@ -449,7 +449,7 @@ lower = fewer reviews but more forgetting — an explicit, tunable trade-off.
 
 ## D.4 Why FSRS over SM-2 (quiz)
 
-**SM-2** is the classic 1980s Anki algorithm: a handful of fixed rules and an "ease factor" nudged
+**SM-2** is the classic SuperMemo algorithm from the 1980s, which Anki adopted: a handful of fixed rules and an "ease factor" nudged
 by hard-coded constants. It works, but it's rigid — the same interval multipliers for everyone,
 ignoring the actual statistical shape of forgetting. **FSRS** is a *fitted statistical model*: its
 parameters are trained on millions of real review logs, and it separates D, S, and R explicitly, so

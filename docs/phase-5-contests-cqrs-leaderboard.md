@@ -225,13 +225,17 @@ It's implemented as a **skip list** (a probabilistic layered linked list) plus a
 memory.
 
 ```
-ZADD leaderboard:7  100 alice   250 bob   175 carol      # add/update scores
-   internally kept sorted:  alice(100) < carol(175) < bob(250)
-
-ZREVRANGE leaderboard:7 0 9 WITHSCORES   # top 10 (REV = highest first)  → O(log N + 10)
-ZREVRANK  leaderboard:7 carol            # carol's rank from the top     → O(log N)
-ZINCRBY   leaderboard:7 50 alice         # atomically add 50 to alice    → O(log N)
+ZADD leaderboard:7 100 alice 250 bob 175 carol
+ZRANGE leaderboard:7 0 9 REV WITHSCORES
+ZREVRANK leaderboard:7 carol
+ZINCRBY leaderboard:7 50 alice
 ```
+
+- `ZADD` adds or updates scores; the set stays sorted internally: alice(100) < carol(175) < bob(250).
+- `ZRANGE … REV` returns the top 10, highest first, in O(log N + 10). (The older `ZREVRANGE` does the
+  same but is [deprecated since Redis 6.2](https://redis.io/docs/latest/commands/zrevrange/).)
+- `ZREVRANK` gives carol's rank from the top, in O(log N).
+- `ZINCRBY` atomically adds 50 to alice's score, in O(log N).
 
 That `ZREVRANK` — "what's my position among 100,000 people" in O(log N) — is the killer feature the
 whole leaderboard is built on. No sorting per request; the set is *always* sorted.
@@ -262,7 +266,7 @@ cyrine  501 pts, t=86000s →  501×1e6 + (999999−86000) = 501,913,999
 dia     499 pts, t=1s     →  499×1e6 + (999999−1)     = 499,999,998
 ```
 
-`ZREVRANGE` then returns **cyrine → ana → bilal → dia**: cyrine's extra point beats ana's much
+`ZRANGE … REV` then returns **cyrine → ana → bilal → dia**: cyrine's extra point beats ana's much
 faster time, and ana beats bilal purely on the tiebreaker. That is exactly the ordering the contest
 rules describe, from one `ZADD` per update.
 

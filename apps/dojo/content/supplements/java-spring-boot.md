@@ -159,7 +159,7 @@ streams
 
 **Maven** is the build tool (Java's `npm`), and its `pom.xml` is your `package.json` — it lists your
 libraries and defines build steps. Generate a ready project at [start.spring.io](https://start.spring.io):
-choose Maven, Java 21, Spring Boot 3.x, and add the starter dependencies **Spring Web, Spring Data JPA,
+choose Maven, Java 21 or 25 (both long-term-support releases), the current Spring Boot (4.x since November 2025; 3.x is what most existing codebases still run, and the concepts here are the same), and add the starter dependencies **Spring Web, Spring Data JPA,
 Validation, PostgreSQL Driver, Spring Security, Springdoc OpenAPI** (a "starter" bundles everything one
 feature needs). Key commands (the `./mvnw` is the "Maven wrapper" — a bundled Maven so teammates don't
 need it pre-installed):

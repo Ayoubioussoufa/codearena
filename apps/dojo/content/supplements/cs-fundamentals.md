@@ -371,8 +371,12 @@ The ladder, loosest (fast, risky) to strictest (safe, slow):
 | Serializable | everything — behaves as if transactions ran one at a time | (nothing — but costs speed and may force retries) |
 
 Senior-signal nuance to volunteer: the SQL standard says repeatable read allows phantoms, but
-**Postgres's implementation actually blocks most of them** — naming that gap between "standard" and
-"real implementation" impresses interviewers.
+**Postgres's repeatable read prevents them** ("allowed, but not in PG"), and its read uncommitted behaves
+like read committed, so it never shows dirty reads
+([Postgres docs: transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)).
+What Postgres's repeatable read still allows is a *serialization anomaly*, such as write skew; only
+serializable stops those. Naming that gap between "standard" and "real implementation" impresses
+interviewers.
 
 ### Indexes — the "index at the back of a book"
 

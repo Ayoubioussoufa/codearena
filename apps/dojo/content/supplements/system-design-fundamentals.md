@@ -122,7 +122,6 @@ That's 100 million requests/day. Divide by 100k seconds → **~1,000 QPS average
 ```exercise
 envelope-estimate
 ```
-
 ## Latency numbers every programmer should know
 
 Different kinds of storage and network hops are *wildly* different speeds — and knowing the rough
@@ -192,7 +191,6 @@ Two facts interviewers love, because they explain *why* redundancy works:
 > target you aim for to keep that promise.)
 
 ---
-
 ## Caching
 
 A **cache** is a small, super-fast store that keeps a copy of expensive-to-get data *close by*, so you
@@ -266,7 +264,6 @@ named patterns, and knowing the trade-offs is a strong interview signal:
 ```exercise
 cache-strategy
 ```
-
 ## Load balancing & stateless services
 
 A **load balancer** (LB) is the traffic cop that sits in front of your servers and spreads incoming
@@ -460,7 +457,6 @@ modern":
 ```exercise
 sql-or-nosql
 ```
-
 ## Consistency & the CAP theorem
 
 First, three definitions:
@@ -539,7 +535,6 @@ active machine dies *after* accepting a write but *before* replicating it, that 
 that window is a senior-level point.
 
 ---
-
 ## Asynchronous work & message queues
 
 Some work doesn't need to finish before you answer the user — sending a welcome email, making a
@@ -601,7 +596,6 @@ queue-backpressure
 ```exercise
 idempotency-key
 ```
-
 ## Rate limiting
 
 **Rate limiting** = capping how many requests one client (or API key) may make in a window, to protect
@@ -699,7 +693,6 @@ flowchart TD
 ```
 
 ---
-
 ## Worked design #1 — a URL shortener (the canonical opener)
 
 The most common *first* design question. Work it end-to-end with the five-step framework; aim to
@@ -962,7 +955,8 @@ across machines without losing priority.
 which is O(n log n) per query and dies under load.
 
 **Data structure: a Redis sorted set (ZSET).** Each member (userId) has a score (rating); the ZSET keeps them
-ordered. Updates are `ZADD` (O(log n)), the top-k is `ZREVRANGE 0 99` (O(log n + k)), and a user's rank is a single
+ordered. Updates are `ZADD` (O(log n)), the top-k is `ZRANGE key 0 99 REV` (O(log n + k); the older `ZREVRANGE` is
+[deprecated since Redis 6.2](https://redis.io/docs/latest/commands/zrevrange/)), and a user's rank is a single
 `ZREVRANK` (O(log n)). One structure answers every query fast. The **database stays the source of truth**; the ZSET
 is the **serving layer**, rebuilt from it if lost.
 
@@ -972,7 +966,6 @@ batch them), and exact rank for a user buried at position 4,000,000 (often an ap
 This is a real thing you built — say so, and walk your actual choices.
 
 ---
-
 ## Daily self-drill — how to practise one design each morning
 
 Reading designs is not the same as *producing* them under pressure. Turn this guide into a daily rep:

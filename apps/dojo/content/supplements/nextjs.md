@@ -33,7 +33,7 @@ flowchart TD
   A[Request] --> B[Server Components run on the server]
   B --> C{Needs state, effects, events, browser APIs?}
   C -->|no| D[Stays server-only, ships zero JS]
-  C -->|yes| E["use client" boundary]
+  C -->|yes| E["#quot;use client#quot; boundary"]
   E --> F[Client Component hydrates in the browser]
 ```
 
@@ -50,7 +50,6 @@ or shipping your whole page (and its data-fetching secrets) to the browser by ma
 ```exercise
 where-does-it-run
 ```
-
 ## 1. Routing is the file system
 
 Folders under `app/` are URL segments; a `page.tsx` makes a segment routable:
@@ -87,7 +86,6 @@ the shell in each page instead of a shared `layout`.
 ```exercise
 client-boundary
 ```
-
 ## 2. Fetching data — on the server, with `await`
 
 Server Components can be `async` and fetch inline. No `useEffect`, no loading state, no client bundle:
@@ -117,16 +115,21 @@ const posts = await getPosts();
 const [user, posts] = await Promise.all([getUser(), getPosts()]);
 ```
 
-**Control caching per request** via the `next` option:
+**Control caching per request.** In Next.js 16, caching is **opt-in**: a plain `fetch` isn't cached
+([fetch reference](https://nextjs.org/docs/app/api-reference/functions/fetch)). It runs on every request,
+or once at build time if the whole route is static.
 
 ```tsx
-fetch(url, { cache: "no-store" });            // always fresh (dynamic)
-fetch(url, { next: { revalidate: 60 } });     // ISR: cached, refreshed ≤ every 60s
-fetch(url, { next: { tags: ["users"] } });    // tag it, purge later with revalidateTag
+fetch(url);                                   // default: not cached
+fetch(url, { cache: "force-cache" });         // opt in: keep it in Next's server-side cache
+fetch(url, { cache: "no-store" });            // always fresh, even on an otherwise static route
+fetch(url, { next: { revalidate: 60 } });     // cached for at most 60 s, then refreshed
+fetch(url, { next: { tags: ["users"] } });    // tag it, expire it later by tag
 ```
 
-Next also *dedupes* identical `fetch`es within a render, so two components asking for the same data hit the
-network once.
+Separately, Next **memoizes** identical `GET` fetches (same URL and options) during one server render, so two
+components asking for the same data hit the network once. Memoization lasts one render; the cache above
+persists across requests.
 
 **The bug it prevents.** A page three times slower than needed (sequential awaits), and stale-or-too-fresh data
 from not choosing a caching strategy.
@@ -137,7 +140,6 @@ from not choosing a caching strategy.
 ```exercise
 server-component-fetch
 ```
-
 ## 3. Mutations — Server Actions and forms
 
 A **Server Action** is a function marked `"use server"` that runs on the server but is callable from the client —
@@ -161,8 +163,12 @@ export async function createTodo(formData: FormData) {
 </form>
 ```
 
-After a mutation you **must** revalidate the cache (`revalidatePath` or `revalidateTag`) or the UI shows stale
-data. For pending state, read the nearest form's status with `useFormStatus` — in a *child* Client Component:
+After a mutation you **must** invalidate whatever cached the old data, or the UI shows stale data:
+`revalidatePath("/todos")` for a page, or `updateTag("todos")` for tagged data. `updateTag` works only inside a
+Server Action and expires the tag immediately, so the user reads their own write
+([updateTag](https://nextjs.org/docs/app/api-reference/functions/updateTag)). Outside actions (a webhook in a
+route handler), use `revalidateTag(tag, "max")`; the one-argument `revalidateTag(tag)` is deprecated in
+Next.js 16 ([revalidateTag](https://nextjs.org/docs/app/api-reference/functions/revalidateTag)). For pending state, read the nearest form's status with `useFormStatus` — in a *child* Client Component:
 
 ```tsx
 "use client";
@@ -213,7 +219,6 @@ need a public endpoint) — or vice versa, trying to make a form post to a Serve
 ```exercise
 loading-error-boundaries
 ```
-
 ## 5. The client hooks React alone doesn't have
 
 These live in `next/navigation` (App Router — *not* the old `next/router`) and only work in Client Components:
@@ -251,14 +256,13 @@ browser at all.
 `<head>` by hand instead of exporting metadata.
 
 ---
-
 ## 6. Putting it together — a mental checklist for any feature
 
 ```mermaid
 flowchart TD
   A[New feature] --> B{Needs interactivity?}
   B -->|no| C[Server Component: await data, render]
-  B -->|yes| D[Small "use client" leaf for the interactive bit]
+  B -->|yes| D["Small #quot;use client#quot; leaf for the interactive bit"]
   A --> E{Changes data?}
   E -->|yes| F[Server Action + revalidatePath/Tag]
   E -->|reads only| G[fetch with the right cache option]
@@ -300,7 +304,7 @@ Answer each aloud before reading the answer under it.
 2. **Why doesn't a list refresh after a Server Action creates a row?**
    *Answer:* Because the route's rendered output is **cached** — the write happened, but nothing told
    Next.js the page's data is now stale, so it re-serves the existing render. Fix it inside the
-   action, after the write: `revalidatePath("/things")` (or `revalidateTag("things")` if you tagged
+   action, after the write: `revalidatePath("/things")` (or `updateTag("things")` if you tagged
    the fetch). The mental model: mutating data and *invalidating the cache that displayed it* are two
    separate steps, and you own the second one.
 

@@ -172,8 +172,10 @@ through a **system call (syscall)**: the narrow doorway between user code and th
 **seccomp** ("secure computing mode") with BPF filters lets you present the process a *smaller
 list* of allowed syscalls; forbidden ones are blocked (the call fails or the process is killed).
 
-Analogy: a building with 350 doors. Default seccomp locks the few genuinely dangerous ones
-(`mount`, `reboot`, kernel-module loading, `ptrace` for inspecting other processes). A **strict
+Analogy: a building with 350 doors. Docker's default seccomp profile locks the few genuinely dangerous
+ones (`mount`, `reboot`, kernel-module loading; `ptrace` only on kernels older than 4.8, since dropping
+`CAP_SYS_PTRACE` already stops tracing other processes —
+[Docker docs: seccomp](https://docs.docker.com/engine/security/seccomp/)). A **strict
 custom profile** inverts the default: deny everything, then allow only the ~50 syscalls a normal
 computation needs (`read`, `write`, `brk`, `exit`…). The narrower the doorway, the less kernel
 attack surface a submission can reach — most container-escape exploits work by abusing an exotic
@@ -231,21 +233,27 @@ So a plain `docker run user-code` is dangerous. The hardened invocation gathers 
 control into one line:
 
 ```bash
-docker run \
-  --rm \                              # delete container when done — no residue between submissions
-  --network none \                    # B.5: no connectivity
-  --memory=256m --memory-swap=256m \  # B.2: hard memory cap (swap=mem disables swap escape)
-  --cpus=1.0 \                        # B.2: one core max
-  --pids-limit=64 \                   # B.2: fork-bomb cap
-  --cap-drop ALL \                    # B.3: no root powers
-  --security-opt no-new-privileges \  # B.3: no privilege escalation
-  --security-opt seccomp=strict.json \# B.4: minimal syscall allowlist
-  --read-only \                       # B.5: immutable root filesystem
-  --tmpfs /tmp:size=16m \             # small disposable scratch
-  -v /path/to/code:/code:ro \         # B.5: submission mounted READ-ONLY
-  --user 1000:1000 \                  # run as unprivileged uid, never root
-  sandbox-image:latest  /code/run.sh
+docker run --rm --network none \
+  --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --security-opt seccomp=strict.json \
+  --read-only --tmpfs /tmp:size=16m \
+  -v /path/to/code:/code:ro --user 1000:1000 \
+  sandbox-image:latest /code/run.sh
 ```
+
+(No comments inside the command: a `#` after a trailing `\` breaks the line continuation when you copy it.)
+Flag by flag:
+
+- `--rm`: delete the container when done, so nothing is left between submissions.
+- `--network none` (B.5): no connectivity at all.
+- `--memory=256m --memory-swap=256m` (B.2): a hard memory cap; swap equal to memory means no swap escape.
+- `--cpus=1.0` and `--pids-limit=64` (B.2): one core at most, and the fork-bomb cap.
+- `--cap-drop ALL` and `--security-opt no-new-privileges` (B.3): no root powers, and no way to gain any.
+- `--security-opt seccomp=strict.json` (B.4): a minimal syscall allowlist.
+- `--read-only`, `--tmpfs /tmp:size=16m`, `-v …:/code:ro` (B.5): an immutable root filesystem, a small
+  disposable scratch space, and the submission mounted read-only.
+- `--user 1000:1000`: an unprivileged uid, never root.
 
 For adversarial, multi-tenant "run anyone's code" at scale, the next tier is **stronger isolation
 runtimes** — gVisor (a user-space kernel that intercepts syscalls so the real kernel is never
@@ -657,6 +665,11 @@ Trace it against the threat table (A.1):
 > handler then retries with backoff (F.1) and eventually dead-letters (F.2). *Every* `spawn` you ever
 > write needs this listener.
 
+> **One trap when `command` becomes `docker run`:** `child.kill("SIGKILL")` kills the `docker run`
+> *client*, not the container. The container keeps running, with its CPU and memory, until something
+> stops it. Give each run a unique `--name` and `docker kill` that name in `finish`. Lesson 2 of the
+> course takes this apart ([time limits](/courses/lessons/0002-time-limits)); it's issue I-17 in CodeArena.
+
 What this toy is *missing* and why the real one needs Docker: it does **not** provide memory limits,
 fork-bomb protection, network isolation, or filesystem isolation — those come only from the kernel
 controls in Part B, which is why the real `command` is `docker run` with the hardened flag set from
@@ -755,7 +768,7 @@ None of these need the project — they build the instincts the project will rel
 |---|---|
 | Namespaces, cgroups, capabilities, seccomp | *Container Security* (Liz Rice), ch. 1–4; her talk "What is a container, really?" |
 | Container privileges | Docker docs, "Runtime privilege and Linux capabilities" |
-| A real judge sandbox | `isolate` (the Codeforces sandbox) source — README + one syscall filter |
+| A real judge sandbox | [`isolate`](https://github.com/ioi/isolate), built for contest grading and used most prominently by CMS — README + one syscall filter |
 | Queue patterns, idempotency | BullMQ docs "Patterns" section; Brandur Leach, "Idempotency Keys" |
 | At-least-once, stream processing | *DDIA* ch. 11; Pat Helland, "Data on the Outside vs Data on the Inside" |
 | WebSocket scaling | Socket.io docs, Adapters & scaling section |

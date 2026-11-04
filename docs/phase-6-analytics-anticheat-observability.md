@@ -53,9 +53,15 @@ SELECT date_trunc('day', created_at) AS day, count(*) AS n
 FROM submissions
 GROUP BY 1;
 
+-- CONCURRENTLY needs a UNIQUE index on plain columns, covering every row:
+CREATE UNIQUE INDEX submission_daily_counts_day ON submission_daily_counts (day);
+
 -- refresh it (e.g., nightly via cron); CONCURRENTLY keeps it readable during refresh:
 REFRESH MATERIALIZED VIEW CONCURRENTLY submission_daily_counts;
 ```
+
+Without that unique index, the concurrent refresh fails with an error: it's how Postgres matches old rows
+to new ones ([Postgres docs: REFRESH MATERIALIZED VIEW](https://www.postgresql.org/docs/current/sql-refreshmaterializedview.html)).
 
 Trade-off: reads become instant, but the data is as fresh as the last refresh. That's usually fine
 for analytics (a dashboard that's an hour stale is acceptable; a leaderboard that's an hour stale is

@@ -152,15 +152,17 @@ time, so there's no type to emit. Hence Part 5's tokens.
 
 ## The failure mode to recognise
 
-Forget `@Injectable()` and **nothing errors at compile time.** The class simply becomes invisible
-to Nest, and you get a runtime error at boot:
+Forget `@Injectable()` and **nothing errors at compile time.** But TypeScript emits type metadata
+only "for declarations that have decorators"
+([TypeScript handbook: decorator metadata](https://www.typescriptlang.org/docs/handbook/decorators.html#metadata)),
+so an undecorated class has no record of its constructor's parameter types. Nest sees a parameter
+it can't identify, and you get a runtime error at boot:
 
 ```
 Nest can't resolve dependencies of ProblemsService (?)
 ```
 
 When you see that, check decorators before anything else.
-
 ---
 
 # Part 3 — The four building blocks
@@ -342,7 +344,6 @@ Week 1 JWT setup**, because the secret lives in validated config, not a literal.
 dynamic-module
 ```
 
-
 ---
 
 # Part 5 — Providers, completely
@@ -459,7 +460,6 @@ constructor(@Inject(forwardRef(() => B)) private b: B) {}
 **Treat it as a smell, not a solution.** A cycle means either one class is doing too much, or a
 shared concept belongs in a third place. Reach for `forwardRef` only after you've tried to remove
 the cycle.
-
 ---
 
 # Part 6 — Controllers and routing
@@ -512,8 +512,12 @@ controllers, and definitely not two folders.
 @Get('featured')   // unreachable
 ```
 
-**Static routes must be declared before dynamic ones.** Nest matches in declaration order, and this
-produces a genuinely baffling bug the first time.
+**Static routes must be declared before dynamic ones.** "Nest registers routes in declaration
+order", so on Express a parameter route can silently shadow a more specific one declared after it,
+and this produces a genuinely baffling bug the first time
+([Nest docs: controllers](https://docs.nestjs.com/controllers)). NestJS v12 adds an opt-in
+`routeResolutionStrategy: 'specificity'` that registers the most specific routes first; the
+default is still declaration order.
 
 ## Response control
 
@@ -576,7 +580,6 @@ If you need the response object only to set a cookie, use the passthrough form:
 
 Now you can call `res.cookie(...)` **and** still return a value normally. This is exactly what
 you'll want for httpOnly refresh cookies.
-
 ---
 
 # Part 8 — DTOs and validation
@@ -670,7 +673,6 @@ dto-coercion
 login-dto
 ```
 
-
 ---
 
 # Part 9 — The request lifecycle, in full
@@ -721,7 +723,6 @@ flowchart TD
 ```exercise
 pipeline-order
 ```
-
 
 ---
 
@@ -837,7 +838,6 @@ auth-guard
 ```exercise
 global-guard
 ```
-
 
 ---
 
@@ -958,7 +958,6 @@ export class AppModule implements NestModule {
 compression).
 **Use a guard or interceptor instead for:** anything that needs to know which controller or handler
 is running — middleware runs too early to know.
-
 ---
 
 # Part 15 — Custom decorators
@@ -1033,7 +1032,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 app.enableShutdownHooks();
 ```
 
-Without it, `onModuleDestroy` **never runs** and connections leak on every restart.
+The destroy and shutdown hooks run when you call `app.close()` yourself. A **signal** is another
+matter: Nest listens for `SIGTERM` and friends only after `enableShutdownHooks()`, because the
+listeners cost resources and are off by default
+([Nest docs: application shutdown](https://docs.nestjs.com/fundamentals/lifecycle-events#application-shutdown)).
+Without it, `docker stop` (which sends `SIGTERM`) ends the process without running
+`onModuleDestroy`, and the database connection is never closed cleanly.
 
 > Note this class uses `extends` **and** `implements` for different reasons: `extends PrismaClient`
 > to inherit its query methods, `implements OnModuleInit` so the compiler checks you spelled the
@@ -1077,7 +1081,6 @@ const config = app.get(ConfigService);
 Validate at boot with a Zod (or Joi) schema and **throw** on failure. The app then refuses to start
 with a message naming the bad variable — instead of booting happily and dying on the first request
 at 3am with an error that mentions nothing useful.
-
 ---
 
 # Part 18 — Testing
@@ -1212,7 +1215,6 @@ the whole point, and the pipeline is what makes it possible.
 resolve-dependencies
 ```
 
-
 ---
 
 # Part 21 — The CLI
@@ -1286,8 +1288,9 @@ a route fact.
 Nest stops serialising your return value. You must call `res.json()` yourself. Use
 `@Res({ passthrough: true })` if you only need to set a cookie.
 
-**8. Why does `onModuleDestroy` sometimes never run?**
-`app.enableShutdownHooks()` wasn't called.
+**8. Why does `onModuleDestroy` sometimes not run when the container stops?**
+`app.enableShutdownHooks()` wasn't called, so Nest isn't listening for `SIGTERM`. (An explicit
+`app.close()` runs the hooks either way.)
 
 **9. Difference between a guard returning `false` and throwing `UnauthorizedException`?**
 `false` → 403 Forbidden. The exception → 401 Unauthorized. Use 401 for "who are you?", 403 for

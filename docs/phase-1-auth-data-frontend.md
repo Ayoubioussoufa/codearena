@@ -522,6 +522,12 @@ $2b$12$N9qo8uLOickgx2ZMRZoMye.IjefY135Nf7uD1v9pIGSOZDGGuUeS6
 
 Everything fits in one string in one column. Verify with `bcrypt.compare(attempt, stored)`.
 
+> **Which algorithm today?** OWASP's [Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+> ranks **Argon2id** first (at least 19 MiB of memory, 2 iterations, parallelism 1), then scrypt,
+> and keeps bcrypt for legacy systems: work factor 10 or more, and passwords capped at 72 bytes,
+> because most bcrypt implementations ignore anything longer. That's why CodeArena uses argon2id
+> (ADR 002). bcrypt is explained here because its one-string format makes the ideas visible.
+
 
 ```exercise
 timing-attack
@@ -665,8 +671,10 @@ Defenses:
 - **`SameSite=Strict`** — the browser refuses to attach the cookie to any request initiated from
   another site. This kills the attack above outright. Trade-off: even a legitimate link *into*
   your app from an email arrives without the cookie (user looks logged out until navigation);
-  `SameSite=Lax` (the default) relaxes exactly that case, allowing top-level GET navigations —
-  a good default because GETs must never mutate state anyway.
+  `SameSite=Lax` relaxes exactly that case, allowing top-level GET navigations — a good choice
+  because GETs must never mutate state anyway. Some browsers apply Lax when no `SameSite` is set,
+  but not all ([MDN: Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie)),
+  so always set it explicitly.
 - **CSRF tokens** — a per-session random value that must ALSO arrive in a header/form field, which
   a foreign page can't read. Belt-and-suspenders for older browsers or `None` cookies.
 
@@ -806,7 +814,7 @@ function Products() {
 ```
 
 Diseases: two components using this fetch **twice** (no shared cache); data is stale forever (no
-refetch on focus); unmount during flight → "setState on unmounted component"; no retry; no
+refetch on focus); unmount during flight → a state update nobody will see (React 17 even warned about it); no retry; no
 deduplication; every component re-implements loading/error. `useState` for server data isn't
 *wrong syntax* — it's the wrong *ownership model*: it treats a cache of someone else's data as if
 it were local truth.

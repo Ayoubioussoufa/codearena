@@ -99,7 +99,6 @@ for (let i = 0; i < 3; i++) {
 binding *per iteration* — each closure captures its own. (More on closures in §5.)
 
 ---
-
 ## 3. Coercion, equality, and truthiness
 
 The eight falsy values — memorise them, everything else is truthy:
@@ -146,7 +145,6 @@ reached for `||` when they needed `??`.
 ```exercise
 coercion-predict
 ```
-
 ## 4. Functions, arrows, and the two returns
 
 Three ways to make a function; the differences matter:
@@ -174,8 +172,9 @@ greet("Sam", undefined); // greeting = "Hi"
 greet("Sam", null);      // greeting = null  (default does NOT apply)
 ```
 
-**The bug it prevents.** `.map(u => { ...u, active: true })` returns a list of `undefined` because the object
-literal wasn't parenthesised.
+**The bug it prevents.** `.map(u => { active: u.isActive })` returning a list of `undefined`: without
+parentheses the braces are a function body and `active:` is a label. (Put a spread in there,
+`u => { ...u, active: true }`, and it doesn't even parse: a `SyntaxError`.)
 
 ---
 
@@ -241,8 +240,11 @@ start() {
 The rule: **methods that need their own `this` stay regular functions; callbacks that should keep the outer
 `this` are arrows.** (Before arrows, people wrote `const self = this` or `.bind(this)`.)
 
-**The bug it prevents.** `Cannot read properties of undefined (reading 'seconds')` inside a callback, because
-`this` wasn't what you assumed.
+**The bug it prevents.** A timer stuck at 0. `setInterval` calls a regular function with a `this` of its own:
+`globalThis` (`window`) in a browser ([MDN: setInterval](https://developer.mozilla.org/en-US/docs/Web/API/Window/setInterval)),
+a `Timeout` object in Node. So `this.seconds += 1` quietly writes `NaN` onto the wrong object. Callers that pass
+no `this` at all, like `forEach` in strict code, give `undefined`, and then you get
+`Cannot read properties of undefined`.
 
 ---
 
@@ -250,7 +252,6 @@ The rule: **methods that need their own `this` stay regular functions; callbacks
 ```exercise
 this-binding
 ```
-
 ## 7. Destructuring, spread, and rest
 
 Pull fields out by name (objects) or position (arrays), with defaults:
@@ -320,7 +321,6 @@ a `.sort()` you thought was pure.
 ```exercise
 array-toolbox
 ```
-
 ## 9. Async — the event loop, promises, and `async/await`
 
 JavaScript is single-threaded: it runs one thing at a time and never blocks on I/O. Slow work (network, timers)
@@ -395,7 +395,6 @@ Named exports are imported by their exact name in `{ }`; the default is imported
 Modules are singletons (evaluated once, cached) and run in strict mode automatically.
 
 ---
-
 ## Mastery checklist — you can…
 
 - [ ] explain why `{} === {}` is false, and copy an object without aliasing it

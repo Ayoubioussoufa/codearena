@@ -340,6 +340,10 @@ function Provider({ children }) {
 }
 ```
 
+React 19 also accepts the context itself as the provider, `<WorkspaceContext value={value}>`; `.Provider`
+still works and will be deprecated in a future version
+([React 19 release post](https://react.dev/blog/2024/12/05/react-19)). You'll meet both.
+
 ### How a child actually reads it
 
 A child does **not** receive the workspace as a prop — nobody passes it one. Instead it *pulls* the
@@ -955,8 +959,11 @@ useLayoutEffect(() => {
 
 - **Default to `useEffect`.** Switch only when you *measure the DOM and immediately change it*, and you
   can see the flicker.
-- `useLayoutEffect` **does not run during server rendering** — Next.js will warn about it. Anything
-  needed for SSR belongs in `useEffect` (or `useSyncExternalStore` with a server snapshot).
+- `useLayoutEffect` **does not run during server rendering**: the server's HTML shows the pre-measure
+  state until the browser takes over. React 18 printed a warning about this; React 19 removed the warning
+  ([the React commit](https://github.com/facebook/react/commit/f77099b6f1ccc658eff3467c6b9337e1b77ec854)),
+  but the effect still runs only in the browser. Anything needed for SSR belongs in `useEffect` (or
+  `useSyncExternalStore` with a server snapshot).
 
 > **Memory hook:** *`useEffect` = after the paint; `useLayoutEffect` = before it.* Measure-then-move
 > is the only common reason to pay the second one's cost.

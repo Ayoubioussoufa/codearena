@@ -33,13 +33,17 @@ export type TopicId =
   | "coding-nest"
   | "coding-system-design"
   | "coding-testing"
-  | "coding-python";
+  | "coding-python"
+  // Lesson quizzes from /courses, scheduled for spaced review only.
+  | "course-recall";
 
 export interface DocRef {
   /** Guide slug under /guides/… */
   slug: string;
   /** Human label, e.g. "Phase 1 §A.3 — Indexes" */
   label: string;
+  /** Overrides the /guides/<slug> link, e.g. a course lesson's URL. */
+  href?: string;
 }
 
 interface ExerciseBase {

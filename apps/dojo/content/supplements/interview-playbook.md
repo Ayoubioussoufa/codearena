@@ -25,6 +25,11 @@ flowchart LR
   B -->|"Strategy consulting"| E["Case practice + fit stories"]
 ```
 
+
+```check
+archetypes
+```
+
 ## Amazon (and product tech generally)
 
 **Pipeline.** Online assessment (OA — an automated coding test you take from home: 2 DSA problems +
@@ -61,6 +66,11 @@ story you don't own.
 **Prepare a story bank, not scripts:** 8–10 real situations, each tagged with the 2–3 principles it
 can serve. Mine CodeArena for at least half of them (see the last section). Then rehearse each one
 out loud, against a timer, until follow-ups stop surprising you.
+
+
+```check
+star
+```
 
 ## Deloitte, Capgemini, Accenture (IT services)
 
@@ -129,6 +139,11 @@ Internalize these — the test rewards recall speed, not derivation:
   of n distinct items: n!.
 - **Probability.** favourable/total. Two dice: 36 outcomes; sum s has 6 − |s − 7| ways.
 
+
+```check
+aptitude
+```
+
 ## Presenting CodeArena — your project deep-dive
 
 Every archetype ends up asking about your project; services firms practically hire on it. Prepare
@@ -155,6 +170,11 @@ Redis; async judge workers consuming a BullMQ queue; WebSockets for live contest
 For each: the problem → 2 options you considered → what you chose and why → a number (latency,
 throughput, test count). "I considered X and Y, chose Y because Z" is the sentence that separates
 builders from tutorial-followers.
+
+
+```check
+project
+```
 
 ## Readiness checklist
 

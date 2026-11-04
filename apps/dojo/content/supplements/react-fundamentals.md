@@ -138,6 +138,11 @@ the two ideas: *batching* decides **when** the re-render happens; the *updater f
 updater-function
 ```
 
+
+```check
+renders
+```
+
 ## 3. Effects: reaching outside React to the real world
 
 Most of your code just turns state into JSX — that stays inside React. But sometimes you must touch
@@ -239,6 +244,11 @@ memorizing whole.
 stale-closure
 ```
 
+
+```check
+effects
+```
+
 ## 5. Keys: how React tells list items apart across renders
 
 When you render a list, React needs to match each *old* item to the corresponding *new* item so it can
@@ -300,6 +310,11 @@ actions (`useActionState` + `<form action>`) are a modern take on this uncontrol
 
 ```exercise
 controlled-input
+```
+
+
+```check
+lists
 ```
 
 ## 7. Context: handing a value to deep children without passing it down every level
@@ -492,6 +507,11 @@ derived-state
 
 ```exercise
 effect-not-needed
+```
+
+
+```check
+context
 ```
 
 ## Part II — the rest of the hooks
@@ -703,6 +723,11 @@ mounts. Handy for measuring, or for a list of nodes. In React 19 that function m
 
 ```exercise
 useref-vs-state
+```
+
+
+```check
+refs
 ```
 
 ## 11. `useCallback` and `React.memo` — when a function's *identity* is the bug
@@ -931,6 +956,11 @@ makes the component readable — not on principle.
 custom-hook
 ```
 
+
+```check
+memo
+```
+
 ## 14. `useLayoutEffect` — the effect that runs *before* the browser paints
 
 `useEffect` runs **after** the browser has painted, so the user briefly sees the pre-effect state. Almost
@@ -1151,6 +1181,11 @@ the `await`. That's the foundation of "Actions" — the next section.
 
 ---
 
+
+```check
+concurrent
+```
+
 ## 19. React 19's async & form hooks — `useActionState`, `useFormStatus`, `useOptimistic`, `use`
 
 React 19 turned the "submit a form, show a spinner, show an error, update the list" dance into
@@ -1235,6 +1270,11 @@ handy when you need a context value only in one branch.
 > `useOptimistic` fakes the result, `use` unwraps the promise.*
 
 ---
+
+
+```check
+react19
+```
 
 ## 20. Which hook do I reach for? — the cheat sheet
 

@@ -1,0 +1,32 @@
+<p class="kicker">Reference · the story track</p>
+<h1>Telling it, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0026-star-stories">26</a> and <a href="/courses/lessons/0027-your-system-out-loud">27</a>.</p>
+
+<h2 id="star">A STAR story, in 90 seconds</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Part</th><th>Time</th><th>Says</th></tr></thead>
+  <tbody>
+    <tr><td>Situation</td><td>~10 s</td><td>where, when, what was wrong</td></tr>
+    <tr><td>Task</td><td>~10 s</td><td>your goal and your role</td></tr>
+    <tr><td>Action</td><td>~45 s</td><td>what <em>I</em> did, step by step, and why</td></tr>
+    <tr><td>Result</td><td>~15 s</td><td>what changed, with a number</td></tr>
+    <tr><td>Learned</td><td>~10 s</td><td>what I now do differently</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li>“I”, not “we”. Numbers, not adjectives. Decisions with their trade-offs (the follow-up is “why not X?”). No filler.</li>
+  <li>About 150 words a minute out loud: 90 seconds ≈ 225 words.</li>
+  <li>Six stories: the sandbox, the faster query, the idempotent queue, a production bug, a disagreement, a failure.</li>
+</ul>
+
+<h2 id="design">A design interview, in order</h2>
+<ol>
+  <li><strong>Requirements:</strong> functional, and non-functional with numbers. Ask first.</li>
+  <li><strong>Estimates:</strong> rate = users × actions ÷ 86,400 (≈ 10<sup>5</sup>); peak = rate × factor; concurrency = rate × time each stays (Little's law); storage = items × size × days.</li>
+  <li><strong>API and data model</strong>, then <strong>the design</strong>, following one request end to end.</li>
+  <li><strong>One part in depth:</strong> the judge.</li>
+  <li><strong>At 100×:</strong> "bottleneck → change", following the load: runners, connections, hot reads, isolation.</li>
+  <li><strong>Trade-offs:</strong> "X instead of Y, because Z", and when it would flip.</li>
+</ol>

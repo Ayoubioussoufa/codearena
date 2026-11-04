@@ -1,0 +1,32 @@
+<p class="kicker">Reference · the web track</p>
+<h1>Next.js rendering and live updates, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0019-nextjs-rendering">19</a> and <a href="/courses/lessons/0020-verdict-live">20</a>.</p>
+
+<h2 id="rendering">Server and client components</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>Server component (default)</th><th>Client component (<code>'use client'</code>)</th></tr></thead>
+  <tbody>
+    <tr><td>Runs</td><td>on the server only</td><td>on the server for the first HTML, then in the browser (hydration)</td></tr>
+    <tr><td>Can</td><td>be async, read the database and secrets</td><td>use state, effects, event handlers, browser APIs</td></tr>
+    <tr><td>Ships code</td><td>no</td><td>yes, with everything it imports</td></tr>
+    <tr><td>Can render</td><td>both kinds</td><td>client components; server ones only as <code>children</code> passed in</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>Props server → client must be serializable:</strong> primitives, plain objects, arrays, Date, Map, Set, promises, JSX. Not functions or class instances.</li>
+  <li><strong>Whatever a client component receives ships</strong> in the RSC payload. Pass ids and small values, never secrets.</li>
+  <li><strong>Push <code>'use client'</code> to the leaves.</strong> Only <code>NEXT_PUBLIC_</code> env vars reach the browser; <code>import "server-only"</code> guards server modules.</li>
+  <li><strong>JSON inside <code>&lt;script&gt;</code>:</strong> escape <code>&lt;</code> as <code><</code>.</li>
+</ul>
+
+<h2 id="live">Live updates</h2>
+<ul>
+  <li><strong>Polling:</strong> <code>setTimeout</code> after each answer (never <code>setInterval</code>); stop on the final state, on unmount (<code>AbortSignal</code>), and on a timeout. TanStack: <code>refetchInterval: (q) =&gt; q.state.data?.status === "DONE" ? false : 1000</code>.</li>
+  <li><strong>Cost:</strong> users × frequency requests, mostly "no change".</li>
+  <li><strong>SSE:</strong> <code>Content-Type: text/event-stream</code>; <code>event: x\ndata: {…}\n\n</code>; <code>: ping</code> heartbeats; <code>EventSource</code> reconnects (and sends <code>Last-Event-ID</code>). Six connections per domain without HTTP/2.</li>
+  <li><strong>Subscribe, buffer, then read.</strong> Read-then-subscribe loses what's published in between.</li>
+  <li><strong>Redis Pub/Sub is at-most-once:</strong> the database stays the truth; push is an optimisation, polling the fallback.</li>
+  <li><strong>WebSocket</strong> when both sides talk continuously (chat, collaborative editing).</li>
+</ul>

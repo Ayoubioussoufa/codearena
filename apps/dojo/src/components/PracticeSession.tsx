@@ -19,7 +19,13 @@ import { useEffect, useRef, useState } from "react";
 import type { CodeCheckResult, Exercise, TopicId } from "@/lib/engine/types";
 import type { TopicBridge } from "@/lib/bridge";
 import { Rng, freshSeed } from "@/lib/engine/rng";
-import { ALL_GENERATORS, getTopic, type PoolEntry } from "@/lib/engine/registry";
+import {
+  ALL_GENERATORS,
+  REVIEW_POOL,
+  getTopic,
+  topicTitle,
+  type PoolEntry,
+} from "@/lib/engine/registry";
 import {
   weightedBagOrder,
   recordAnswer,
@@ -117,8 +123,9 @@ export function PracticeSession({
           }
         : null;
 
-  const pool: PoolEntry[] =
-    isMixed || isReview
+  const pool: PoolEntry[] = isReview
+    ? REVIEW_POOL
+    : isMixed
       ? ALL_GENERATORS
       : (topic?.generators ?? []).map((generator) => ({
           generator,
@@ -443,7 +450,7 @@ export function PracticeSession({
         <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           {(isMixed || isReview) && (
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-400">
-              {getTopic(ownerTopicId(exercise.genId))?.title}
+              {topicTitle(ownerTopicId(exercise.genId))}
             </p>
           )}
           <p className="whitespace-pre-wrap text-sm leading-7">
@@ -758,7 +765,7 @@ export function PracticeSession({
                 </div>
               )}
               <Link
-                href={`/guides/${exercise.docRef.slug}`}
+                href={exercise.docRef.href ?? `/guides/${exercise.docRef.slug}`}
                 className="mt-3 inline-block text-xs font-medium text-cyan-700 hover:underline dark:text-cyan-400"
               >
                 📖 Read more: {exercise.docRef.label}

@@ -1,0 +1,78 @@
+<p class="kicker">Reference · the data track</p>
+<h1>Postgres and Redis, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0015-how-an-index-works">15</a>, <a href="/courses/lessons/0016-reading-plans">16</a>, <a href="/courses/lessons/0017-transactions-isolation">17</a> and <a href="/courses/lessons/0018-leaderboard">18</a>.</p>
+
+<h2 id="indexes">Indexes</h2>
+<ul>
+  <li><strong>The unit of cost is the 8 kB page.</strong> <code>EXPLAIN (ANALYZE, BUFFERS)</code> counts them. A Seq Scan reads every page of the heap.</li>
+  <li><strong>A B-tree</strong> is a sorted copy of some columns plus a few levels of branch pages: millions of entries in four or five levels.</li>
+  <li><strong>Leftmost prefix:</strong> <code>(a, b)</code> serves <code>a</code>, or <code>a</code> and <code>b</code>; never <code>b</code> alone (I-16).</li>
+  <li><strong>Equality columns first, then the sort or range column.</strong> Then <code>ORDER BY … LIMIT</code> reads only what it returns. Backwards is free.</li>
+  <li><strong>Partial index:</strong> <code>… WHERE status = 'ACCEPTED'</code> indexes only the rows a query ever asks for: smaller and cheaper to write.</li>
+  <li><strong>Every index costs every insert.</strong> Name the query each one serves; delete the ones nobody can name.</li>
+</ul>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Plan node</th><th>When the planner picks it</th></tr></thead>
+  <tbody>
+    <tr><td>Seq Scan</td><td>no usable index, or a large share of the table matches</td></tr>
+    <tr><td>Index Scan</td><td>few rows: walk the tree, one heap page per row; also delivers rows in index order</td></tr>
+    <tr><td>Index Only Scan</td><td>every needed column is in the index, and the visibility map is fresh (<code>VACUUM</code>)</td></tr>
+    <tr><td>Bitmap Heap Scan</td><td>hundreds to thousands of scattered rows: collect pages, read each once; <code>BitmapAnd</code> combines indexes</td></tr>
+  </tbody>
+</table>
+</div>
+<pre>-- the real plan, real times, pages read
+EXPLAIN (ANALYZE, BUFFERS) SELECT …;
+-- refresh statistics after a big seed
+ANALYZE;</pre>
+
+<h2 id="plans">Reading a plan</h2>
+<ul>
+  <li><strong>Read from the innermost line outward.</strong> <code>cost</code> is an estimate; <code>actual time</code> is measured, in ms.</li>
+  <li><strong><code>rows</code> and <code>time</code> are per loop:</strong> multiply by <code>loops</code>.</li>
+  <li><strong>Find the node that holds the buffers.</strong> That's where the work is.</li>
+</ul>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td><code>Limit</code> 20 over <code>rows=1000</code></td><td>OFFSET</td><td>keyset: <code>WHERE (created_at, id) &lt; ($ts, $id) ORDER BY created_at DESC, id DESC LIMIT 20</code>; the cursor carries values (I-10)</td></tr>
+    <tr><td>estimate ≪ or ≫ actual</td><td>stale statistics</td><td><code>ANALYZE</code></td></tr>
+    <tr><td>Index Scan, many buffers, columns all in the index</td><td>heap fetches</td><td>count or select only indexed columns → Index Only Scan</td></tr>
+    <tr><td>the same query × N</td><td>N+1</td><td>one query: join, <code>EXISTS</code>, or <code>= ANY($1)</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>count(*)</code> counts rows; <code>count(col)</code> counts non-nulls. Over a <code>LEFT JOIN</code>, only the second gives 0.</p>
+
+<h2 id="isolation">Transactions and isolation</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Level</th><th>Snapshot</th><th>Lets through</th><th>On conflict</th></tr></thead>
+  <tbody>
+    <tr><td>READ COMMITTED (default)</td><td>per statement</td><td>non-repeatable reads, lost updates (app-side read-modify-write), write skew</td><td>waits, then re-checks the newest row</td></tr>
+    <tr><td>REPEATABLE READ</td><td>per transaction</td><td>write skew</td><td>40001 on a row changed since the snapshot</td></tr>
+    <tr><td>SERIALIZABLE</td><td>per transaction</td><td>nothing</td><td>40001 whenever no serial order fits: retry</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>Check-then-act, made safe:</strong> one statement (<code>SET n = n + 1</code>, conditional <code>UPDATE … WHERE</code>); a unique key + <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code>; <code>SELECT … FOR UPDATE</code>; or SERIALIZABLE + retry.</li>
+  <li><strong>Prisma 7.8:</strong> <code>$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })</code>; 40001 and deadlocks arrive as <code>P2034</code>. Retry the whole transaction, a bounded number of times.</li>
+  <li><strong>Test races concurrently</strong> (<code>Promise.all</code>), never sequentially.</li>
+</ul>
+
+<h2 id="redis">Redis: the leaderboard</h2>
+<pre>ZINCRBY  board 100 ada               # +100, O(log N)
+ZADD     board &lt;score&gt; ada           # set a score, O(log N)
+ZRANGE   board 0 9 REV WITHSCORES    # top 10 (ZREVRANGE is deprecated)
+ZREVRANK board ada                   # 0 = best, O(log N); nil if absent
+ZSCORE   board ada                   # O(1)
+EVAL     "&lt;lua&gt;" 2 key1 key2 arg1 …  # atomic: nothing runs in between</pre>
+<ul>
+  <li><strong>Sorted set</strong> = skip list + hash table. Ties order by member name, so build a <strong>composite score</strong>: <code>points × T + (T − 1 − reachedAt)</code>, below 2<sup>53</sup>.</li>
+  <li><strong>Idempotent update:</strong> <code>SADD solved user:problem</code> and the points in <strong>one Lua script</strong>.</li>
+  <li><strong>Derived data:</strong> Postgres is the truth. Write Redis after the commit; rebuild aside, then <code>MULTI</code> + <code>RENAME</code> + <code>EXEC</code>.</li>
+  <li><strong>Lua:</strong> <code>tostring</code> and <code>..</code> keep 14 significant digits; pass numbers straight to <code>redis.call</code>, or <code>string.format('%.0f', n)</code>.</li>
+</ul>

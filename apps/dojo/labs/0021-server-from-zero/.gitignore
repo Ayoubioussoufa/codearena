@@ -1,0 +1,4 @@
+# What you create in this lab: your key pair and your provisioning files.
+keys/
+setup.sh
+50-hardening.conf

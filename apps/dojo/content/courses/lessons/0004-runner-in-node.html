@@ -1,0 +1,223 @@
+<!--
+  Lesson 0004 · body only. The page renders the title, meta, warm-up (at the
+  warmup marker), quiz (at the quiz marker), finish line and pager.
+-->
+<p class="lede">CodeArena’s worker isn’t written in C. It’s TypeScript, running on Node. Today you rebuild your runner in Node, and see that every system call from lessons 1 to 3 is still there, hidden behind events and streams. You’ll also meet the Node defaults that look helpful and would quietly break a judge.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>In lesson 8, CodeArena’s <code>DockerCodeRunner</code> will be <code>spawn("docker", [...])</code> with this lesson’s runner wrapped around it. Every mistake here becomes a production bug there: a worker that crashes on one submission, a verdict that waits forever, a timeout that leaves processes behind. You’ll make some of those mistakes today, on purpose, in a lab where the checker catches them.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. The same system calls, behind events</h2>
+
+<p>Node doesn’t have different powers from C. Its I/O library, <strong>libuv</strong>, makes the same system calls you made by hand. What changes is how you hear about the results: instead of blocking in <code>waitpid</code>, you get an <strong>event</strong> when something happens, and your code runs in between. Here’s everything you built, translated:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Lessons 1–3, in C</th><th>In Node</th></tr></thead>
+  <tbody>
+    <tr><td><code>fork</code> + <code>execvp</code></td><td><code>spawn(command, args)</code></td></tr>
+    <tr><td><code>exec</code> fails, the child calls <code>_exit(127)</code></td><td>an <code>'error'</code> event, <code>err.code === "ENOENT"</code>, and maybe no exit at all</td></tr>
+    <tr><td><code>waitpid</code>, then <code>WIFEXITED</code> / <code>WTERMSIG</code></td><td>the <code>'exit'</code> event: <code>(code, signal)</code>, exactly one of them non-null</td></tr>
+    <tr><td><code>pipe</code> + <code>dup2</code></td><td><code>stdio: "pipe"</code> (the default): <code>child.stdin</code>, <code>child.stdout</code>, <code>child.stderr</code></td></tr>
+    <tr><td><code>poll()</code>, then <code>read</code> while it runs</td><td><code>'data'</code> events, from the event loop</td></tr>
+    <tr><td>close the write end, so the reader sees end of file</td><td><code>child.stdin.end()</code></td></tr>
+    <tr><td><code>setpgid(0, 0)</code> in the gap</td><td><code>{ detached: true }</code>, which calls <code>setsid()</code>: a new session and a new group</td></tr>
+    <tr><td><code>kill(-pgid, SIGKILL)</code></td><td><code>process.kill(-child.pid, "SIGKILL")</code></td></tr>
+    <tr><td><code>CLOCK_MONOTONIC</code></td><td><code>performance.now()</code></td></tr>
+    <tr><td><code>RLIMIT_FSIZE</code></td><td>nothing: you count the bytes yourself</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">The <code>exec</code>/<code>execFile</code> functions in Node are not <code>execvp</code>: they’re spawn plus “collect all the output into one string”. Same word, different thing.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Four events, and the one to wait for</h2>
+
+<p>A child process in Node is an object that emits events:</p>
+<ul>
+  <li><strong><code>'spawn'</code></strong>: the program started.</li>
+  <li><strong><code>'error'</code></strong>: it couldn’t be started (or killed). For a missing program, this is all you get.</li>
+  <li><strong><code>'exit'</code></strong> <code>(code, signal)</code>: the process ended. Its pipes may still hold unread output.</li>
+  <li><strong><code>'close'</code></strong> <code>(code, signal)</code>: the process ended <em>and</em> all its stdio streams are closed. Wait for this one, or you’ll miss the last chunk of output.</li>
+</ul>
+
+<p><strong>Try it</strong> (2 minutes):</p>
+<pre>node -e '
+const { spawn } = require("node:child_process");
+for (const cmd of ["sh", "./no-such-program"]) {
+  const c = spawn(cmd, ["-c", "echo hi; exit 3"]);
+  for (const ev of ["spawn", "error", "exit", "close"])
+    c.on(ev, (...a) => console.log(cmd, ev, a.map(String).join(" ")));
+  c.stdout.on("data", (d) => console.log(cmd, "data", JSON.stringify(String(d))));
+}'</pre>
+<p>For <code>sh</code>: spawn, data, exit, close, possibly in a slightly different order. For the missing program: an <code>'error'</code> with <code>ENOENT</code>, then a <code>'close'</code> with the odd code <code>-2</code> (that’s <code>-ENOENT</code>), and no <code>'exit'</code> at all. That’s the 127 of lesson 1, arriving by a different door, and it’s why a runner must resolve exactly once.</p>
+
+<p class="aside">Remember lesson 3’s rule: a reader sees end of file only when <em>every</em> copy of the write end is closed. If an orphan still holds the child’s stdout, <code>'close'</code> never fires.</p>
+
+<p>There’s a trap in <code>'close'</code>, and it’s lesson 3’s rule again. It waits for every copy of the pipes to close, and a grandchild that inherited stdout holds a copy. Kill only the direct child, and <code>'close'</code> waits for the orphan, maybe forever. When this lesson’s checker was tested with a runner that killed only the direct child, <code>run()</code> simply never answered. Killing the whole group at the deadline is what makes <code>'close'</code> arrive.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Streams, and the event loop</h2>
+
+<p>In C, reading while the program runs took <code>poll()</code> and a loop. In Node, it’s the default. The <strong>event loop</strong> asks the kernel which pipes have data (with <code>epoll</code> on Linux, a bigger cousin of <code>poll</code>: see <a href="https://docs.libuv.org/en/v1.x/design.html">libuv’s design overview</a>), reads them, and hands you each chunk in a <code>'data'</code> event. That solves lesson 3’s deadlock, on three conditions:</p>
+<ol>
+  <li><strong>Read both streams.</strong> If nobody listens to stderr, Node stops draining it once its own buffer is full. The pipe fills, and the child blocks in <code>write</code>: lesson 3’s deadlock through the side door.</li>
+  <li><strong>End stdin.</strong> Write the input, then call <code>child.stdin.end()</code>. Without it, a program reading to end of file waits forever.</li>
+  <li><strong>Expect EPIPE.</strong> If the program exits without reading all its input, your next write fails with <code>EPIPE</code>. On a Node stream, that’s an <code>'error'</code> event, and an <code>'error'</code> event with no listener is thrown as an uncaught exception. <strong>One submission crashes your whole worker.</strong></li>
+</ol>
+
+<p><strong>Try it</strong> (2 minutes). Condition 1, broken on purpose:</p>
+<pre>node -e '
+const { spawn } = require("node:child_process");
+const c = spawn("python3", ["-c", "import sys; sys.stderr.write(\"e\" * 200000); print(\"done\")"]);
+c.stdout.on("data", (d) => console.log("stdout:", String(d).trim()));
+setTimeout(() => { console.log("still running after 2 s:", c.exitCode === null); c.kill("SIGKILL"); }, 2000);'</pre>
+<p>“done” never prints: Python is stuck writing stderr that nobody reads. Add <code>c.stderr.on("data", () =&gt; {});</code> and it finishes at once.</p>
+
+<p class="aside">Collect output as <code>Buffer</code> chunks and decode once at the end. A UTF-8 character can be split across two chunks, and decoding each chunk separately would mangle it.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Node’s defaults are not a judge’s defaults</h2>
+
+<p>Node’s child-process options are designed for trusted programs. For a stranger’s code, three of them are traps:</p>
+<ul>
+  <li><strong>The <code>timeout</code> option</strong> sends <code>killSignal</code>, which is <a href="https://nodejs.org/api/child_process.html#child_processspawncommand-args-options">SIGTERM by default</a> (ignorable), and only to the direct child, not its group. That’s both of lesson 2’s traps in one option. When this lesson was tested, a shell killed this way left its <code>sleep</code> running.</li>
+  <li><strong><code>exec</code> and <code>execFile</code></strong> collect all output in memory, up to <code>maxBuffer</code> (<a href="https://nodejs.org/api/child_process.html#child_processexeccommand-options-callback">1 MiB by default</a>), then kill the child with SIGTERM. You can’t stream, you can’t cap stdout and stderr your own way, and the kill is the polite one.</li>
+  <li><strong><code>shell: true</code></strong>, and <code>exec</code> with a string, run your command through <code>/bin/sh -c</code>. Build that string from anything a user controls, and a filename like <code>x; rm -rf ~</code> runs as a command. This is <strong>shell injection</strong>. A judge treats submitted code as data (a file, or stdin), and passes arguments as an array, never as one string.</li>
+</ul>
+
+<p>So you write the deadline yourself: <code>{ detached: true }</code> makes the child “the leader of a new process group and session” (<a href="https://nodejs.org/api/child_process.html#optionsdetached">Node docs</a>), and at the deadline, <code>process.kill(-child.pid, "SIGKILL")</code> reaches every process in it.</p>
+<p class="aside"><code>detached</code> also means the group outlives your worker if the worker dies. In lesson 8, the worker kills its running groups when it shuts down.</p>
+
+<p><strong>Before you build it, predict it.</strong> Unread streams, EPIPE and three ways to kill: say what each runner would report, with new scenarios every round.</p>
+<!-- drill:node-facts -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build: <code>runner.mjs</code></h2>
+
+<div class="spec">
+  <p><strong>The contract</strong> is in <code>runner.start.mjs</code>, as JSDoc types. In short:</p>
+  <pre>run({ command, args, input, timeoutMs, maxOutputBytes }) → Promise&lt;{
+  outcome: "exit" | "signal" | "timeout"
+         | "output-limit" | "spawn-error",
+  exitCode, signal, stdout, stderr, timeMs
+}&gt;</pre>
+  <ul>
+    <li>It <strong>never rejects</strong>. A program that can’t start, crashes, hangs or floods is a fact, not an exception.</li>
+    <li><code>exitCode</code> is set only for <code>"exit"</code>, and <code>signal</code> (like <code>"SIGSEGV"</code>) only for <code>"signal"</code>.</li>
+    <li>stdout and stderr each keep at most <code>maxOutputBytes</code> bytes, and going over means <code>"output-limit"</code>. If a limit stopped the program, the outcome is the <em>first</em> limit it hit.</li>
+    <li>At the deadline or the limit, the program and everything it started are killed.</li>
+  </ul>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>The contract</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0004-runner-in-node
+cp runner.start.mjs runner.mjs
+bash check.sh</pre>
+  <p>Everything fails: <code>run</code> throws. Read the types in <code>runner.mjs</code>, then the cases in <code>check.mjs</code>. Each section of the checker is one step below.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>spawn, and the exit facts</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-1"> done</label>
+  </div>
+  <p>Return a <code>Promise</code> that spawns the program and resolves with the facts on <code>'close'</code>, or with <code>"spawn-error"</code> on <code>'error'</code>. Make “Ends by itself” green.</p>
+  <details>
+    <summary>Hint: resolve exactly once</summary>
+    <p>For a missing program, Node can emit <code>'error'</code> <em>and then</em> <code>'close'</code>. Keep a <code>settled</code> flag, and make one small <code>finish(facts)</code> function the only place that calls <code>resolve</code>. Everything else calls <code>finish</code>.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Streams</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-2"> done</label>
+  </div>
+  <p>Collect stdout and stderr, write the input and end stdin, and survive EPIPE. Make “Input and output” green, including the case where the program exits without reading 1 MB of input: the checker catches the uncaught exception that would have killed your worker.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>The deadline</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-3"> done</label>
+  </div>
+  <p>Spawn the program as the leader of its own group, set a timer, and at the deadline kill the whole group. Clear the timer when the run ends. Make “The deadline” green: a loop, a program that ignores SIGTERM, and two shells whose children must not survive.</p>
+  <details>
+    <summary>Your run() never answers on the shell cases?</summary>
+    <p>Then you killed only the shell. Its <code>sleep</code> is an orphan that still holds a copy of stdout, so <code>'close'</code> waits for it (section 2). Kill <code>-child.pid</code>, not <code>child.pid</code>, and spawn with <code>detached: true</code>, or there’s no group to kill.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <h3>The cap</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-4"> done</label>
+  </div>
+  <p>Count bytes per stream. Keep at most the cap; past it, record <code>"output-limit"</code> and kill the group. Exactly the cap must still pass. Then run <code>bash check.sh</code> until all 18 cases are green.</p>
+  <details>
+    <summary>Hint: “the first verdict wins”, in one operator</summary>
+    <p>Keep a <code>verdict</code> variable that starts as <code>null</code>. The timer does <code>verdict ??= "timeout"</code>, and the cap does <code>verdict ??= "output-limit"</code>. <code>??=</code> only assigns if it’s still <code>null</code>, so whichever limit was hit first is what you report: the thing that actually stopped the program.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: make wrong states impossible</h3>
+    <label><input type="checkbox" data-key="lesson-0004-step-5"> done</label>
+  </div>
+  <p>In the contract, <code>exitCode</code> is “set only when outcome is exit”, but the type can’t enforce that. Rewrite your runner as <code>runner.ts</code>, with <code>RunFacts</code> as a <strong>discriminated union</strong>: one shape per outcome, each with only its own fields (<code>{ outcome: "exit"; exitCode: number; … }</code>, <code>{ outcome: "signal"; signal: NodeJS.Signals; … }</code>, and so on). Then make <code>runner.mjs</code> a single line, <code>export { run } from "./runner.ts";</code>: Node 24 strips the types itself, and the checker doesn’t change.</p>
+  <p>Now try to read <code>facts.exitCode</code> without first checking <code>facts.outcome</code>, and watch your editor refuse. That’s how you’ll model CodeArena’s <code>RunResult</code> in lesson 8.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for a judge</h2>
+<ul>
+  <li><strong>The worker must survive every submission.</strong> Unhandled <code>'error'</code> events, unread streams and orphans holding pipes are worker bugs that look like user bugs.</li>
+  <li><strong>Never trust a convenience option with a stranger’s code.</strong> <code>timeout</code>, <code>exec</code>, <code>maxBuffer</code> and <code>shell</code> are built for programs you trust.</li>
+  <li><strong>Facts out, verdicts later.</strong> Your <code>run()</code> returns what happened, not whether the answer was right. Turning facts into AC, WA or TLE is the judge loop’s job (lesson 9).</li>
+  <li><strong>In Docker, the group isn’t enough.</strong> <code>spawn("docker", …)</code> starts a client, and killing its group kills the messenger (lesson 2, I-17). The DockerCodeRunner will also kill the container by name.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Open <code>apps/worker/src/ports/code-runner.port.ts</code> and <code>apps/worker/src/domain/run-result.entity.ts</code>. In the box in section 8 (not in the code yet), write the TypeScript type you want <code>CodeRunner.run()</code> to return, using what you built today: facts only, no verdict. Lesson 8 starts from your type, and you’ll change the code yourself.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>8. Say it in your own words</h2>
+<p>Your <code>RunResult</code> type from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://nodejs.org/api/child_process.html">Node.js docs: Child process</a></strong>. Read <code>child_process.spawn()</code>, then <code>options.detached</code>, <code>options.stdio</code>, and the <code>'close'</code>, <code>'error'</code> and <code>'exit'</code> events. Notice the warning near the top of the page, right after the introduction to pipes, about output that isn’t consumed: it’s the deadlock from section 3, in Node’s own words.</p>
+  <p>Then the <a href="https://nodejs.org/api/stream.html">Stream</a> page, “Event: 'error'” and “Buffering”, for why an unhandled stream error crashes the process.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how the event loop knows a pipe has data, why <code>detached</code> calls <code>setsid</code>, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0004</code></strong> message from section 8 and paste it in the terminal. For Node questions this lesson doesn’t cover, the <a href="https://stackoverflow.com/questions/tagged/child-process+node.js">child-process tag on Stack Overflow</a> is where they get answered.</p>
+</div>

@@ -155,6 +155,11 @@ over-stream in interviews** — a plain `for` loop you can explain beats a cleve
 streams
 ```
 
+
+```check
+java
+```
+
 ## 5. Project setup: Maven and Spring Initializr
 
 **Maven** is the build tool (Java's `npm`), and its `pom.xml` is your `package.json` — it lists your
@@ -217,6 +222,11 @@ class ApiErrors {
 
 ```exercise
 spring-controller
+```
+
+
+```check
+rest
 ```
 
 ## 7. Data with Spring Data JPA
@@ -367,6 +377,11 @@ persistence-context
 
 ```exercise
 jpa-n-plus-one
+```
+
+
+```check
+jpa
 ```
 
 ## 8. Security in one page
@@ -670,6 +685,11 @@ Rehearse these aloud in the *definition + example + trade-off* shape
 - What `@Transactional` does, its default rollback rules, and why it fails on self-invocation.
 - Lazy vs eager fetching; the N+1 problem and two fixes.
 - What `@SpringBootApplication` actually turns on (auto-configuration + component scan).
+
+
+```check
+security
+```
 
 ## Mastery checklist — you can…
 

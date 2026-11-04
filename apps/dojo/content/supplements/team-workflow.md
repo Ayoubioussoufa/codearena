@@ -375,6 +375,11 @@ read-commitlint-output
 
 ---
 
+
+```check
+pipeline
+```
+
 ## 6. Continuous integration with GitHub Actions
 
 ### The vocabulary
@@ -721,6 +726,11 @@ Not every PR needs an issue: small chores usually don't. Features and bugs do.
 
 ---
 
+
+```check
+merging
+```
+
 ## 12. Secrets and supply-chain hygiene
 
 - **Ignore what's secret, commit an example.** `.env` stays out of Git; `.env.example` holds the
@@ -746,6 +756,11 @@ leaked-secret
 ```
 
 ---
+
+
+```check
+secrets
+```
 
 ## 13. Build it from zero: the lab (45 min)
 
@@ -974,6 +989,18 @@ need it to build.
   Pack). The settings to pick are in part 10.
 - **Until then.** Nothing reaches `main` except through a PR, and nothing merges while CI is red.
   The template's checklist reminds you on every PR.
+
+### 12. A dojo test was red, and CI never ran it
+
+- **The problem.** `test:scheduling` failed one case: it expected a review item with no due date
+  to be due. The code says the opposite on purpose (an unscheduled item isn't in the queue: that's
+  what "reset reviews" relies on), so the test was stale. Nobody noticed, because CI only ran three
+  of the dojo's checks.
+- **The fix.** The test now expects "not due", matching the comment on `isDue`. CI's *Dojo content
+  checks* job also runs `test:scheduling` and the new `test:courses`, which checks every written
+  lesson: equal-length quiz options, links that resolve, labs that exist.
+- **Check it.** `pnpm --filter dojo test:scheduling && pnpm --filter dojo test:courses` both end
+  with a ✓.
 
 ---
 

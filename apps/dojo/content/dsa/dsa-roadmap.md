@@ -28,6 +28,11 @@ loud**, and if you can't explain *why* the trick is safe, you've memorised, not 
 
 ---
 
+
+```check
+loop
+```
+
 ## The 20 patterns, in learning order
 
 Order matters — each pattern builds on the ones before it (monotonic structures extend Stack; DFS/BFS
@@ -132,6 +137,11 @@ extra reps — they are not required to finish the roadmap.
 > Text Justification (H).
 
 ---
+
+
+```check
+order
+```
 
 ## The 3–4 month schedule
 

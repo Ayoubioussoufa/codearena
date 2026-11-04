@@ -50,6 +50,11 @@ or shipping your whole page (and its data-fetching secrets) to the browser by ma
 ```exercise
 where-does-it-run
 ```
+
+```check
+where
+```
+
 ## 1. Routing is the file system
 
 Folders under `app/` are URL segments; a `page.tsx` makes a segment routable:
@@ -86,6 +91,11 @@ the shell in each page instead of a shared `layout`.
 ```exercise
 client-boundary
 ```
+
+```check
+routing
+```
+
 ## 2. Fetching data — on the server, with `await`
 
 Server Components can be `async` and fetch inline. No `useEffect`, no loading state, no client bundle:
@@ -140,6 +150,11 @@ from not choosing a caching strategy.
 ```exercise
 server-component-fetch
 ```
+
+```check
+data
+```
+
 ## 3. Mutations — Server Actions and forms
 
 A **Server Action** is a function marked `"use server"` that runs on the server but is callable from the client —
@@ -219,6 +234,11 @@ need a public endpoint) — or vice versa, trying to make a form post to a Serve
 ```exercise
 loading-error-boundaries
 ```
+
+```check
+mutations
+```
+
 ## 5. The client hooks React alone doesn't have
 
 These live in `next/navigation` (App Router — *not* the old `next/router`) and only work in Client Components:
@@ -256,6 +276,11 @@ browser at all.
 `<head>` by hand instead of exporting metadata.
 
 ---
+
+```check
+navigation
+```
+
 ## 6. Putting it together — a mental checklist for any feature
 
 ```mermaid

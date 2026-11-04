@@ -1,0 +1,110 @@
+<!--
+  Lesson 0014 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Lesson 13 ended with an honest promise: a queue that survives crashes delivers each job <em>at least</em> once. Sometimes twice. Today you make the second delivery harmless, with a technique that also fixes I-6, the race in your refresh tokens: one statement that checks and writes at once.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>“The same job delivered twice judges once, and here’s the test that proves it, even concurrently” is the second-best sentence in your interview after the sandbox. The idea is called <strong>idempotency</strong>: doing something twice has the same effect as doing it once. Stripe built their API around it (<a href="https://stripe.com/blog/idempotency">Stripe: designing robust and predictable APIs with idempotency</a>).</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Check-then-write is a race</h2>
+<p>The obvious claim reads the submission, sees <code>PENDING</code>, then updates it to <code>RUNNING</code>. Two workers that both read before either writes both see <code>PENDING</code>, and both run it. That’s exactly I-6: two concurrent refreshes both find the token unused.</p>
+<p>The fix is to put the check <em>inside</em> the write:</p>
+<pre>UPDATE submissions
+SET status = 'RUNNING', claimed_by = $worker, claimed_at = now()
+WHERE id = $id AND status = 'PENDING'
+RETURNING id;  <span class="c">-- a row back: you won. Nothing back: someone else did</span></pre>
+<p>Why is that safe? The first UPDATE locks the row. The others wait, and when it commits, each one re-evaluates its <code>WHERE</code> against the new version of the row (<a href="https://www.postgresql.org/docs/current/transaction-iso.html">Postgres: Read Committed</a>). The row says <code>RUNNING</code> now, so nothing matches, nothing is written, and no row is returned. This is a <strong>compare-and-set</strong>. In Prisma it’s <code>updateMany</code> with the condition in <code>where</code>, then checking <code>count === 1</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Claims that expire, and fencing</h2>
+<p>A claim held by a dead worker blocks the submission forever. So a claim gets a <strong>lease</strong>: it can be taken over once <code>claimed_at</code> is older than some duration, by adding <code>OR (status = 'RUNNING' AND claimed_at &lt; now() - lease)</code> to the condition.</p>
+<p>That opens a subtler hole. The old worker may not be dead, only slow. If it finishes after the new owner, it overwrites a newer verdict. So every write after the claim must also be conditional on <em>still holding</em> it (<code>AND claimed_by = $worker</code>). That’s called <strong>fencing</strong>, and Martin Kleppmann’s article on distributed locks explains why a lease without it isn’t safe (<a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">How to do distributed locking</a>).</p>
+<p class="aside">Kleppmann’s stronger version is a <strong>fencing token</strong>: a number that increases with every claim, checked on every write. A worker id works when ids are unique per claim; the token works even if the same worker claims twice. That’s the challenge.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Retries, and the end of the line</h2>
+<ul>
+  <li><strong>Retry your failures, not the user’s.</strong> Docker or Postgres down: retry with <strong>exponential backoff</strong> (wait 1 s, 2 s, 4 s…) so a struggling service isn’t hammered. A verdict is a successful job, never retried.</li>
+  <li><strong>Never leave a submission in PENDING forever.</strong> After the last retry, give it a terminal state the user can see (an internal error with a “try again”), keep the job in the dead-letter queue, and alert.</li>
+  <li><strong>BullMQ’s side:</strong> <code>attempts</code> and <code>backoff</code> on the job, and a failed event after the last one (<a href="https://docs.bullmq.io/guide/retrying-failing-jobs">retrying failing jobs</a>). Throwing in the processor means “retry me”; returning normally means done, whatever the verdict.</li>
+</ul>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:idempotency -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build three statements</h2>
+<div class="spec">
+  <p>The full specification is in the lab’s <code>README.md</code>: <code>claim.sql</code>, <code>finish.sql</code> and <code>rotate.sql</code>, each a single statement using psql variables (<code>:id</code>, <code>:'worker'</code>, <code>:lease</code>, <code>:'verdict'</code>, <code>:'hash'</code>). The checker starts a throwaway Postgres, then fires 20 concurrent sessions at your claim and your rotation.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The claim</h3>
+    <label><input type="checkbox" data-key="lesson-0014-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0014-idempotency
+cat README.md
+bash check.sh</pre>
+  <p>Write <code>claim.sql</code> without the lease first: “The claim” goes green, including 20 racers and one winner. Then add the takeover condition. <code>make_interval(secs =&gt; :lease)</code> turns seconds into an interval.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The fenced finish</h3>
+    <label><input type="checkbox" data-key="lesson-0014-step-2"> done</label>
+  </div>
+  <p><code>finish.sql</code> writes the verdict only for the current owner of a <code>RUNNING</code> claim. The old worker, a stranger and a second finish must all write nothing.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>I-6</h3>
+    <label><input type="checkbox" data-key="lesson-0014-step-3"> done</label>
+  </div>
+  <p><code>rotate.sql</code>: the same idea for a refresh token. All 12 cases should pass. Then fix I-6 in CodeArena the same way, with a test that fails first (it’s in today’s task).</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a fencing token</h3>
+    <label><input type="checkbox" data-key="lesson-0014-step-4"> done</label>
+  </div>
+  <p>Add a <code>claim_version</code> column that every successful claim increments and returns, and make <code>finish</code> require the version it was given. Then explain, in one sentence, a case the worker-id check misses that the token catches.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>The idempotency test</strong> delivers the same job twice, also concurrently, and asserts the runner was called once and one verdict written: use the fake runner and count its calls.</li>
+  <li><strong>The claim lives in the worker, the condition in the database.</strong> No in-memory lock survives two worker processes.</li>
+  <li><strong>The lease must outlast a run.</strong> Pick it from your time limits (all tests, plus startup), or renew it while judging.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write down your claim’s condition, your lease duration and why, which errors you retry and how many times, and what the user sees after the last retry. In section 7’s box: it’s today’s design, before the code.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://stripe.com/blog/idempotency">Stripe: Designing robust and predictable APIs with idempotency</a></strong>, the classic article on why retries need idempotency and how idempotency keys work. Then Martin Kleppmann, <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">How to do distributed locking</a>, for leases and fencing tokens.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the WHERE is re-checked, how long a lease should be, why exactly-once delivery is impossible, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0014</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

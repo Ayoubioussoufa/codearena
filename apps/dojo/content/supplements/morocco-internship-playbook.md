@@ -40,6 +40,11 @@ The two games overlap ~60% — prepare for both simultaneously. English is the s
 differentiator: every multinational lists it, Game 1 interviews in it, and most local candidates
 are weaker at it than at French.
 
+
+```check
+games
+```
+
 ## How the market works
 
 **The PFE system.** The *Projet de Fin d'Études* (4–6 months, typically February–July) is
@@ -73,6 +78,11 @@ flowchart LR
   B --> C["Oct to Nov - forums and ESN campaigns"]
   C --> D["Dec to Jan - interview loops and offers"]
   D --> E["Feb to Jul - PFE, then conversion"]
+```
+
+
+```check
+market
 ```
 
 ## The employers — deep dive
@@ -292,6 +302,11 @@ claiming skills you can't defend for five minutes (ESN interviewers probe the CV
 being unprepared for "Can you continue in English?" (now standard even at French ESNs); accepting
 an unpaid no-name "PFE" out of panic in November — the campaign season runs through January and
 this list is deep enough.
+
+
+```check
+applying
+```
 
 ## Prep resources
 

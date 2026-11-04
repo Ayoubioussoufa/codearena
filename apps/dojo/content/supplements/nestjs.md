@@ -163,6 +163,11 @@ Nest can't resolve dependencies of ProblemsService (?)
 ```
 
 When you see that, check decorators before anything else.
+
+```check
+decorators
+```
+
 ---
 
 # Part 3 — The four building blocks
@@ -344,6 +349,11 @@ Week 1 JWT setup**, because the secret lives in validated config, not a literal.
 dynamic-module
 ```
 
+
+```check
+modules
+```
+
 ---
 
 # Part 5 — Providers, completely
@@ -460,6 +470,11 @@ constructor(@Inject(forwardRef(() => B)) private b: B) {}
 **Treat it as a smell, not a solution.** A cycle means either one class is doing too much, or a
 shared concept belongs in a third place. Reach for `forwardRef` only after you've tried to remove
 the cycle.
+
+```check
+providers
+```
+
 ---
 
 # Part 6 — Controllers and routing
@@ -580,6 +595,11 @@ If you need the response object only to set a cookie, use the passthrough form:
 
 Now you can call `res.cookie(...)` **and** still return a value normally. This is exactly what
 you'll want for httpOnly refresh cookies.
+
+```check
+routing
+```
+
 ---
 
 # Part 8 — DTOs and validation
@@ -673,6 +693,11 @@ dto-coercion
 login-dto
 ```
 
+
+```check
+dtos
+```
+
 ---
 
 # Part 9 — The request lifecycle, in full
@@ -722,6 +747,11 @@ flowchart TD
 > never contain `if (!user) throw`.
 ```exercise
 pipeline-order
+```
+
+
+```check
+lifecycle
 ```
 
 ---
@@ -837,6 +867,11 @@ auth-guard
 
 ```exercise
 global-guard
+```
+
+
+```check
+guards
 ```
 
 ---
@@ -958,6 +993,11 @@ export class AppModule implements NestModule {
 compression).
 **Use a guard or interceptor instead for:** anything that needs to know which controller or handler
 is running — middleware runs too early to know.
+
+```check
+wrappers
+```
+
 ---
 
 # Part 15 — Custom decorators
@@ -1081,6 +1121,11 @@ const config = app.get(ConfigService);
 Validate at boot with a Zod (or Joi) schema and **throw** on failure. The app then refuses to start
 with a message naming the bad variable — instead of booting happily and dying on the first request
 at 3am with an error that mentions nothing useful.
+
+```check
+extras
+```
+
 ---
 
 # Part 18 — Testing
@@ -1213,6 +1258,11 @@ the whole point, and the pipeline is what makes it possible.
    exist
 ```exercise
 resolve-dependencies
+```
+
+
+```check
+testing
 ```
 
 ---

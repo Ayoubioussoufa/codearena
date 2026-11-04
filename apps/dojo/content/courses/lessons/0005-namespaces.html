@@ -1,0 +1,198 @@
+<!--
+  Lesson 0005 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">So far your runner limits <em>how long</em> a program runs and <em>how much</em> it prints. But the program still sees everything: your files, your processes, your network. Today you take that away. You’ll build the thing Docker builds for every container, in about 100 lines of C, and you won’t need root to do it.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Lesson 1 said a sandbox is a set of rules about what the kernel lets a program see and do. <strong>Namespaces are the “see” half.</strong> After today, “a container” stops being magic: it’s a process started with a few extra flags, and you’ll have written those flags yourself. Lesson 2’s escaper, the grandchild that left your process group, can’t escape what you build today.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. A namespace is a private view</h2>
+
+<p>The kernel keeps some resources global: the hostname, the list of processes, the network interfaces, the mounted filesystems, the user IDs. A <strong>namespace</strong> gives a process its own copy of one of them. Everything else stays shared: same kernel, same CPU, same memory. Linux has eight kinds (<a href="https://man7.org/linux/man-pages/man7/namespaces.7.html">namespaces(7)</a>); you’ll use six:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Namespace</th><th>The program gets its own…</th></tr></thead>
+  <tbody>
+    <tr><td><code>CLONE_NEWUTS</code></td><td>UTS</td><td>hostname</td></tr>
+    <tr><td><code>CLONE_NEWPID</code></td><td>PID</td><td>process numbers, starting at 1, and only its own processes</td></tr>
+    <tr><td><code>CLONE_NEWNS</code></td><td>mount</td><td>table of mounted filesystems</td></tr>
+    <tr><td><code>CLONE_NEWNET</code></td><td>network</td><td>interfaces and routes: a new one has only a loopback</td></tr>
+    <tr><td><code>CLONE_NEWIPC</code></td><td>IPC</td><td>System V message queues and shared memory</td></tr>
+    <tr><td><code>CLONE_NEWUSER</code></td><td>user</td><td>user IDs: it can be root inside without being root outside</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Try it</strong> (3 minutes). The <code>unshare</code> command creates namespaces for a shell. No sudo needed:</p>
+<pre>unshare --user --map-root-user --pid --fork --mount-proc --uts --net sh
+hostname box; hostname       <span class="c"># changed... only in here</span>
+echo $$; ps                  <span class="c"># you're PID 1, and alone</span>
+ip link                      <span class="c"># just lo, and it's down</span>
+id -u                        <span class="c"># 0: root, in here</span>
+exit</pre>
+<p>Run <code>hostname</code> in another terminal: the host’s name didn’t change. That shell was a container in every sense except the files it could see. You’ll add those in section 4.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Root without power: the user namespace</h2>
+
+<p>Creating most namespaces needs root, with one exception: the <strong>user namespace</strong>. Any user can create one, and inside it the process can be uid 0, with all of root’s capabilities, but <em>only over resources that belong to that namespace</em> (<a href="https://man7.org/linux/man-pages/man7/user_namespaces.7.html">user_namespaces(7)</a>). Create the other namespaces together with a user namespace, and they belong to it. That’s how you’ll build a container without sudo.</p>
+<p>Who is “root inside” on the outside? The kernel reads <code>/proc/&lt;pid&gt;/uid_map</code>, one line per range: <code>inside-start outside-start count</code>. Your box will use <code>0 1000 1</code>: uid 0 inside is your own uid, 1000, outside. A file root creates inside belongs to <em>you</em> on the host, and the host’s files owned by real root stay out of reach.</p>
+
+<p class="aside">Before writing <code>gid_map</code>, an unprivileged process must write <code>deny</code> to <code>/proc/&lt;pid&gt;/setgroups</code>: otherwise “root” inside could drop a group that was keeping it <em>out</em> of a file (<a href="https://man7.org/linux/man-pages/man7/user_namespaces.7.html">user_namespaces(7)</a>, “Interaction with system calls that change process UIDs or GIDs”).</p>
+
+<p>There’s a catch, and it shapes your code. A new user namespace starts with <em>no</em> mapping, and the child can’t write its own: the map has to be written from outside, by the parent. So the child must <strong>wait</strong> until the parent has written it. The classic tool is a pipe: the child reads from it, and the parent closes it once the maps are written.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. PID 1 is special</h2>
+
+<p>The first process in a new PID namespace is its <strong>init</strong>, PID 1, and the kernel treats it differently in two ways (<a href="https://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid_namespaces(7)</a>):</p>
+<ul>
+  <li><strong>When PID 1 dies, the kernel kills every other process in the namespace</strong> with SIGKILL. No orphan survives, no matter what it did with <code>setsid</code>. That closes the hole lesson 2 left open: kill PID 1, and everything inside goes with it.</li>
+  <li><strong>PID 1 only receives signals it has a handler for.</strong> Only SIGKILL and SIGSTOP sent from an ancestor namespace are forced through. A shell or a Node program running as PID 1 with no SIGTERM handler simply ignores SIGTERM.</li>
+</ul>
+<p>The second rule is the rest of I-17. <code>docker run</code> forwards your SIGTERM to the container’s PID 1, and PID 1 ignores it, so nothing happens. Your checker proves it: inside your box, <code>kill -TERM $$</code> followed by <code>echo still alive</code> prints <em>still alive</em>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. A filesystem of its own</h2>
+
+<p>A mount namespace gives the box its own mount table, but at first it’s a copy of yours: the same files. To give it <em>different</em> files, you need three moves.</p>
+<ol>
+  <li><strong>A root filesystem:</strong> a directory holding a whole Linux userland. The checker makes one by exporting Alpine’s from Docker (<code>docker export</code> of an <code>alpine:3.20</code> container, about 8 MB).</li>
+  <li><strong><code>chroot(rootfs)</code></strong> makes that directory the process’s <code>/</code>. Then <code>chdir("/")</code>, or the current directory still points outside.</li>
+  <li><strong>The pseudo-filesystems.</strong> <code>ps</code> reads <code>/proc</code>, so mount a fresh <code>proc</code> there, which shows only your PID namespace. And programs expect <code>/dev/null</code> and friends, so mount a small <code>tmpfs</code> on <code>/dev</code> and bind-mount the host’s <code>/dev/null</code>, <code>/dev/zero</code> and <code>/dev/urandom</code> onto empty files in it. You can’t create device files in a user namespace, but you can bind existing ones: that’s what rootless container runtimes do.</li>
+</ol>
+<p>First, though, call <code>mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL)</code>, so your mounts stay in your namespace instead of propagating back to the host.</p>
+
+<p class="aside"><strong>chroot isn’t a wall on its own.</strong> Its man page warns it “is not intended to be used for any kind of security purpose” (<a href="https://man7.org/linux/man-pages/man2/chroot.2.html">chroot(2)</a>): a process with root’s powers can climb back out. Real runtimes use <code>pivot_root</code>, which swaps the whole root and lets you unmount the old one. That’s today’s challenge.</p>
+
+<p><strong>Before you build it, predict it.</strong> Which namespace hides what, what PID 1 does with each signal, and how a <code>uid_map</code> reads, with new cases every round:</p>
+<!-- drill:namespaces -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build <code>box</code></h2>
+
+<div class="spec">
+  <p><strong>Usage:</strong> <code>./box &lt;rootfs&gt; &lt;program&gt; [args...]</code></p>
+  <p>Runs the program inside new UTS, PID, mount, network, IPC and user namespaces, with <code>rootfs</code> as its root, hostname <code>box</code>, uid 0 inside mapped to your uid outside, <code>/proc</code> mounted and a minimal <code>/dev</code>. The program’s output goes straight through. Then <code>box</code> prints one line, <code>exit N</code> or <code>signal S</code>, as in lesson 1. With no arguments: a usage line on stderr, exit 2.</p>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Remember</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/clone.2.html"><code>clone(fn, stack_top, flags | SIGCHLD, arg)</code></a></td><td>like <code>fork</code>, but runs <code>fn(arg)</code> in the child, on a stack you provide (pass its <em>top</em>: <code>stack + sizeof stack</code>); <code>SIGCHLD</code> so <code>waitpid</code> works. Needs <code>#define _GNU_SOURCE</code> and <code>&lt;sched.h&gt;</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/sethostname.2.html"><code>sethostname("box", 3)</code></a></td><td>in the child: it only changes the UTS namespace’s name</td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/mount.2.html"><code>mount(src, target, type, flags, data)</code></a></td><td>private: <code>(NULL, "/", NULL, MS_REC|MS_PRIVATE, NULL)</code> · proc: <code>("proc", "/proc", "proc", 0, NULL)</code> · tmpfs: <code>("tmpfs", dir, "tmpfs", 0, "size=64k")</code> · bind: <code>(host_path, target, NULL, MS_BIND, NULL)</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/chroot.2.html"><code>chroot(path)</code></a> + <code>chdir("/")</code></td><td>after the <code>/dev</code> mounts (they use paths under the rootfs), before mounting <code>/proc</code></td></tr>
+    <tr><td><code>/proc/&lt;pid&gt;/uid_map</code>, <code>setgroups</code>, <code>gid_map</code></td><td>written by the <strong>parent</strong>, in that order: <code>"0 &lt;getuid()&gt; 1\n"</code>, <code>"deny"</code>, <code>"0 &lt;getgid()&gt; 1\n"</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>The root filesystem</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0005-namespaces
+<span class="c"># the first time, exports Alpine into build/rootfs</span>
+bash check.sh build
+ls build/rootfs; cat build/rootfs/etc/alpine-release</pre>
+  <p>That directory is a whole Linux system’s files, and nothing else: no kernel, because the kernel is yours.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>clone, a name, a PID</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-1"> done</label>
+  </div>
+  <p>Start from lesson 1’s <code>run.c</code> shape, with <code>clone</code> instead of <code>fork</code>: <code>CLONE_NEWUSER | CLONE_NEWUTS | CLONE_NEWPID | SIGCHLD</code>. In <code>fn</code>, set the hostname and <code>execvp</code> the program. The parent waits and prints the status. The first two cases of “Its own names” should pass.</p>
+  <details>
+    <summary>Why CLONE_NEWUSER already?</summary>
+    <p>Without root, the kernel refuses <code>CLONE_NEWUTS</code> and <code>CLONE_NEWPID</code> on their own (<code>EPERM</code>). Created <em>together with</em> a user namespace, they belong to it, and the child has the capabilities to use them.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The uid map, and the wait</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-2"> done</label>
+  </div>
+  <p>Make a pipe before <code>clone</code>. The child closes its write end, blocks on <code>read</code> until the parent is done, then carries on. The parent writes the three files under <code>/proc/&lt;child pid&gt;/</code>, then closes the pipe. “Its own root” should go green.</p>
+  <details>
+    <summary>Hint: how the child knows the parent is done</summary>
+    <p>It doesn’t need a message. Lesson 3: <code>read</code> returns 0, end of file, once every write end is closed. So the parent writes nothing into the pipe at all, and just closes it when the maps are written.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Its own files</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-3"> done</label>
+  </div>
+  <p>Add <code>CLONE_NEWNS</code>. In the child, after the wait: make <code>/</code> private, set up <code>/dev</code> under the rootfs, <code>chroot</code>, <code>chdir("/")</code>, mount <code>/proc</code>, then <code>exec</code>. “Its own files” should go green, and so should the <code>ps</code> case: with its own <code>/proc</code>, the box sees one to three processes.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <h3>No network, and all green</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-4"> done</label>
+  </div>
+  <p>Add <code>CLONE_NEWNET | CLONE_NEWIPC</code>, then run <code>bash check.sh</code> until all 13 cases pass. You didn’t write anything for “PID 1 is special”: the kernel did it. Read those two cases again until you can explain both.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: pivot_root, read-only</h3>
+    <label><input type="checkbox" data-key="lesson-0005-step-5"> done</label>
+  </div>
+  <p>Replace <code>chroot</code> with <a href="https://man7.org/linux/man-pages/man2/pivot_root.2.html"><code>pivot_root</code></a>: bind-mount the rootfs onto itself (it must be a mount point), <code>pivot_root(".", ".")</code> from inside it, then unmount the old root with <code>MNT_DETACH</code>. Then make it read-only: remount the bind with <code>MS_BIND | MS_REMOUNT | MS_RDONLY</code>. Check by hand: <code>./build/box build/rootfs /bin/touch /etc/x</code> must fail with “Read-only file system”.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for a judge</h2>
+<ul>
+  <li><strong>This is what Docker does.</strong> <code>docker run</code> asks the daemon, which asks <code>runc</code>, which calls <code>clone</code> with these flags, sets up mounts and execs your program: what you wrote today, with more care.</li>
+  <li><strong>PID namespaces close lesson 2’s hole.</strong> Kill PID 1, and nothing inside survives, whatever it did with process groups.</li>
+  <li><strong>The user namespace is the one Docker skips.</strong> By default Docker doesn’t use one, so root in a container <em>is</em> root on the host, which is why your runner will add <code>--user</code> (lesson 8).</li>
+  <li><strong>Seeing less isn’t using less.</strong> A box can still eat all your memory, fork a million processes, or spin on every core. Limits are lesson 6.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>For each of today’s six namespaces, say whether <code>docker run</code> gives it to a container by default, and which <code>docker run</code> flag you’d use in CodeArena’s runner to get today’s network isolation. Two or three sentences, in section 8’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>8. Say it in your own words</h2>
+<p>Your answer to section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://labs.iximiuz.com/tutorials/build-a-container-from-scratch-in-go-1b92e418">“Build a container from scratch”, iximiuz Labs</a></strong>, the companion to Liz Rice’s talk <em>Containers From Scratch</em> (GOTO 2018). It builds the same thing in Go, so you’ll recognise every step and see it from a second angle.</p>
+  <p>Then the kernel’s own words: <a href="https://man7.org/linux/man-pages/man7/namespaces.7.html">namespaces(7)</a>, <a href="https://man7.org/linux/man-pages/man7/user_namespaces.7.html">user_namespaces(7)</a> and <a href="https://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid_namespaces(7)</a>.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the stack pointer is the top, why <code>EPERM</code>, what <code>MS_PRIVATE</code> protects, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0005</code></strong> message from section 8 and paste it in the terminal. For namespace questions beyond this lesson, <a href="https://unix.stackexchange.com/questions/tagged/namespace">Unix &amp; Linux Stack Exchange</a> has the experts.</p>
+</div>

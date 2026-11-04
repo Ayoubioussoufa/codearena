@@ -9,6 +9,7 @@ import { DSA_CATEGORIES, TOTAL_PROBLEMS } from "@/lib/dsa/registry";
 import { useProgress, accuracy, dueList, today } from "@/lib/progress";
 import { useDsaProgress, solvedCount } from "@/lib/dsa-progress";
 import { MasteryBar } from "@/components/ui";
+import { CoursesBanner } from "@/components/courses/HubWidgets";
 
 export default function DashboardPage() {
   const progress = useProgress();
@@ -45,6 +46,9 @@ export default function DashboardPage() {
           fresh numbers, grade instantly, and always explain <em>why</em>.
         </p>
       </header>
+
+      {/* Courses: the day's lesson comes first */}
+      <CoursesBanner />
 
       {/* Due-for-review banner */}
       {dueCount > 0 && (

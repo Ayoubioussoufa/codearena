@@ -128,6 +128,11 @@ accident.
 
 ---
 
+
+```check
+toolkit
+```
+
 <a name="part-b"></a>
 # Part B — Rating systems
 
@@ -242,6 +247,11 @@ their RD drops (they just gained evidence). The 1700 player loses a bit and thei
 
 ---
 
+
+```check
+ratings
+```
+
 <a name="part-c"></a>
 # Part C — Item Response Theory (IRT)
 
@@ -343,6 +353,11 @@ Two disciplines that are also pitfalls:
   repeat Elo's dishonesty.
 
 ---
+
+
+```check
+irt
+```
 
 <a name="part-d"></a>
 # Part D — FSRS: spaced repetition
@@ -460,6 +475,11 @@ measurable curves.
 
 ---
 
+
+```check
+fsrs
+```
+
 <a name="part-e"></a>
 # Part E — Engineering the math
 
@@ -541,6 +561,11 @@ Property tests catch the bugs example tests miss precisely because they explore 
 think to type — the ideal companion to code that must be *mathematically* correct.
 
 ---
+
+
+```check
+engineering
+```
 
 <a name="worked"></a>
 # Part F — From formula to code: two complete walkthroughs

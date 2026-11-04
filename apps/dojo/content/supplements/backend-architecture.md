@@ -129,6 +129,11 @@ it's all about users. A file called `Helpers` with `formatDate`, `parseCSV`, `se
 2. **What can I change without breaking everything else?**
 
 Hold those two in mind. The rest of this guide is machinery for answering them.
+
+```check
+why
+```
+
 ---
 
 # Part 2 — The one rule
@@ -204,6 +209,11 @@ know `P2002` means "duplicate". Six months of that discipline is the difference 
 you can reason about and one you can only poke at.
 
 The swap is a bonus. The vocabulary boundary is the point.
+
+```check
+rule
+```
+
 ---
 
 # Part 3 — The five layers, in depth
@@ -431,6 +441,11 @@ model to suit one consumer).
 http-thin
 ```
 
+
+```check
+layers
+```
+
 ---
 
 # Part 4 — Domain modelling: the vocabulary you'll be asked about
@@ -503,6 +518,11 @@ translation step, and translation steps are where bugs breed. If a domain expert
 type names, your model has drifted from the thing it models.
 
 **Cheap test:** show `domain/` to someone non-technical. They should recognise most of the nouns.
+
+```check
+domain
+```
+
 ---
 
 # Part 5 — Ports and adapters, mechanically
@@ -635,6 +655,11 @@ decays.
 audit-command
 ```
 
+
+```check
+ports
+```
+
 ---
 
 # Part 7 — Errors deserve their own architecture
@@ -710,6 +735,11 @@ translate-at-boundary
 
 ```exercise
 silent-catch
+```
+
+
+```check
+errors
 ```
 
 ---
@@ -838,6 +868,11 @@ flowchart LR
 ```
 
 Three doors, one room. That's what "use case" means.
+
+```check
+boundaries
+```
+
 ---
 
 # Part 10 — Sizing and chunking
@@ -1033,6 +1068,11 @@ judgement. Most professional codebases live happily at stage 3.
 
 > The interesting question in an interview is never "do you know clean architecture" — it's **"how
 > do you know when you need it?"** Stages and triggers are the answer.
+
+```check
+judgement
+```
+
 ---
 
 # Part 14 — Testing, layer by layer
@@ -1146,6 +1186,11 @@ catch (e) { console.log(e); }
 ```
 The bug is now invisible and permanent.
 **Fix:** catch only what you can handle. Rethrow the rest.
+
+```check
+testing
+```
+
 ---
 
 # Part 16 — The same skeleton elsewhere

@@ -95,6 +95,11 @@ a[::-1]   # [5, 4, 3, 2, 1, 0]   reversed
 
 Works on strings and tuples too (`"hello"[::-1]` → `"olleh"`).
 
+
+```check
+basics
+```
+
 ## Comprehensions
 
 The Pythonic replacement for map/filter + an accumulator loop — `[expr for item in iterable if condition]`:
@@ -150,6 +155,11 @@ def scale(value, factor=2, *args, unit="px", **kwargs):
 - **`*args`** collects extra positional args into a **tuple**; **`**kwargs`** collects extra keyword args into a **dict**.
 - The same `*`/`**` **unpack** at the call site: `scale(*[10, 3], **{"unit": "em"})`.
 - **`lambda`** makes a one-expression anonymous function: `sorted(words, key=lambda w: len(w))`.
+
+
+```check
+functions
+```
 
 ## Iterators and generators
 
@@ -227,6 +237,11 @@ class Point:
 
 Python cares about *behaviour*, not declared type: "if it walks like a duck and quacks like a duck…". A function that calls `.read()` works on any object with a `read` method — no interface to declare. This is why Python leans on **EAFP** over type checks.
 
+
+```check
+iterators
+```
+
 ## Errors: EAFP and exceptions
 
 **EAFP** — "easier to ask forgiveness than permission" — attempt the operation and catch failure, rather than checking first (**LBYL**). It's often faster (no double lookup) and avoids check-then-use races:
@@ -298,6 +313,11 @@ pip freeze > requirements.txt
 
 Never `pip install` into the system Python; always into a venv (or use `poetry`/`uv`).
 
+
+```check
+errors
+```
+
 ## Concurrency and the GIL
 
 The **GIL (Global Interpreter Lock)** lets only one thread execute Python bytecode at a time. This shapes every concurrency decision:
@@ -335,6 +355,11 @@ async def main():
 - **Shallow vs deep copy.** `b = a` binds the *same* object. `a.copy()`/`a[:]` copies the outer container but shares nested objects; only `copy.deepcopy(a)` clones all the way down.
 - **Mutating while iterating.** Don't add/remove from a list (or dict) you're looping over — iterate a copy (`for x in items[:]`) or build a new list.
 - **Integer/float division.** `/` always gives a float (`4 / 2 == 2.0`); use `//` for floor division and `%` for remainder.
+
+
+```check
+gil
+```
 
 ## Testing (pytest, briefly)
 

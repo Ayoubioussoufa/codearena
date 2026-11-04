@@ -31,6 +31,21 @@ import { lesson0024 } from "./lessons/0024-ci-cd";
 import { lesson0025 } from "./lessons/0025-observability";
 import { lesson0026 } from "./lessons/0026-star-stories";
 import { lesson0027 } from "./lessons/0027-your-system-out-loud";
+import { lesson0028 } from "./lessons/0028-cargo-and-the-compiler";
+import { lesson0029 } from "./lessons/0029-ownership";
+import { lesson0030 } from "./lessons/0030-borrowing";
+import { lesson0031 } from "./lessons/0031-enums-and-match";
+import { lesson0032 } from "./lessons/0032-errors-as-values";
+import { lesson0033 } from "./lessons/0033-traits-and-generics";
+import { lesson0034 } from "./lessons/0034-lifetimes";
+import { lesson0035 } from "./lessons/0035-iterators-and-maps";
+import { lesson0036 } from "./lessons/0036-processes-in-rust";
+import { lesson0037 } from "./lessons/0037-files-and-io";
+import { lesson0038 } from "./lessons/0038-threads";
+import { lesson0039 } from "./lessons/0039-async-tokio";
+import { lesson0040 } from "./lessons/0040-bpe-tokenizer";
+import { lesson0041 } from "./lessons/0041-pyo3-extension";
+import { lesson0042 } from "./lessons/0042-parallel-and-shipped";
 
 export const TRACKS: Track[] = [
   {
@@ -62,6 +77,12 @@ export const TRACKS: Track[] = [
     id: "story",
     title: "The story",
     blurb: "Turning what you built into interview answers.",
+  },
+  {
+    id: "rust",
+    title: "Rust, after the sprint",
+    blurb: "The language that ends the memory bugs you fought in C, then the judge rebuilt in it, then the reason Python's AI tools are written in it.",
+    opens: "2026-11-30",
   },
 ];
 
@@ -99,6 +120,22 @@ export const LESSONS: Lesson[] = [
   // ── The story ──
   lesson0026,
   lesson0027,
+  // ── Rust, after the sprint (opens 30 Nov) ──
+  lesson0028,
+  lesson0029,
+  lesson0030,
+  lesson0031,
+  lesson0032,
+  lesson0033,
+  lesson0034,
+  lesson0035,
+  lesson0036,
+  lesson0037,
+  lesson0038,
+  lesson0039,
+  lesson0040,
+  lesson0041,
+  lesson0042,
 ];
 
 const SD = "/guides/system-design-fundamentals";
@@ -315,6 +352,98 @@ export const WEEKS: Week[] = [
         dsa: "Block 13 · DP, day 4 of 4 (set R13)",
       }),
       day("Sun 29 Nov", "2026-11-29", [], { build: "Sprint retro: what's next", dsa: "Final review" }),
+    ],
+  },
+  // ── Rust, after the sprint: three lessons a week, lighter than the sprint, so applications and interviews come first ──
+  {
+    number: 6,
+    title: "Rust: ownership",
+    start: "2026-11-30",
+    end: "2026-12-06",
+    goal: "You can say who owns every value in a function, and fix a borrow error by reading it rather than by adding clone().",
+    note: "After the sprint. Applications and interviews come first: on an interview day, slide the lesson to the next free one.",
+    doneWhen: [
+      "Rust installed; `cargo test` runs; lesson 1's wait-status decoder ported and green",
+      "Five ownership errors fixed without a single clone()",
+      "The judge's output comparator, in Rust, returning slices instead of copies",
+    ],
+    days: [
+      day("Mon 30 Nov", "2026-11-30", ["0028-cargo-and-the-compiler"]),
+      day("Wed 2 Dec", "2026-12-02", ["0029-ownership"]),
+      day("Fri 4 Dec", "2026-12-04", ["0030-borrowing"]),
+      day("Sun 6 Dec", "2026-12-06", [], { note: "Review: clear what's due in spaced review, then read The Book's chapter 4 again, start to end." }),
+    ],
+  },
+  {
+    number: 7,
+    title: "Rust: types that carry meaning",
+    start: "2026-12-07",
+    end: "2026-12-13",
+    goal: "Verdicts, errors and checkers are types the compiler checks, so the case you forget is a compile error, not a bug report.",
+    doneWhen: [
+      "Lesson 9's facts-to-verdict logic as an enum and one exhaustive match",
+      "A limits parser whose errors name the line, with ? and no unwrap()",
+      "A Checker trait with three implementations, used both through generics and through dyn",
+    ],
+    days: [
+      day("Mon 7 Dec", "2026-12-07", ["0031-enums-and-match"]),
+      day("Wed 9 Dec", "2026-12-09", ["0032-errors-as-values"]),
+      day("Fri 11 Dec", "2026-12-11", ["0033-traits-and-generics"]),
+      day("Sun 13 Dec", "2026-12-13", [], { note: "Review, then one Codeforces Div. 3 virtual contest in Rust if you want to feel the language under time pressure." }),
+    ],
+  },
+  {
+    number: 8,
+    title: "Rust: zero copies, then processes",
+    start: "2026-12-14",
+    end: "2026-12-20",
+    goal: "You read lifetimes as promises, write iterator chains fluently, and `run` exists in Rust with lesson 2's behaviour.",
+    doneWhen: [
+      "A token scanner that borrows from its input and allocates nothing",
+      "Contest standings from raw submissions with iterators and the entry API",
+      "`run -t` in Rust: exit, signal and timeout, with the whole process group killed",
+    ],
+    days: [
+      day("Mon 14 Dec", "2026-12-14", ["0034-lifetimes"]),
+      day("Wed 16 Dec", "2026-12-16", ["0035-iterators-and-maps"]),
+      day("Fri 18 Dec", "2026-12-18", ["0036-processes-in-rust"]),
+      day("Sun 20 Dec", "2026-12-20", [], { note: "Review. Compare your run.c and your Rust run side by side: which bugs could each one still have?" }),
+    ],
+  },
+  {
+    number: 9,
+    title: "Rust: systems",
+    start: "2026-12-21",
+    end: "2026-12-27",
+    goal: "A judge in one binary that walks a tests folder, runs cases in parallel, and an async runner that holds hundreds of jobs on a few threads.",
+    doneWhen: [
+      "`minijudge` prints a verdict per test, with output capped",
+      "Parallel judging with scoped threads: same results as sequential, in a fraction of the time",
+      "An async runner with a concurrency limit and per-job timeouts, tested on a paused clock",
+    ],
+    days: [
+      day("Mon 21 Dec", "2026-12-21", ["0037-files-and-io"]),
+      day("Wed 23 Dec", "2026-12-23", ["0038-threads"]),
+      day("Fri 25 Dec", "2026-12-25", ["0039-async-tokio"]),
+      day("Sun 27 Dec", "2026-12-27", [], { note: "Review, and rest." }),
+    ],
+  },
+  {
+    number: 10,
+    title: "Rust for AI infrastructure",
+    start: "2026-12-28",
+    end: "2027-01-03",
+    goal: "A BPE tokenizer written in Rust, imported from Python, measured against pure Python, and explained in two minutes.",
+    doneWhen: [
+      "BPE training and encoding in Rust, matching the kit's expected merges",
+      "`import fasttok` works in a virtualenv, with the GIL released during encoding",
+      "Batch encoding in parallel with rayon; clippy and fmt clean; your Rust story told out loud",
+    ],
+    days: [
+      day("Mon 28 Dec", "2026-12-28", ["0040-bpe-tokenizer"]),
+      day("Wed 30 Dec", "2026-12-30", ["0041-pyo3-extension"]),
+      day("Sat 2 Jan", "2027-01-02", ["0042-parallel-and-shipped"]),
+      day("Sun 3 Jan", "2027-01-03", [], { note: "Retro: what Rust changed in how you write C, TypeScript and Python." }),
     ],
   },
 ];

@@ -1,0 +1,103 @@
+<!--
+  Lesson 0037 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You have <code>run</code> in Rust. A judge needs more around it: find the tests in a folder, feed each input file to the program, read its output without letting it flood you, compare, report. Today you build <code>minijudge</code>, a judge in one binary that you can point at any folder of <code>N.in</code>/<code>N.out</code> files, and you learn the parts of <code>std::fs</code> and <code>std::io</code> it takes.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This is the tool contest setters and competitors actually use locally: run my solution on every sample, tell me which one fails. It’s also lesson 3’s pipe deadlock again, and Rust doesn’t prevent that one for you: ownership guarantees memory safety, not that two processes stop waiting for each other.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Paths and folders</h2>
+<p><code>Path</code> is to <code>PathBuf</code> what <code>&amp;str</code> is to <code>String</code>: a borrowed view and its owned version. Paths aren’t <code>String</code>s, because file names on Linux are bytes, not necessarily UTF-8 (<a href="https://doc.rust-lang.org/std/path/index.html">std::path</a>).</p>
+<pre>for entry in fs::read_dir(dir)? {          // io::Result&lt;DirEntry&gt;, in no set order
+    let path = entry?.path();               // tests/data/sum/10.in
+    path.extension();                       // Some("in")
+    path.file_stem();                       // Some("10")
+    dir.join("10.out");                     // tests/data/sum/10.out
+}</pre>
+<p><code>read_dir</code>’s order depends on the filesystem, so sort, and sort the right thing: as strings, <code>"10.in"</code> comes before <code>"2.in"</code>. Parse the stem to a number first.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Reading and writing, with buffers</h2>
+<ul>
+  <li><code>fs::read_to_string(path)?</code> for small files you need whole (an answer file).</li>
+  <li><code>BufReader::new(file).lines()</code> for big files, lazily. Unbuffered reads ask the kernel for every few bytes.</li>
+  <li>stdout is <strong>line-buffered</strong>, even into a pipe, and <code>println!</code> locks it on each call (<a href="https://doc.rust-lang.org/std/macro.println.html">println! docs</a>). Measured on Rust 1.99: 1,000 <code>println!</code>s into a pipe made 1,000 <code>write</code> system calls; the same lines through <code>let mut out = BufWriter::new(io::stdout().lock());</code> and <code>writeln!(out, …)?</code> made 2.</li>
+  <li>A <code>BufWriter</code> flushes when dropped. <code>std::process::exit</code> runs <strong>no destructors</strong> (<a href="https://doc.rust-lang.org/std/process/fn.exit.html">its docs say so</a>), so flush before exiting, or return from the function and exit afterwards, as the starter’s <code>main</code> does.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Pipes, a cap, and lesson 3’s deadlock</h2>
+<pre>let mut child = Command::new(prog)
+    .stdin(Stdio::from(File::open(input)?))    // the file IS its stdin
+    .stdout(Stdio::piped())                    // a pipe you read
+    .stderr(Stdio::null())
+    .spawn()?;
+let mut out = Vec::new();
+child.stdout.take().unwrap()                   // the pipe: move it out of the Child
+    .take(OUTPUT_CAP + 1)                      // Read::take: stop after N bytes
+    .read_to_end(&amp;mut out)?;</pre>
+<p>A Linux pipe holds 64 KiB by default (<a href="https://man7.org/linux/man-pages/man7/pipe.7.html">pipe(7)</a>). If you stop reading while the pipe is still open and then <code>wait()</code>, a program that keeps writing blocks on the full pipe, and you block in <code>wait</code>: forever. In the code above the pipe happens to be dropped right after <code>read_to_end</code>, so the flooder dies of SIGPIPE on its next write, which is lucky rather than designed. A program that stops writing but keeps running would still hang you. So over the cap, <code>child.kill()</code> before <code>child.wait()</code>, every time.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-io -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>minijudge</code></h2>
+<div class="spec">
+  <p><code>minijudge &lt;tests-dir&gt; &lt;program&gt; [args…]</code> prints <code>test N: AC</code> (or WA, OLE, <code>RE (exit N)</code>, <code>RE (signal S)</code>) per test in numeric order, then <code>passed X/Y</code>. Exit code 0 if all passed, 1 if any failed, 2 if the judge itself couldn’t run, with a <code>minijudge: …</code> line on stderr. The kit has five C programs in <code>progs/</code> (a right one, a wrong one, a crasher, an <code>exit 3</code>, a flood) and a tests folder. The tests drive your binary with a 10-second watchdog, so a hang fails instead of freezing.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3><code>find_tests</code></h3>
+    <label><input type="checkbox" data-key="lesson-0037-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0037-files-and-io
+cp src/main.start.rs src/main.rs
+bash check.sh        # 8 red</pre>
+  <p>Collect the <code>N</code> of every <code>N.in</code>, check that <code>N.out</code> exists (<code>dir.join(…).is_file()</code>), sort. Errors become <code>Box&lt;dyn Error&gt;</code>: a <code>String</code> converts with <code>.into()</code>, and <code>map_err</code> adds the folder’s name to an I/O error.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3><code>run_one</code>, <code>verdict</code>, <code>judge</code></h3>
+    <label><input type="checkbox" data-key="lesson-0037-step-2"> done</label>
+  </div>
+  <p><code>run_one</code> is section 3’s code plus the kill and the wait. <code>verdict</code> follows lesson 9’s order: the cap, then how it ended, then the tokens. <code>judge</code> prints through one <code>BufWriter</code> and flushes before returning.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Put <code>minijudge</code> on your <code>PATH</code> (<code>cargo install --path .</code>) and use it on your next Codeforces problem: samples into <code>1.in</code>/<code>1.out</code>, your solution as the program. In section 6’s box, write what you’d add first to make it your daily tool.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a time limit</h3>
+    <label><input type="checkbox" data-key="lesson-0037-step-3"> done</label>
+  </div>
+  <p>Add <code>-t &lt;ms&gt;</code> and a TLE verdict, reusing lesson 36’s loop: but now you’re reading a pipe <em>and</em> watching a clock. Reading in a second thread is the clean answer, and that’s Wednesday’s lesson.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your answer from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch12-00-an-io-project.html">The Book, chapter 12: An I/O Project</a></strong>, which builds a small <code>grep</code> with the same pieces: arguments, files, errors, stderr. Then the module pages for <a href="https://doc.rust-lang.org/std/io/index.html">std::io</a> (its “Buffered I/O” section) and <a href="https://doc.rust-lang.org/std/fs/index.html">std::fs</a>.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>child.stdout</code> is an <code>Option</code>, what <code>OsStr</code> is, how <code>Box&lt;dyn Error&gt;</code> swallows both <code>io::Error</code> and <code>String</code>, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0037</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

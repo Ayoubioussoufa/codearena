@@ -1,0 +1,53 @@
+<p class="kicker">Reference · the Rust track, part 3</p>
+<h1>Rust for AI infrastructure, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0040-bpe-tokenizer">40</a> to <a href="/courses/lessons/0042-parallel-and-shipped">42</a>. Checked against rustc 1.99.1, PyO3 0.30, maturin 1.16 and rayon 1.12. Keep it open while you work.</p>
+
+<h2 id="bpe">Byte-level BPE (lesson <a href="/courses/lessons/0040-bpe-tokenizer">40</a>)</h2>
+<ol>
+  <li><strong>Base vocabulary</strong>: the 256 byte values. Any text encodes; nothing is unknown.</li>
+  <li><strong>Train</strong>: count adjacent pairs (overlapping); merge the most frequent into token 256, 257, … (ties: smallest pair); replace occurrences left to right, without overlap; stop at the vocabulary size, or when no pair repeats.</li>
+  <li><strong>Encode</strong>: start from the bytes; while a learned pair is present, merge the one learned earliest.</li>
+  <li><strong>Decode</strong>: expand each token to its bytes; merged tokens are their two halves.</li>
+</ol>
+<pre>"aaabdaaabac" → (a,a)=256 → (a,b)=257 → (256,257)=258 → [258, d, 258, a, c]</pre>
+<p>Sources: Sennrich, Haddow and Birch, ACL 2016 (<a href="https://arxiv.org/abs/1508.07909">arXiv:1508.07909</a>); GPT-2’s byte-level variant (Radford et al., 2019); <a href="https://github.com/karpathy/minbpe">minbpe</a>.</p>
+
+<h2 id="pyo3">A Python extension with PyO3 (lesson <a href="/courses/lessons/0041-pyo3-extension">41</a>)</h2>
+<pre>[lib] crate-type = ["cdylib"]          # Cargo.toml: a shared library Python can load
+[dependencies] pyo3 = "0.30"
+
+#[pyo3::pymodule]
+mod fasttok {
+    use pyo3::prelude::*;
+    #[pyclass] struct Tokenizer { inner: crate::bpe::Tokenizer }
+    #[pymethods] impl Tokenizer {
+        #[staticmethod] fn train(text: &amp;str, n: usize) -> Self { … }
+        fn encode(&amp;self, py: Python&lt;'_&gt;, text: &amp;str) -> Vec&lt;u32&gt; {
+            py.detach(|| self.inner.encode(text))      // GIL released
+        }
+        #[getter] fn merges(&amp;self) -> Vec&lt;(u32, u32)&gt; { … }
+    }
+}</pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Python</th><th>Rust parameter</th><th>Rust return</th><th>Python sees</th></tr></thead>
+  <tbody>
+    <tr><td><code>str</code></td><td><code>&amp;str</code> / <code>String</code></td><td><code>String</code></td><td><code>str</code></td></tr>
+    <tr><td><code>bytes</code></td><td><code>&amp;[u8]</code></td><td><code>Vec&lt;T&gt;</code></td><td><code>list</code></td></tr>
+    <tr><td><code>list[int]</code></td><td><code>Vec&lt;u32&gt;</code></td><td><code>(T, U)</code></td><td><code>tuple</code></td></tr>
+    <tr><td><code>int | None</code></td><td><code>Option&lt;i64&gt;</code></td><td><code>Err(PyValueError::new_err(…))</code></td><td>raised <code>ValueError</code></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><code>python3 -m venv .venv</code> · <code>pip install maturin</code> · <code>maturin develop --release</code> (into the venv) · <code>maturin build --release</code> (a wheel in <code>target/wheels/</code>).</li>
+  <li>Detach only for long work on Rust data; never touch Python objects inside <code>detach</code>.</li>
+  <li>Measured here: about 25× faster than pure Python on encode; the gain is specific to tight byte loops.</li>
+</ul>
+
+<h2 id="rayon">Parallel, and shipped (lesson <a href="/courses/lessons/0042-parallel-and-shipped">42</a>)</h2>
+<ul>
+  <li><code>use rayon::prelude::*;</code> then <code>items.par_iter().map(f).collect()</code>: a pool sized to the logical CPUs (<code>RAYON_NUM_THREADS</code> overrides), order kept.</li>
+  <li>Helps for independent, big-enough pieces; not for chains (BPE training), tiny work, or one ordered output. Measured: 5.5× on 12 cores.</li>
+  <li>CI trio: <code>cargo fmt --check</code> · <code>cargo clippy -- -D warnings</code> · <code>cargo test</code>; plus <code>cargo audit</code> for advisories.</li>
+</ul>

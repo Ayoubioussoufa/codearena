@@ -1,0 +1,81 @@
+<p class="kicker">Reference · the Rust track, part 2</p>
+<h1>Rust for systems, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0036-processes-in-rust">36</a> to <a href="/courses/lessons/0039-async-tokio">39</a>. Every behaviour checked against rustc 1.99.1 and tokio 1.54 on Linux. Keep it open while you work; it prints on two pages.</p>
+
+<h2 id="process">Processes (lesson <a href="/courses/lessons/0036-processes-in-rust">36</a>)</h2>
+<pre>use std::os::unix::process::{CommandExt, ExitStatusExt};
+let mut child = Command::new(prog).args(rest)
+    .process_group(0)                  // setpgid(0, 0)
+    .spawn()?;                         // Err if it can't start (report exit 127)
+match child.try_wait()? {              // waitpid(…, WNOHANG)
+    Some(status) => …,                 // status.code() / status.signal()
+    None => …,                         // still running
+}</pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Ask</th><th>Gives</th></tr></thead>
+  <tbody>
+    <tr><td><code>status.code()</code></td><td><code>Some(code)</code> (low 8 bits) if it exited; <code>None</code> if a signal killed it</td></tr>
+    <tr><td><code>status.signal()</code></td><td><code>Some(sig)</code> if a signal killed it</td></tr>
+    <tr><td><code>child.kill()</code></td><td>SIGKILL to that one process only</td></tr>
+    <tr><td><code>unsafe { libc::kill(-pgid, libc::SIGKILL) }</code></td><td>the whole group; std has no wrapper</td></tr>
+    <tr><td><code>Instant::now()</code> · <code>start.elapsed().as_millis()</code></td><td>monotonic clock: never jumps backwards</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="unsafe">What <code>unsafe</code> allows</h2>
+<ul>
+  <li>Dereferencing a raw pointer (creating one is safe) · calling an <code>unsafe</code> or foreign function · using a <code>static mut</code> · implementing an <code>unsafe trait</code> · reading a union field.</li>
+  <li>It switches <strong>nothing</strong> off: borrow and type checks still run. Write a <code>// SAFETY:</code> comment saying why the block is sound.</li>
+</ul>
+
+<h2 id="io">Files and I/O (lesson <a href="/courses/lessons/0037-files-and-io">37</a>)</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Task</th><th>Call</th></tr></thead>
+  <tbody>
+    <tr><td>whole small file</td><td><code>fs::read_to_string(p)?</code></td></tr>
+    <tr><td>big file, lazily</td><td><code>BufReader::new(File::open(p)?).lines()</code></td></tr>
+    <tr><td>list a folder (no set order: sort!)</td><td><code>fs::read_dir(dir)?</code> → <code>entry?.path()</code></td></tr>
+    <tr><td>path parts</td><td><code>p.file_stem()</code> · <code>p.extension()</code> · <code>dir.join("10.out")</code></td></tr>
+    <tr><td>file as a child’s stdin</td><td><code>.stdin(Stdio::from(File::open(p)?))</code></td></tr>
+    <tr><td>read a child’s output, capped</td><td><code>.stdout(Stdio::piped())</code>, then <code>child.stdout.take().unwrap().take(cap + 1).read_to_end(&amp;mut buf)?</code></td></tr>
+    <tr><td>fast output</td><td><code>let mut out = BufWriter::new(io::stdout().lock()); writeln!(out, …)?;</code></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li>stdout is line-buffered even into a pipe: 1,000 <code>println!</code>s = 1,000 <code>write</code> syscalls; a <code>BufWriter</code> made 2.</li>
+  <li><code>process::exit</code> runs no destructors: flush first.</li>
+  <li>Over the cap, <code>kill()</code> before <code>wait()</code>: a writer blocked on a full 64 KiB pipe never exits.</li>
+  <li>Sort test numbers as numbers: as strings, <code>"10.in" &lt; "2.in"</code>.</li>
+</ul>
+
+<h2 id="threads">Threads (lesson <a href="/courses/lessons/0038-threads">38</a>)</h2>
+<pre>thread::scope(|s| {                                  // may borrow: joined before return
+    let hs: Vec&lt;_&gt; = chunks.map(|c| s.spawn(move || work(c))).collect();
+    hs.into_iter().map(|h| h.join().unwrap()).sum::&lt;u64&gt;()
+});
+let h = thread::spawn(move || …);                    // 'static: owns or Arc-shares</pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Need</th><th>Tool</th></tr></thead>
+  <tbody>
+    <tr><td>a shared counter</td><td><code>AtomicUsize::fetch_add</code></td></tr>
+    <tr><td>shared ownership across threads</td><td><code>Arc&lt;T&gt;</code> (not <code>Rc</code>: not <code>Send</code>)</td></tr>
+    <tr><td>shared and mutable</td><td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code> (not <code>RefCell</code>: not <code>Sync</code>)</td></tr>
+    <tr><td>producers → one consumer</td><td><code>mpsc::channel()</code>; the receiver ends when every sender is dropped</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Data races don’t compile (E0499, E0277, E0373). Deadlocks do: lock in one global order.</p>
+
+<h2 id="async">Async with tokio (lesson <a href="/courses/lessons/0039-async-tokio">39</a>)</h2>
+<ul>
+  <li>Futures are lazy: nothing runs until <code>.await</code>, <code>join!</code>, <code>select!</code> or <code>tokio::spawn</code>.</li>
+  <li>Sequential awaits add up; <code>join!</code> takes the max; <code>select!</code> and <code>timeout</code> take the min and <strong>drop</strong> (cancel) the loser.</li>
+  <li>Limit concurrency with <code>Arc&lt;Semaphore&gt;</code> and <code>acquire_owned().await</code> inside each task; the permit frees when dropped.</li>
+  <li>Never block a runtime thread: CPU work or blocking calls go to <code>spawn_blocking</code> (or rayon).</li>
+  <li>Tests: <code>#[tokio::test(start_paused = true)]</code> with the <code>test-util</code> feature, for instant, exact time.</li>
+</ul>

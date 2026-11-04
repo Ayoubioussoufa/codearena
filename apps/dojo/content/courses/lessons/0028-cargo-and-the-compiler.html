@@ -1,0 +1,126 @@
+<!--
+  Lesson 0028 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You wrote <code>run.c</code> in lesson 1 and minishell at 42. You know the bugs C lets through: a pointer used after <code>free</code>, a buffer read one byte too far, a leak nobody notices. Rust refuses to compile most of them. Today you install it, learn the tool you’ll use every day (Cargo), and port lesson 1’s wait-status decoder, reading every compiler error as a hint rather than a wall.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Memory-safety bugs were 76% of Android’s vulnerabilities in 2019. Google started writing new code in memory-safe languages, Rust among them, and by 2024 the share was 24% (<a href="https://security.googleblog.com/2024/09/eliminating-memory-safety-vulnerabilities-Android.html">Google Security Blog, Sept 2024</a>). And the honest AI angle, for lessons 40–42: the AI work itself happens in Python, but more and more of the fast parts underneath are Rust (Hugging Face’s tokenizers, the uv package manager). That’s where you’ll use it.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Install Rust</h2>
+<p><strong>rustup</strong> installs and updates the toolchain: <code>rustc</code> (the compiler), <code>cargo</code> (the build tool and package manager), and the standard library’s docs. It’s the official way (<a href="https://www.rust-lang.org/tools/install">rust-lang.org/tools/install</a>). Rust uses your system’s linker, the <code>cc</code> you already use for the C labs.</p>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Install, then check</h3>
+    <label><input type="checkbox" data-key="lesson-0028-step-1"> done</label>
+  </div>
+  <pre>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# accept the default install, then open a NEW terminal
+rustc --version     # 1.99 or later
+cargo --version</pre>
+  <p>In VS Code, install the <strong>rust-analyzer</strong> extension: it runs the compiler’s checks as you type and shows types inline. Later, <code>rustup update</code> moves you to each new release, every six weeks.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Cargo, your <code>pnpm</code></h2>
+<p>A <strong>crate</strong> is Rust’s unit of compilation: a library or a program. Cargo builds crates, fetches their dependencies from <a href="https://crates.io">crates.io</a>, runs tests and docs. <code>Cargo.toml</code> is your <code>package.json</code>; <code>Cargo.lock</code> pins exact versions, like <code>pnpm-lock.yaml</code>.</p>
+<pre>cargo new hello        # a program: src/main.rs  (cargo new --lib: src/lib.rs)
+cd hello
+cargo check            # types and borrows only, no binary: fastest feedback
+cargo run              # build (debug) and run
+cargo test             # build and run every #[test]
+cargo build --release  # optimized binary in target/release/</pre>
+<p>Two build profiles matter. <strong>Debug</strong> (the default) compiles fast and keeps safety checks such as integer overflow. <strong>Release</strong> optimizes hard. Benchmark only release builds; lesson 42 shows the gap.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The basics you need today</h2>
+<p><strong>Immutable by default.</strong> <code>let x = 5;</code> can’t change. <code>let mut x = 5;</code> can. Most variables in good Rust never need <code>mut</code>, and when you see one, it tells you to watch it.</p>
+<p><strong>Shadowing.</strong> A second <code>let x</code> declares a new variable that hides the first, and may change its type: <code>let n = "42"; let n: i32 = n.parse().unwrap();</code> is normal Rust. (<code>unwrap()</code> means “crash if this failed”; lesson 32 replaces it.)</p>
+<p><strong>Integer types say their size.</strong> <code>i32</code>, <code>i64</code>, <code>u8</code> (a byte), <code>usize</code> (a length or index). No silent conversion: <code>x as i64</code> converts on purpose.</p>
+<p><strong>Overflow is defined.</strong> In a debug build, <code>255u8 + 1</code> computed at runtime <em>panics</em>: the program stops with a message, instead of continuing with a wrong value. A release build wraps to 0. If you mean wrapping, write <code>wrapping_add</code>; <code>checked_add</code> returns <code>None</code> on overflow (<a href="https://doc.rust-lang.org/book/ch03-02-data-types.html#integer-overflow">The Book, §3.2</a>). In C, signed overflow is undefined behaviour.</p>
+<p><strong>Almost everything is an expression.</strong> A block’s value is its last expression <em>without</em> a semicolon. So <code>if</code> returns a value, and a function needs no <code>return</code> at the end:</p>
+<pre>fn sign(n: i32) -> &amp;'static str {
+    if n &lt; 0 { "negative" } else { "not negative" }   // no semicolon: the value
+}</pre>
+<p>Add a semicolon after the <code>if</code> and the block’s value becomes <code>()</code>, the empty “unit” value, and the compiler says <em>mismatched types</em>. You’ll make that mistake today; the compiler’s help line tells you which semicolon to remove.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-basics -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>status</code></h2>
+<div class="spec">
+  <p>The lab is lesson 1’s decoder as a library. <code>src/lib.start.rs</code> gives five functions with <code>todo!()</code> bodies: <code>exited</code>, <code>exit_code</code>, <code>term_signal</code>, <code>describe</code> (“exit N” or “signal S”) and <code>shell_code</code> (what <code>$?</code> shows). The tests in <code>tests/status.rs</code> are the spec, and the <a href="/courses/reference/processes">processes reference</a> has the bit layout.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Start from the kit</h3>
+    <label><input type="checkbox" data-key="lesson-0028-step-2"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0028-cargo-and-the-compiler
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # compiles, then 7 red tests: "not yet implemented"</pre>
+  <p><code>todo!()</code> compiles, then panics when it runs, which is why every test is red but nothing is broken. Replace them one at a time.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Make it green</h3>
+    <label><input type="checkbox" data-key="lesson-0028-step-3"> done</label>
+  </div>
+  <p>Bitwise operators are C’s: <code>&amp;</code>, <code>|</code>, <code>&gt;&gt;</code>. <code>format!("exit {}", code)</code> builds a <code>String</code>, like <code>sprintf</code> but with no buffer to overflow. Reuse your own functions inside <code>describe</code> and <code>shell_code</code>. When the compiler refuses something, read the whole message, help lines included, before you change anything.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: say what overflow should do</h3>
+    <label><input type="checkbox" data-key="lesson-0028-step-4"> done</label>
+  </div>
+  <p>In a scratch project, read a <code>u8</code> from the arguments and add 1 to it in four ways: <code>+</code>, <code>wrapping_add</code>, <code>checked_add</code>, <code>saturating_add</code>. Run each in debug and in release. Then write which one a judge’s memory counter should use, and why, in section 7’s box.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Reading the compiler</h2>
+<p>Rust’s errors have a shape worth learning once:</p>
+<pre class="wide">error[E0384]: cannot assign twice to immutable variable `x`   ← the code, then what
+ --> src/lib.rs:3:5                                            ← file:line:column
+  |
+2 |     let x = 0;
+  |         - first assignment to `x`                          ← labels point at the story
+3 |     x = status &amp; 0x7f;
+  |     ^^^^^^^^^^^^^^^^^ cannot assign twice to immutable variable
+  |
+help: consider making this binding mutable                     ← often the fix itself
+  |
+2 |     let mut x = 0;
+  |         +++</pre>
+<p>Every error code has a long explanation with examples: <code>rustc --explain E0384</code> (<a href="https://doc.rust-lang.org/error_codes/E0384.html">online index</a>). Fix the <em>first</em> error first; later ones are often its echoes. The lab’s checker shows you only that first one, on purpose.</p>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Find one bug you really wrote in C: minishell, <code>run.c</code>, anything. Write it in three sentences in section 7’s box: what the code did, what went wrong at runtime, and which Rust rule would have refused to compile it. If you can’t yet name the rule, write your guess; lessons 29 and 30 will settle it.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your C bug from section 5, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/">The Rust Programming Language</a></strong> (“The Book”), chapters 1 and 3: installation, Cargo, variables, types, functions, control flow. It’s free, written by the Rust team, and the rest of this track follows its order. Keep <a href="https://doc.rust-lang.org/rust-by-example/">Rust by Example</a> open for runnable snippets.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: an error you can’t read, why <code>usize</code> exists, what rust-analyzer is showing you, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0028</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

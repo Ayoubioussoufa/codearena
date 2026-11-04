@@ -1,0 +1,102 @@
+<!--
+  Lesson 0035 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You’ve been using iterators since lesson 30 without looking under the hood. Today you look: closures, adaptors that do nothing until something pulls, and <code>HashMap</code>’s entry API. You’ll use them to compute ICPC standings from raw submissions, with penalty minutes, first blood and acceptance rates, mostly without a single <code>for</code> loop.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Iterator chains are how idiomatic Rust processes data, and they compile to the same loop you’d write by hand. You built CodeArena’s leaderboard on a Redis sorted set in lesson 18; today’s version computes the same kind of ranking from scratch, which is what you’d need for a contest’s final standings, a replay, or a frozen scoreboard.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Closures</h2>
+<p>A <strong>closure</strong> is an anonymous function that can capture variables from where it’s written: <code>|s| s.minute &gt; late</code> reads <code>late</code> from the surrounding scope (<a href="https://doc.rust-lang.org/book/ch13-01-closures.html">The Book, §13.1</a>). How it captures decides which trait it implements:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>The closure…</th><th>Implements</th><th>Can be called</th></tr></thead>
+  <tbody>
+    <tr><td>only reads its captures (or captures nothing)</td><td><code>Fn</code></td><td>any number of times, even from several places</td></tr>
+    <tr><td>changes a capture (<code>count += 1</code>)</td><td><code>FnMut</code></td><td>many times, through a <code>&amp;mut</code></td></tr>
+    <tr><td>moves a capture out (returns it, drops it)</td><td><code>FnOnce</code></td><td>once</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A function that takes a closure says which it needs: <code>fn count_where&lt;F: Fn(&amp;Submission) -&gt; bool&gt;(…, pred: F)</code>. The keyword <code>move</code> makes a closure take ownership of what it captures (essential for threads, lesson 38), but a <code>move</code> closure that only reads is still <code>Fn</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Iterators: lazy adaptors, one consumer</h2>
+<p>An <strong>iterator</strong> is anything with a <code>next()</code> method. <strong>Adaptors</strong> (<code>map</code>, <code>filter</code>, <code>enumerate</code>, <code>take_while</code>, <code>rev</code>…) wrap an iterator in another and do nothing yet. A <strong>consumer</strong> (<code>sum</code>, <code>count</code>, <code>max</code>, <code>position</code>, <code>collect</code>, a <code>for</code> loop) pulls values through the whole chain, one at a time (<a href="https://doc.rust-lang.org/book/ch13-02-iterators.html">§13.2</a>).</p>
+<pre>let late_accepted: u32 = subs.iter()
+    .filter(|s| s.accepted)          // nothing happens here…
+    .map(|s| s.minute)               // …or here…
+    .filter(|&amp;m| m &gt; 60)
+    .count() as u32;                 // …until count pulls</pre>
+<p>No intermediate <code>Vec</code> is ever built, and the optimizer compiles the chain into one tight loop: in The Book’s benchmark the two versions ran within 2% of each other (<a href="https://doc.rust-lang.org/book/ch13-04-performance.html">§13.4</a>). <code>collect()</code> builds whatever you ask for: a <code>Vec</code>, a <code>HashMap</code>, a <code>String</code>, even an <code>Option&lt;Vec&lt;T&gt;&gt;</code>, as in lesson 34.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. <code>HashMap</code>, <code>BTreeMap</code>, and the entry API</h2>
+<p><code>map.entry(key)</code> looks the key up once and lets you insert or update in place:</p>
+<pre>*counts.entry(team).or_insert(0) += 1;                   // count per team
+teams.entry(team).or_default().entry(problem).or_default();  // nested maps</pre>
+<p><code>HashMap</code>’s iteration order is unspecified, and its hasher is seeded randomly, so the order changes between runs (<a href="https://doc.rust-lang.org/std/collections/struct.HashMap.html">std docs</a>). When order matters, sort explicitly, or use a <code>BTreeMap</code>, which keeps keys sorted. Sorting by several keys reads like a sentence: <code>rows.sort_by(|a, b| b.solved.cmp(&amp;a.solved).then(a.penalty.cmp(&amp;b.penalty)))</code>.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-iterators -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the standings</h2>
+<div class="spec">
+  <p>ICPC scoring, as the regional rulebooks state it (<a href="https://icpc-ecna.ysu.edu/rules.html">ECNA rules</a>): rank by problems solved, then by penalty minutes, lower first. A solved problem costs the minute of its first accepted run plus 20 per rejected run before it; rejected runs on unsolved problems cost nothing. <code>src/lib.start.rs</code> asks for <code>standings</code>, <code>first_solvers</code>, <code>acceptance_rate</code>, <code>count_where</code> and <code>top</code>.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Standings with the entry API</h3>
+    <label><input type="checkbox" data-key="lesson-0035-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0035-iterators-and-maps
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # 9 red</pre>
+  <p>One pass over the submissions fills a <code>HashMap&lt;&amp;str, HashMap&lt;char, Attempt&gt;&gt;</code>, where an <code>Attempt</code> holds the rejected count and the minute it was solved, if it was. A second pass turns each team into a <code>Row</code> with <code>map</code>, <code>filter_map</code> and <code>sum</code>. Then one <code>sort_by</code> with three keys.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The small ones</h3>
+    <label><input type="checkbox" data-key="lesson-0035-step-2"> done</label>
+  </div>
+  <p><code>first_solvers</code> fits a <code>BTreeMap</code>, keeping the earliest run per problem. <code>acceptance_rate</code> needs a count of each, and <code>None</code> when nobody tried. <code>count_where</code> and <code>top</code> are one chain each.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Lesson 18 kept the leaderboard in a Redis sorted set, updated on every Accepted. Today you recompute it from all submissions. In section 7’s box: which would you use for a live contest with 10,000 teams, which for the final, official standings, and why?</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: the frozen scoreboard</h3>
+    <label><input type="checkbox" data-key="lesson-0035-step-3"> done</label>
+  </div>
+  <p>ICPC freezes the public scoreboard for the last hour: runs after the freeze show as “pending”. Write <code>standings_at(subs, freeze_minute)</code> plus a count of pending runs per team, reusing <code>standings</code> through an iterator <code>filter</code>, without copying the submissions.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your answer from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch13-00-functional-features.html">The Book, chapter 13: Iterators and Closures</a></strong>, all four sections, and <a href="https://doc.rust-lang.org/book/ch08-03-hash-maps.html">§8.3 on hash maps</a> for the entry API. Keep <a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html">std::iter::Iterator</a> open: its list of methods is the menu.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>filter</code> gets <code>&amp;&amp;T</code>, how <code>filter_map</code> differs from <code>filter</code> then <code>map</code>, when a plain <code>for</code> loop reads better, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0035</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

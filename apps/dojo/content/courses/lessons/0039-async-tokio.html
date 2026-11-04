@@ -1,0 +1,100 @@
+<!--
+  Lesson 0039 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Threads are the right tool when work needs cores. When work mostly <em>waits</em> (for a socket, a timer, a container to finish), a thread per wait is wasteful: each one reserves a stack and the OS has to schedule it. <strong>Async</strong> Rust turns each waiting job into a small state machine, and a runtime, <strong>tokio</strong>, drives thousands of them on a few threads. Today you build a job runner with a concurrency limit and per-job timeouts, race two mirrors, and meet the one mistake that makes async slower than threads.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Nearly every Rust network service runs on tokio: web frameworks like axum, database clients, proxies. And you already know the model from Node’s event loop, with one difference that bites people: a Rust future does nothing until it’s polled.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Futures are lazy, and <code>.await</code> yields</h2>
+<pre>async fn wait(ms: u64) {
+    tokio::time::sleep(Duration::from_millis(ms)).await;
+}
+let f = wait(100);      // builds a future: nothing has run
+f.await;                // now it runs; while it sleeps, the thread serves other tasks</pre>
+<p>An <code>async fn</code> returns a <strong>future</strong>, a state machine the compiler writes for you, and its body doesn’t start until something polls it: <code>.await</code>, <code>join!</code>, <code>select!</code>, or <code>tokio::spawn</code> (<a href="https://tokio.rs/tokio/tutorial/hello-tokio">tokio tutorial: Hello Tokio</a>). That’s the opposite of a JavaScript promise, which starts running as soon as it’s created. At an <code>.await</code> on something not ready, the task gives its thread back, and the runtime wakes it when the timer fires or the socket has data.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Composing: spawn, join, select, timeout, limit</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>You want</th><th>Write</th><th>Takes</th></tr></thead>
+  <tbody>
+    <tr><td>one after the other</td><td><code>a.await; b.await;</code></td><td>a + b</td></tr>
+    <tr><td>both, concurrently</td><td><code>tokio::join!(a, b)</code></td><td>max(a, b)</td></tr>
+    <tr><td>the first to finish; drop the other</td><td><code>tokio::select! { … }</code></td><td>min(a, b)</td></tr>
+    <tr><td>give up after a deadline</td><td><code>timeout(d, a).await</code>: <code>Err(Elapsed)</code> if late</td><td>min(a, d)</td></tr>
+    <tr><td>many independent tasks</td><td><code>JoinSet::spawn</code>, then <code>join_all()</code></td><td>the slowest</td></tr>
+    <tr><td>at most N at once</td><td>a <code>Semaphore</code> with N permits</td><td>batches of N</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A future that loses a <code>select!</code> or a <code>timeout</code> is <strong>dropped</strong>: it never runs again, so it’s cancelled at the <code>.await</code> where it was waiting (<a href="https://tokio.rs/tokio/tutorial/select">tokio tutorial: select</a>). A semaphore permit is released when its guard drops, which is lesson 29’s ownership doing concurrency control: hold <code>_permit</code> for the length of the job.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Never block the runtime</h2>
+<p>Scheduling is cooperative: a task gives up its thread only at an <code>.await</code>. A CPU loop or a blocking call inside an async function (<code>std::thread::sleep</code>, a big compression, a synchronous C library) holds the thread, and every task scheduled on it waits. <code>tokio::task::spawn_blocking(move || work())</code> runs the closure on a separate pool of threads meant for blocking, and gives you a future for the result. tokio’s own tutorial says when not to use it at all: CPU-bound computation (use rayon), reading many files, or a single request where the blocking library is simpler (<a href="https://tokio.rs/tokio/tutorial">tokio tutorial</a>).</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-async -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the runner</h2>
+<div class="spec">
+  <p><code>run_all</code> runs jobs (each a <code>sleep</code>, standing in for I/O) with a semaphore limit and a timeout per job; <code>fastest</code> races two mirrors with <code>select!</code>; <code>checksum_all</code> runs <code>slow_checksum</code> (300 ms of blocking work, given in <code>kit.rs</code>) without blocking the runtime. Most tests run on tokio’s <strong>paused clock</strong> (<code>start_paused = true</code>, from the <code>test-util</code> feature): sleeps finish instantly, and elapsed time is exact. 100 one-second jobs, 10 at a time, must take exactly 10 virtual seconds.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3><code>run_all</code> and <code>fastest</code></h3>
+    <label><input type="checkbox" data-key="lesson-0039-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0039-async-tokio
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # the first build downloads tokio</pre>
+  <p>Wrap the semaphore in an <code>Arc</code>, clone it into each <code>async move</code> task, and take <code>acquire_owned().await</code> inside the task (taking it in the loop would serialize the spawning instead). Match on the <code>timeout</code>’s <code>Result</code> to choose <code>Done</code> or <code>TimedOut</code>. Sort by id at the end: tasks finish in any order.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3><code>checksum_all</code> without blocking</h3>
+    <label><input type="checkbox" data-key="lesson-0039-step-2"> done</label>
+  </div>
+  <p>Call <code>slow_checksum</code> directly and the test fails: a 50 ms timer fires after more than a second, because <code>#[tokio::test]</code> runs on one thread and your loop holds it. Start one <code>spawn_blocking</code> per input first, then await the handles in order: they run concurrently on the blocking pool.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Node runs one event loop on one thread, plus a thread pool for file and DNS work; tokio runs tasks on a pool of worker threads. In section 6’s box, name one bug that behaves differently in the two, and which one the lab’s blocking test would catch in each.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a real server</h3>
+    <label><input type="checkbox" data-key="lesson-0039-step-3"> done</label>
+  </div>
+  <p>Follow the tutorial’s <a href="https://tokio.rs/tokio/tutorial/io">I/O chapter</a> to write a TCP echo server with <code>TcpListener</code> and one <code>tokio::spawn</code> per connection, then open 1,000 connections to it from a second program. Watch the thread count stay flat (<code>ls /proc/&lt;pid&gt;/task | wc -l</code>).</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your comparison from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://tokio.rs/tokio/tutorial">The tokio tutorial</a></strong>: start with “Hello Tokio”, “Spawning” and “select”, the three chapters behind this lab. Then <a href="https://rust-lang.github.io/async-book/">the Async Book</a> for how futures and wakers work underneath.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>async move</code> needs the <code>Arc</code> clone, what the paused clock really does, what “cancellation safe” means, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0039</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

@@ -1,0 +1,95 @@
+<!--
+  Lesson 0030 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Moving everything around would make Rust unusable: you’d hand a string to a function and never see it again. So you <strong>lend</strong> it. A borrow is a pointer the compiler tracks, and one rule makes it safe: <em>many readers or one writer, never both</em>. Today you learn the rule and why it exists, then rebuild lesson 9’s output comparator so that every token it looks at is a slice of the program’s output. No copies at all.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>A judge compares megabytes of output per submission. In C you’d return pointers into the output buffer and hope nobody frees it first. In Rust you do the same thing, and the compiler proves nobody can. That combination, C’s speed with checked safety, is the whole case for Rust in infrastructure.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. References</h2>
+<p><code>&amp;s</code> creates a <strong>shared reference</strong> to <code>s</code>: you can read through it, and <code>s</code> keeps ownership. <code>&amp;mut s</code> creates a <strong>mutable reference</strong>: you can change <code>s</code> through it. Both are plain pointers at runtime, with no reference counting and no cost. All the checking happens at compile time (<a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html">The Book, §4.2</a>).</p>
+<pre>fn count_words(line: &amp;str) -> usize {      // borrows: reads, gives back
+    line.split_whitespace().count()
+}
+fn add_newline(buf: &amp;mut String) {         // borrows exclusively: changes it
+    buf.push('\n');
+}</pre>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. The rule: many readers or one writer</h2>
+<p>At any moment, a value can have <strong>any number of shared references, or exactly one mutable reference</strong>, never both. And a reference can never outlive the value it points to. A borrow lasts from where it’s created to its <em>last use</em>, not to the end of the block, so most code that’s safe compiles without ceremony.</p>
+<p>Why so strict? Look at the code The Book uses (<a href="https://doc.rust-lang.org/book/ch08-01-vectors.html">§8.1</a>):</p>
+<pre>let mut v = vec![1, 2, 3];
+let first = &amp;v[0];       // a pointer into v's buffer
+v.push(4);               // full? push allocates a new buffer and frees the old one
+println!("{first}");     // first would point at freed memory</pre>
+<p>The same code in C++ compiles and reads freed memory, sometimes, depending on the capacity. Rust refuses it with E0502: <code>first</code> is a reader still in use, and <code>push</code> wants to write.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Slices: borrowing part of something</h2>
+<p>A <strong>slice</strong> is a pointer and a length into memory someone else owns: <code>&amp;str</code> for text, <code>&amp;[T]</code> for elements. <code>"hello"</code> is a <code>&amp;str</code> pointing into the program’s binary; <code>&amp;line[2..5]</code> points into <code>line</code>; <code>split_whitespace()</code> yields slices of its input, one per token, without allocating.</p>
+<p>So the right parameter type for a function that reads text is <code>&amp;str</code>: it accepts a <code>&amp;String</code>, a literal, or a slice of a bigger output. For a list, <code>&amp;[T]</code>. Take <code>&amp;mut</code> only to change, and take ownership only to keep.</p>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Name a C bug the one-writer rule prevents: two pointers to one buffer, one of them calling <code>realloc</code>, or a function freeing what its caller still reads. Write it in section 7’s box: the code shape, what broke, and which borrow the compiler would have refused.</p>
+</div>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-borrowing -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the comparator</h2>
+<div class="spec">
+  <p>Lesson 9’s rule, kept exactly: outputs match when their whitespace-separated <strong>tokens</strong> match, as in Codeforces’ <code>wcmp</code>. <code>src/lib.start.rs</code> asks for <code>tokens</code>, <code>same_tokens</code>, <code>first_difference</code> (the 1-based token where they differ), <code>token</code> (the n-th, as a slice), <code>trim_lines</code> (in place), and one function to fix, <code>append_eof</code>. The tests check that returned slices point into the input, and that <code>trim_lines</code> keeps each line’s buffer.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Fix <code>append_eof</code> first</h3>
+    <label><input type="checkbox" data-key="lesson-0030-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0030-borrowing
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # E0502: read all three labels</pre>
+  <p>The error tells the story in three labels: where the shared borrow starts, where the mutable one happens, where the shared one is used again. You need the first line’s length, not a pointer to the line: take the number before you push.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The comparator</h3>
+    <label><input type="checkbox" data-key="lesson-0030-step-2"> done</label>
+  </div>
+  <p><code>split_whitespace()</code> is an iterator of <code>&amp;str</code>. Iterators compare with <code>.eq()</code>, step with <code>.next()</code> (which returns an <code>Option</code>), and skip with <code>.nth()</code>. For <code>first_difference</code>, walk both iterators together; a <code>match</code> on the pair <code>(e.next(), a.next())</code> reads well. For <code>trim_lines</code>, <code>iter_mut()</code> lends each line mutably, <code>trim_end()</code> tells you how much to keep, and <code>truncate</code> keeps the buffer.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: where do the tokens live?</h3>
+    <label><input type="checkbox" data-key="lesson-0030-step-3"> done</label>
+  </div>
+  <p>Print <code>out.as_ptr()</code> and each token’s <code>as_ptr()</code> for a small output, and explain the numbers in section 7: why no token needs its own allocation, and what would happen to the tokens if <code>out</code> were dropped while you still held them. (Then try it: the compiler’s answer is lesson 34.)</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your C bug from section 3, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html">The Book, §4.2: References and Borrowing</a></strong>, then <a href="https://doc.rust-lang.org/book/ch04-03-slices.html">§4.3: The Slice Type</a>. Short, precise, and the source of the two rules this lesson is built on.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>&amp;mut [i32]</code> can sort but not push, how <code>iter_mut</code> lends one element at a time, why the borrow checker accepts a line you expected it to refuse, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0030</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

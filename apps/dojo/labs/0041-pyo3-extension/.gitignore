@@ -1,0 +1,7 @@
+# The files you write in this lab, and what the build makes.
+src/lib.rs
+src/bpe.rs
+target/
+Cargo.lock
+.venv/
+__pycache__/

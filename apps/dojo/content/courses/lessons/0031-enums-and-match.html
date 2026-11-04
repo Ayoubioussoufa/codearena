@@ -1,0 +1,105 @@
+<!--
+  Lesson 0031 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">In lesson 9 you turned runner facts into verdicts in TypeScript, with a string union and a chain of <code>if</code>s. Today you write the same judge in Rust, where a verdict is an <strong>enum</strong> whose variants carry their own data, and every decision is a <strong>match</strong> the compiler checks for completeness. Forget a case, and it doesn’t compile.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Most production bugs in a judge are a case nobody handled: the crash after the right output, the timeout that also ran out of memory. Rust’s enums turn “did we handle every case?” from a code-review question into a compiler error, and that idea, making illegal states impossible to build, is worth carrying back to your TypeScript.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Structs and enums</h2>
+<p>A <strong>struct</strong> groups named fields, like C’s. An <strong>enum</strong> is one of several <strong>variants</strong>, and unlike C’s, each variant can carry its own data (<a href="https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html">The Book, §6.1</a>):</p>
+<pre>enum Ending {
+    Exited(i32),     // a tuple-like variant: the exit code
+    Signaled(i32),   // the signal number
+    TimedOut,        // no data
+}
+enum TestVerdict {
+    Passed,
+    WrongAnswer { token: usize },   // a struct-like variant
+    RuntimeError(Ending),           // variants can hold other enums
+    // ...
+}</pre>
+<p>In memory, it’s a tag plus room for the largest variant: C’s tagged union, except the compiler won’t let you read the wrong member. <code>#[derive(Debug, PartialEq)]</code> above a type asks the compiler to write printing and <code>==</code> for it.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. <code>match</code>: the only way in</h2>
+<p>To use a variant’s data, you <code>match</code> on it. Arms are tried top to bottom; the first whose <strong>pattern</strong> fits, and whose <strong>guard</strong> (<code>if …</code>) is true, runs. And the match must be <strong>exhaustive</strong>: every possible value covered, or it’s error E0004 (<a href="https://doc.rust-lang.org/book/ch06-02-match.html">§6.2</a>).</p>
+<pre>match facts.ending {
+    Ending::TimedOut => TestVerdict::TimeLimit,
+    _ if facts.oom_killed => TestVerdict::MemoryLimit,   // guard: order matters
+    Ending::Exited(0) => compare(expected, &amp;facts.stdout),
+    Ending::Exited(_) | Ending::Signaled(_) => TestVerdict::RuntimeError(facts.ending),
+}</pre>
+<p>That match <em>is</em> lesson 9’s order of checks. <code>match</code> is an expression, so its arms produce the result, and they must all have the same type. <code>if let Some(x) = opt { … }</code> is the short form when you care about one pattern only.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. <code>Option</code>: no null</h2>
+<p>Rust has no null. A value that might be missing is an <code>Option&lt;T&gt;</code>, an ordinary enum: <code>Some(value)</code> or <code>None</code>. You can’t use the value without dealing with <code>None</code>, so “undefined is not a function” has no Rust equivalent. <code>first_difference</code> returns <code>Option&lt;usize&gt;</code>: <code>None</code> means the outputs match.</p>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Pick a discriminated union from CodeArena’s TypeScript (a submission status, an API result, a WebSocket message) and write it as a Rust enum in section 7’s box. Which fields only make sense for one variant? In Rust, that’s where they go.</p>
+</div>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-match -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the judge</h2>
+<div class="spec">
+  <p>The types are given in <code>src/lib.start.rs</code>, with lesson 30’s comparator in <code>src/compare.rs</code>. You write <code>judge_test</code> (lesson 9’s order: TLE, MLE, OLE, RE, then WA), <code>judge</code> (tests in order, stop at the first failure, report the slowest time, <code>None</code> for no tests), and two methods in an <code>impl Verdict</code> block: <code>code</code> (“AC”, “WA”…) and <code>describe</code>, for the user.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>One test, then the loop</h3>
+    <label><input type="checkbox" data-key="lesson-0031-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0031-enums-and-match
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # 12 red: "not yet implemented"</pre>
+  <p>Write <code>judge_test</code> as one <code>match</code>, arms in lesson 9’s order. In <code>judge</code>, <code>results.iter().enumerate()</code> gives <code>(index, item)</code> pairs; tests are numbered from 1.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Methods</h3>
+    <label><input type="checkbox" data-key="lesson-0031-step-2"> done</label>
+  </div>
+  <p><code>impl Verdict { … }</code> attaches functions to the type; <code>&amp;self</code> is the verdict they’re called on. Match on <code>self</code>, and inside the <code>Failed</code> arm, match again on <code>why</code>. Patterns nest: <code>TestVerdict::RuntimeError(Ending::Signaled(s))</code> is one pattern.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Make illegal states unrepresentable</h2>
+<p>When you write <code>describe</code>, the compiler makes you handle <code>Failed { why: TestVerdict::Passed }</code> and <code>RuntimeError(Ending::TimedOut)</code>. Neither can happen, but the types allow them, so you write arms for nonsense. The fix isn’t a comment or an assert: it’s types that can’t express the nonsense. A failure reason enum without <code>Passed</code>; a crash enum with only <code>Exit(i32)</code> and <code>Signal(i32)</code>. Then the impossible arms disappear, and so do the bugs they could hide. The phrase comes from Yaron Minsky’s <a href="https://blog.janestreet.com/effective-ml-revisited/">“Effective ML”</a> talk, and it applies to TypeScript just as well.</p>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: tighten the types</h3>
+    <label><input type="checkbox" data-key="lesson-0031-step-3"> done</label>
+  </div>
+  <p>In a copy of your solution, change the types so both impossible states can’t be built, and update the code until it compiles again: the compiler lists every place to touch. (The kit’s tests use the original types, so keep this in a separate file.) Write your new types in section 7.</p>
+</section>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your union from section 3, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch06-00-enums.html">The Book, chapter 6: Enums and Pattern Matching</a></strong>, then <a href="https://doc.rust-lang.org/book/ch05-00-structs.html">chapter 5</a> for structs and methods. Chapter 19 (<a href="https://doc.rust-lang.org/book/ch19-00-patterns.html">Patterns</a>) has every pattern form, for reference.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>Ending</code> needs <code>Copy</code> to be put in a <code>RuntimeError</code>, how <code>..</code> skips fields in a pattern, when <code>_</code> is fine, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0031</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

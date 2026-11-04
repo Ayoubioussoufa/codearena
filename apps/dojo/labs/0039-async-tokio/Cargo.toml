@@ -1,0 +1,13 @@
+[package]
+name = "asyncjudge"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+doctest = false
+
+[dependencies]
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "time", "sync"] }
+
+[dev-dependencies]
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }

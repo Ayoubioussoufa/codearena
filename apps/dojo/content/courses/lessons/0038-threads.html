@@ -1,0 +1,110 @@
+<!--
+  Lesson 0038 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">A judge spends most of its time waiting for programs to finish, so it runs several at once. In C or TypeScript you’d protect shared state by discipline and code review. In Rust, the borrowing rule you learned in lesson 30, one writer or many readers, holds across threads too, and a data race is a compile error. Today you plant one, watch it refused, then judge in parallel two ways: scoped threads that borrow, and a worker pool fed by a channel.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>“Fearless concurrency” is the Rust slogan, and an interviewer will ask what it really means. After today you can say it precisely: which bugs the compiler rules out (data races), which it doesn’t (deadlocks, a wrong worker count), and which two traits, <code>Send</code> and <code>Sync</code>, carry the proof.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Two ways to start a thread</h2>
+<pre>// thread::spawn: the thread may outlive this function, so it must own its data
+let h = thread::spawn(move || judge_one(&amp;job));    // move: the closure takes `job`
+let outcome = h.join().unwrap();                    // join: wait, and get its result
+
+// thread::scope: every thread ends before the scope does, so they may borrow
+thread::scope(|s| {
+    for chunk in jobs.chunks(size) {
+        s.spawn(move || chunk.iter().map(judge_one).collect::&lt;Vec&lt;_&gt;&gt;());
+    }
+});                                                 // all joined here</pre>
+<p><code>thread::spawn</code> requires a <code>'static</code> closure: it owns everything it uses, or shares it through an <code>Arc</code>. <code>thread::scope</code> (stable since Rust 1.63) lifts that requirement, because the scope can’t return before its threads have finished (<a href="https://doc.rust-lang.org/std/thread/fn.scope.html">std::thread::scope</a>). A thread’s return value comes back through <code>join()</code>, and that’s often all the communication you need.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. The data race that doesn’t compile</h2>
+<pre>let mut total = 0;
+thread::scope(|s| {
+    for chunk in values.chunks(1000) {
+        s.spawn(|| total += chunk.iter().sum::&lt;u64&gt;());   // E0499
+    }
+});</pre>
+<p>Each closure needs <code>&amp;mut total</code>, and two can’t exist at once. That rule is exactly the definition of a data race (two threads, one location, at least one writing, no synchronization), so data races can’t compile. The fixes all remove the shared <code>&amp;mut</code>: return partial sums through <code>join</code>; use an <code>AtomicU64</code>; or wrap the value in a <code>Mutex</code>, which hands out one <code>&amp;mut</code> at a time.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. <code>Send</code>, <code>Sync</code>, and the shared-state toolbox</h2>
+<p>Two marker traits carry the proof. A type is <strong><code>Send</code></strong> if it can move to another thread, and <strong><code>Sync</code></strong> if <code>&amp;T</code> can be shared between threads. The compiler derives both from a type’s fields (<a href="https://doc.rust-lang.org/book/ch16-04-extensible-concurrency-sync-and-send.html">The Book, §16.4</a>). <code>Rc</code> isn’t <code>Send</code> (its count isn’t atomic), <code>RefCell</code> isn’t <code>Sync</code> (its borrow flag isn’t either), so using them across threads is E0277.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Need</th><th>Tool</th></tr></thead>
+  <tbody>
+    <tr><td>one counter, many threads</td><td><code>AtomicUsize</code>, <code>fetch_add</code></td></tr>
+    <tr><td>shared ownership across <code>spawn</code>ed threads</td><td><code>Arc&lt;T&gt;</code>, atomically reference-counted</td></tr>
+    <tr><td>shared and mutable</td><td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code>; <code>lock()</code> returns a guard that unlocks when dropped</td></tr>
+    <tr><td>hand values from producers to a consumer</td><td><code>mpsc::channel()</code>: many senders, one receiver</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Rust rules out data races, not deadlocks: two threads that each hold one lock and wait for the other’s hang forever in perfectly safe code, as The Book warns (<a href="https://doc.rust-lang.org/book/ch16-03-shared-state.html">§16.3</a>).</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-threads -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Judge in parallel</h2>
+<div class="spec">
+  <p><code>src/work.rs</code> gives <code>judge_one</code>, which sleeps for a job’s duration like a container run, and records how many jobs run at once. You write <code>total_parallel</code> (fix the race), <code>judge_parallel</code> (scoped threads, outcomes in input order) and <code>judge_with_channel</code> (a pool of <code>spawn</code>ed workers fed by a channel). The tests time them: 8 jobs of 100 ms on 4 workers should take about 200 ms, not 800, and never run more than 4 at once.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Fix the race, then scope</h3>
+    <label><input type="checkbox" data-key="lesson-0038-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0038-threads
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # E0499 first</pre>
+  <p>Collect the <code>ScopedJoinHandle</code>s in a <code>Vec</code>, then <code>join</code> them and add the results. <code>judge_parallel</code> has the same shape: split the jobs into <code>workers</code> chunks (<code>div_ceil</code> gives the size), one thread per chunk, then join in order and <code>flat_map</code> the results back together.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The channel pool</h3>
+    <label><input type="checkbox" data-key="lesson-0038-step-2"> done</label>
+  </div>
+  <p>Two channels: jobs out, outcomes back. The job receiver can’t be cloned, so share it as <code>Arc&lt;Mutex&lt;Receiver&lt;Job&gt;&gt;&gt;</code>; each worker locks, <code>recv()</code>s one job, unlocks (the guard drops at the end of the statement), judges. Workers stop when <code>recv()</code> returns <code>Err</code>, which happens once every sender is dropped, so drop yours after sending. Drop your copy of the outcome sender too, or the collecting loop never ends.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>CodeArena’s worker runs each submission in a container. How many should it judge at once on a 4-core VM, and is a thread per job, a fixed pool, or BullMQ’s own concurrency setting the right knob? Answer in section 6’s box, with the resource that runs out first.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: write a deadlock</h3>
+    <label><input type="checkbox" data-key="lesson-0038-step-3"> done</label>
+  </div>
+  <p>In a scratch project, with two <code>Mutex</code>es and two threads that lock them in opposite orders (and a short sleep between the two locks), make a program that hangs, in 100% safe Rust. Then fix it by locking in one global order. Explain in section 6 why the compiler couldn’t help.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your answer from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch16-00-concurrency.html">The Book, chapter 16: Fearless Concurrency</a></strong>: threads, message passing, shared state, <code>Send</code> and <code>Sync</code>, in four short sections. For depth, Mara Bos’s <a href="https://mara.nl/atomics/">Rust Atomics and Locks</a> is free online, by the engineer who co-led Rust’s library team.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the <code>MutexGuard</code> must drop before judging, what “poisoned” means, when <code>Ordering::Relaxed</code> is enough, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0038</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

@@ -1,0 +1,121 @@
+<p class="kicker">Reference · the Rust track, part 1</p>
+<h1>Rust the language, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0028-cargo-and-the-compiler">28</a> to <a href="/courses/lessons/0035-iterators-and-maps">35</a>. Every behaviour checked against rustc 1.99.1. Keep it open while you work; it prints on three pages.</p>
+
+<h2 id="cargo">Cargo</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Command</th><th>Does</th><th>Like</th></tr></thead>
+  <tbody>
+    <tr><td><code>cargo new x</code> · <code>--lib</code></td><td>a program (<code>src/main.rs</code>) · a library (<code>src/lib.rs</code>)</td><td><code>pnpm init</code></td></tr>
+    <tr><td><code>cargo check</code></td><td>types and borrows, no binary: the fast loop</td><td><code>tsc --noEmit</code></td></tr>
+    <tr><td><code>cargo run -- args</code></td><td>debug build, then run</td><td><code>pnpm dev</code></td></tr>
+    <tr><td><code>cargo test</code></td><td>build and run every <code>#[test]</code>; <code>tests/*.rs</code> are integration tests</td><td><code>pnpm test</code></td></tr>
+    <tr><td><code>cargo build --release</code></td><td>optimized; the only build worth timing</td><td><code>pnpm build</code></td></tr>
+    <tr><td><code>cargo add serde</code></td><td>add a dependency to <code>Cargo.toml</code></td><td><code>pnpm add</code></td></tr>
+    <tr><td><code>cargo fmt</code> · <code>cargo clippy</code></td><td>format · lint (lesson 42)</td><td>prettier · eslint</td></tr>
+    <tr><td><code>rustc --explain E0384</code></td><td>the long story of an error code</td><td></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="basics">Bindings, types, expressions</h2>
+<ul>
+  <li><code>let x = 5;</code> is immutable. <code>let mut x</code> can change its value, never its type. A second <code>let x</code> <strong>shadows</strong>: a new variable, possibly of a new type.</li>
+  <li>Integers say their size: <code>i8</code>…<code>i128</code>, <code>u8</code>…<code>u128</code>, <code>isize</code>/<code>usize</code> (pointer-sized: lengths and indexes). Floats: <code>f32</code>, <code>f64</code>. Also <code>bool</code>, and <code>char</code> (a Unicode scalar, 4 bytes).</li>
+  <li>No silent conversions: <code>x as i64</code> (may truncate), <code>i32::try_from(x)</code> (checks).</li>
+  <li>A block’s value is its last expression <strong>without</strong> a semicolon. <code>if</code>, <code>match</code> and blocks are expressions; both arms of an <code>if</code> must have the same type.</li>
+  <li>Precedence: <code>&amp;</code> <code>^</code> <code>|</code> bind tighter than <code>==</code>, so <code>s &amp; 0x7f == 0</code> means <code>(s &amp; 0x7f) == 0</code>. (C has it the other way round.)</li>
+</ul>
+
+<h2 id="overflow">Integer overflow</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>You write</th><th>Debug build</th><th>Release build</th></tr></thead>
+  <tbody>
+    <tr><td><code>a + b</code> (runtime values)</td><td>panics: “attempt to add with overflow”</td><td>wraps silently (relying on it is a bug)</td></tr>
+    <tr><td><code>a + b</code> (both known to the compiler)</td><td colspan="2">compile error: “this arithmetic operation will overflow”</td></tr>
+    <tr><td><code>a.wrapping_add(b)</code></td><td colspan="2">wraps, on purpose</td></tr>
+    <tr><td><code>a.checked_add(b)</code></td><td colspan="2"><code>Some(sum)</code>, or <code>None</code> on overflow</td></tr>
+    <tr><td><code>a.saturating_add(b)</code></td><td colspan="2">clamps at the type’s max (or min)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="errors">Reading an error</h2>
+<p><code>error[E0384]: what</code> → <code>--&gt; file:line:col</code> → labelled source lines → <code>help:</code>, often the fix itself. Fix the first error first: the rest are often its echoes.</p>
+
+<h2 id="ownership">Ownership (lesson <a href="/courses/lessons/0029-ownership">29</a>)</h2>
+<ol>
+  <li>Each value has one <strong>owner</strong>. When the owner goes out of scope, the value is <strong>dropped</strong> (freed), once.</li>
+  <li><code>let t = s;</code> <strong>moves</strong> a non-<code>Copy</code> value: <code>s</code> is unusable after (E0382). Passing to a <code>String</code> parameter or <code>v.push(s)</code> moves too.</li>
+  <li><code>Copy</code> types (integers, <code>bool</code>, <code>char</code>, shared references, tuples of these) are copied instead.</li>
+  <li><code>.clone()</code> = a second, independent allocation. Right when you need two owners; wrong to silence the compiler.</li>
+  <li><code>std::mem::take(&amp;mut s)</code> moves a value out and leaves its default (an empty String) behind, with no allocation.</li>
+</ol>
+
+<h2 id="borrowing">Borrowing (lesson <a href="/courses/lessons/0030-borrowing">30</a>)</h2>
+<ul>
+  <li><strong>Any number of <code>&amp;T</code>, or exactly one <code>&amp;mut T</code></strong>, never both. A borrow lasts until its <em>last use</em>.</li>
+  <li>References never outlive their owner. Holding <code>&amp;v[0]</code> across <code>v.push(…)</code> is E0502: push may reallocate.</li>
+  <li>Parameters: read text <code>&amp;str</code>, read a list <code>&amp;[T]</code>, change in place <code>&amp;mut String</code> / <code>&amp;mut Vec&lt;T&gt;</code> / <code>&amp;mut [T]</code>, keep it <code>String</code> / <code>Vec&lt;T&gt;</code>. Never <code>&amp;String</code>.</li>
+  <li>Slices (<code>&amp;s[a..b]</code>, <code>split_whitespace()</code>) point into their owner: no copy.</li>
+</ul>
+
+<h2 id="enums">Enums and match (lesson <a href="/courses/lessons/0031-enums-and-match">31</a>)</h2>
+<pre>enum Ending { Exited(i32), Signaled(i32), TimedOut }
+match facts.ending {
+    Ending::TimedOut => …,
+    _ if facts.oom_killed => …,          // guard; first matching arm wins
+    Ending::Exited(0) => …,
+    Ending::Exited(_) | Ending::Signaled(_) => …,
+}</pre>
+<ul>
+  <li>Matches must be <strong>exhaustive</strong> (E0004); guards don’t count towards it. <code>if let</code> / <code>let … else</code> for one pattern.</li>
+  <li><code>Option&lt;T&gt;</code> = <code>Some(T)</code> | <code>None</code>: Rust’s replacement for null.</li>
+  <li>Make illegal states unrepresentable: if a combination can’t happen, design types that can’t hold it.</li>
+</ul>
+
+<h2 id="results">Errors (lesson <a href="/courses/lessons/0032-errors-as-values">32</a>)</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tool</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>Result&lt;T, E&gt;</code></td><td><code>Ok(T)</code> | <code>Err(E)</code>: recoverable failures. Panics are for bugs.</td></tr>
+    <tr><td><code>expr?</code></td><td><code>Ok(v)</code> → <code>v</code>; <code>Err(e)</code> → <code>return Err(From::from(e))</code>. Also on <code>Option</code> in functions returning <code>Option</code>.</td></tr>
+    <tr><td><code>ok_or(e)</code> · <code>map_err(f)</code> · <code>.ok()</code></td><td>Option → Result · change the error · Result → Option</td></tr>
+    <tr><td><code>impl Display</code> · <code>impl Error</code> · <code>impl From</code></td><td>user message · usable as <code>Box&lt;dyn Error&gt;</code> · lets <code>?</code> convert</td></tr>
+    <tr><td><code>unwrap()</code> · <code>expect("why")</code></td><td>panic on failure: tests, or provable impossibility only</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>"…".parse::&lt;T&gt;()</code> never trims: <code>" 7"</code> and <code>"7\n"</code> fail. <code>"+5"</code> parses; <code>"-1"</code> as <code>u32</code> is an invalid digit.</p>
+
+<h2 id="traits">Traits and generics (lesson <a href="/courses/lessons/0033-traits-and-generics">33</a>)</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Need</th><th>Use</th><th>Dispatch</th></tr></thead>
+  <tbody>
+    <tr><td>type known at compile time</td><td><code>fn f&lt;C: Checker&gt;(c: &amp;C)</code> · <code>impl Checker</code></td><td>static: one copy per type, inlinable</td></tr>
+    <tr><td>types chosen at runtime, mixed collections</td><td><code>Box&lt;dyn Checker&gt;</code> · <code>&amp;dyn Checker</code></td><td>dynamic: vtable call</td></tr>
+    <tr><td>a closed set of kinds</td><td>an enum + <code>match</code></td><td>a branch</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Default methods are written once in the trait. Not dyn compatible (E0038): generic methods, or methods returning <code>Self</code> without <code>where Self: Sized</code>.</p>
+
+<h2 id="lifetimes">Lifetimes (lesson <a href="/courses/lessons/0034-lifetimes">34</a>)</h2>
+<ul>
+  <li><code>fn longest&lt;'a&gt;(a: &amp;'a str, b: &amp;'a str) -&gt; &amp;'a str</code>: the result can’t outlive either input. Annotations describe; they never extend a life.</li>
+  <li>Elision: (1) each input reference gets a lifetime; (2) one input lifetime → outputs get it; (3) <code>&amp;self</code> methods → outputs get <code>self</code>’s. Otherwise E0106.</li>
+  <li>A struct holding a reference: <code>struct Tokens&lt;'a&gt; { rest: &amp;'a str }</code>. Return <code>&amp;'a str</code> from its methods when the result borrows the input, not the struct.</li>
+  <li><code>'static</code>: lives for the whole program (string literals). E0597: “does not live long enough”.</li>
+</ul>
+
+<h2 id="iterators">Iterators, closures, maps (lesson <a href="/courses/lessons/0035-iterators-and-maps">35</a>)</h2>
+<ul>
+  <li>Closures: only reads → <code>Fn</code>; changes a capture → <code>FnMut</code>; moves one out → <code>FnOnce</code>. <code>move</code> changes how values are captured, not which trait.</li>
+  <li>Adaptors are lazy (<code>map</code>, <code>filter</code>, <code>filter_map</code>, <code>enumerate</code>, <code>take_while</code>, <code>skip</code>, <code>rev</code>, <code>windows(2)</code> on slices); consumers pull (<code>sum</code>, <code>count</code>, <code>max</code>, <code>min_by_key</code>, <code>position</code>, <code>any</code>, <code>fold</code>, <code>collect</code>).</li>
+  <li><code>*map.entry(k).or_insert(0) += 1;</code> · <code>map.entry(k).or_default()</code>: one lookup, update in place.</li>
+  <li><code>HashMap</code> order is random per run; use <code>BTreeMap</code> or sort. Multi-key sort: <code>a.x.cmp(&amp;b.x).then(b.y.cmp(&amp;a.y))</code>.</li>
+</ul>

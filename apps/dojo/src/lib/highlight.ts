@@ -16,6 +16,7 @@ import python from "highlight.js/lib/languages/python";
 import java from "highlight.js/lib/languages/java";
 import properties from "highlight.js/lib/languages/properties";
 import plaintext from "highlight.js/lib/languages/plaintext";
+import rust from "highlight.js/lib/languages/rust";
 
 hljs.registerLanguage("typescript", typescript);
 hljs.registerLanguage("javascript", javascript);
@@ -29,6 +30,7 @@ hljs.registerLanguage("python", python);
 hljs.registerLanguage("java", java);
 hljs.registerLanguage("properties", properties);
 hljs.registerLanguage("plaintext", plaintext);
+hljs.registerLanguage("rust", rust);
 
 const ALIASES: Record<string, string> = {
   ts: "typescript",
@@ -39,6 +41,7 @@ const ALIASES: Record<string, string> = {
   prisma: "graphql", // closest built-in grammar to Prisma schema files
   shell: "bash",
   text: "plaintext",
+  rs: "rust",
 };
 
 export function highlightToHtml(code: string, language: string): string {

@@ -1,0 +1,83 @@
+<!--
+  Lesson 0040 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Before a language model sees your prompt, a <strong>tokenizer</strong> turns it into numbers. The algorithm behind GPT-style tokenizers is <strong>byte-pair encoding</strong>: start from bytes, and repeatedly merge the most frequent pair into a new token. It’s twenty lines of logic, it runs over every document a model is trained on and every request it serves, and it’s exactly the kind of tight byte loop Rust is for. Today you write it from scratch.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This is where the course meets the honest version of “Rust is the language of AI”. The models are trained and called from Python, but the fast parts underneath are often Rust: Hugging Face’s <code>tokenizers</code> library is a Rust core with Python, Node and WebAssembly bindings (<a href="https://github.com/huggingface/tokenizers">its README</a>). Lesson 41 puts your tokenizer behind <code>import</code> in Python; lesson 42 makes it parallel.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Why subwords, and why bytes</h2>
+<p>A vocabulary of whole words can’t cover every name, typo and new word. Characters cover everything but make sequences long, and a model’s cost grows with sequence length. <strong>Subword</strong> tokens sit between: frequent words become one token, rare ones split into a few pieces. Sennrich, Haddow and Birch brought BPE from compression (Gage, 1994) to neural translation for exactly this reason (<a href="https://arxiv.org/abs/1508.07909">ACL 2016, arXiv:1508.07909</a>). GPT-2 then ran it on <strong>bytes</strong> rather than characters (<a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf">Radford et al., 2019, §2.2</a>): the 256 byte values are the base vocabulary, so any text in any language encodes, and no token is ever “unknown”.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Training, by hand</h2>
+<p>Take <code>aaabdaaabac</code>, the example <a href="https://en.wikipedia.org/wiki/Byte-pair_encoding">Wikipedia</a> uses. Count every adjacent pair, overlaps included: <code>aa</code> appears 4 times. Merge it into a new token, Z: <code>ZabdZabac</code>. Count again: <code>Za</code> and <code>ab</code> tie at 2. The lab breaks ties towards the smallest pair, here <code>ab</code> (bytes 97, 98) before <code>Za</code> (256, 97), so Y = <code>ab</code>: <code>ZYdZYac</code>. Then X = <code>ZY</code>: <code>XdXac</code>. Now no pair occurs twice, so training stops. The merges, in order, <em>are</em> the tokenizer.</p>
+<pre>tokens:  a a a b d a a a b a c      11 tokens
+merge 1: (a, a)  → 256            Z a b d Z a b a c      9
+merge 2: (a, b)  → 257            Z Y d Z Y a c          7
+merge 3: (256, 257) → 258         X d X a c              5</pre>
+<p><strong>Encoding</strong> new text replays the merges by rank: while some adjacent pair has been learned, merge the one learned earliest. So <code>aaab</code> becomes <code>[258]</code>. <strong>Decoding</strong> expands each token back into its bytes. Andrej Karpathy’s <a href="https://github.com/karpathy/minbpe">minbpe</a> is the same algorithm in about a hundred lines of Python, written to be read: keep it open next to your Rust.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-bpe -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build the tokenizer</h2>
+<div class="spec">
+  <p><code>src/lib.start.rs</code>: two helpers, <code>merge</code> (non-overlapping, left to right) and <code>pair_counts</code> (overlapping), then <code>Tokenizer::train</code>, <code>encode</code>, <code>token_bytes</code> and <code>decode</code>. The tests check the textbook merges exactly, round trips through accented letters and an emoji, and that 144 merges trained on the kit’s corpus (a page about judges) cut it to under half as many tokens as bytes.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3><code>merge</code>, <code>pair_counts</code>, <code>train</code></h3>
+    <label><input type="checkbox" data-key="lesson-0040-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0040-bpe-tokenizer
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # 8 red</pre>
+  <p><code>ids.windows(2)</code> gives every adjacent pair for counting. <code>merge</code> needs an index you advance by 2 after a match, so a <code>while</code> loop beats an iterator here. For the tie-break, <code>max_by_key(|&amp;(pair, count)| (count, Reverse(pair)))</code> picks the highest count, then the smallest pair: <code>std::cmp::Reverse</code> flips an ordering.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3><code>encode</code>, <code>decode</code></h3>
+    <label><input type="checkbox" data-key="lesson-0040-step-2"> done</label>
+  </div>
+  <p>Build a <code>HashMap&lt;Pair, rank&gt;</code> from the merges once. Then loop: among the adjacent pairs that have a rank, take the lowest (<code>filter_map</code> then <code>min</code>), merge it, repeat until none is left. <code>token_bytes</code> is naturally recursive: a merged token is its two halves’ bytes, concatenated.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Train on the kit’s corpus with 400 tokens, then encode your own name, your city and an English sentence. In section 5’s box, explain why some come out as one token and others as many, and what that implies for how much a non-English prompt costs a model.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: train faster</h3>
+    <label><input type="checkbox" data-key="lesson-0040-step-3"> done</label>
+  </div>
+  <p>Your <code>train</code> recounts every pair after every merge: O(merges × length). Real trainers update only the counts around each merge. Time your version on a 1 MB file in release mode, then try the incremental update. It’s the optimization the Hugging Face trainer is built on.</p>
+</section>
+
+<h2>4. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>5. Say it in your own words</h2>
+<p>Your answer from section 3, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://arxiv.org/abs/1508.07909">Sennrich, Haddow and Birch: Neural Machine Translation of Rare Words with Subword Units</a></strong>, the paper that brought BPE to NLP. Its algorithm fits in one figure. Then <a href="https://github.com/karpathy/minbpe">minbpe</a>’s README and code, for the byte-level version you just wrote.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why overlapping counts but non-overlapping merges, how GPT-2 splits text before BPE, how a 100,000-token vocabulary changes things, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0040</code></strong> message from section 5 and paste it in the terminal.</p>
+</div>

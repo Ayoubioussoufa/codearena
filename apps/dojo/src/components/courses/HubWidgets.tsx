@@ -9,7 +9,7 @@ import Link from "next/link";
 import { LESSONS, getLesson, lessonPath } from "@/lib/courses/catalog";
 import type { DayPlan, Lesson, Week } from "@/lib/courses/types";
 import { isCompleted, lessonProgress, setStep, useCourseProgress } from "@/lib/courses/progress";
-import { currentWeek, dayOf, lessonsOfWeek, nextLesson } from "@/lib/courses/schedule";
+import { currentWeek, dayOf, isOpen, lessonsOfWeek, nextLesson } from "@/lib/courses/schedule";
 import { useToday } from "@/lib/courses/use-today";
 import { dueList, today as utcToday, useProgress } from "@/lib/progress";
 import { Inline } from "./Inline";
@@ -33,7 +33,7 @@ export function CourseToday() {
   if (today === null) return <div className="today" style={{ minHeight: "9rem" }} />;
 
   const week = currentWeek(today);
-  const next = nextLesson(done);
+  const next = nextLesson(done, today);
   const plan = week ? dayOf(week, today) : undefined;
   const todaysLessons = (plan?.lessons ?? []).map(getLesson).filter((l): l is Lesson => !!l);
 
@@ -99,7 +99,8 @@ function started(lesson: { steps: Record<string, boolean>; quiz: Record<string, 
 
 export function LessonBadge({ lesson }: { lesson: Lesson }) {
   const done = useCompletion();
-  const next = nextLesson(done);
+  const today = useToday();
+  const next = today === null ? undefined : nextLesson(done, today);
   if (lesson.status === "planned") return <span className="badge">being written</span>;
   if (done(lesson.slug)) return <span className="badge done">done</span>;
   if (next?.slug === lesson.slug) return <span className="badge now">next</span>;
@@ -283,9 +284,10 @@ export function CoursesBanner() {
   const done = useCompletion();
   if (today === null) return null;
   const week = currentWeek(today);
-  const next = nextLesson(done);
-  const total = LESSONS.filter((l) => l.status === "ready").length;
-  const finished = LESSONS.filter((l) => l.status === "ready" && done(l.slug)).length;
+  const next = nextLesson(done, today);
+  const open = LESSONS.filter((l) => l.status === "ready" && isOpen(l, today));
+  const total = open.length;
+  const finished = open.filter((l) => done(l.slug)).length;
   return (
     <Link
       href={next ? lessonPath(next.slug) : "/courses"}

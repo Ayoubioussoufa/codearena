@@ -5,12 +5,17 @@
  * scheduled for spaced review, and listed on the hub.
  */
 
-export type TrackId = "sandbox" | "backend" | "data" | "web" | "ship" | "story";
+export type TrackId = "sandbox" | "backend" | "data" | "web" | "ship" | "story" | "rust";
 
 export interface Track {
   id: TrackId;
   title: string;
   blurb: string;
+  /**
+   * ISO date. Before it, the track's lessons stay off the "next lesson" path
+   * and out of the progress count (they can still be opened from the map).
+   */
+  opens?: string;
 }
 
 /**

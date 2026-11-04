@@ -13,7 +13,8 @@
     "test:dsa": "pnpm dlx tsx scripts/check-dsa.ts",
     "test:diagrams": "pnpm dlx tsx scripts/check-diagrams.ts",
     "typecheck": "tsc --noEmit",
-    "test:guide-exercises": "pnpm dlx tsx scripts/check-guide-exercises.ts"
+    "test:guide-exercises": "pnpm dlx tsx scripts/check-guide-exercises.ts",
+    "test:courses": "pnpm dlx tsx scripts/check-courses.ts"
   },
   "dependencies": {
     "github-slugger": "^2.0.0",

@@ -1,0 +1,177 @@
+<!--
+  Lesson 0007 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Namespaces hide the world, cgroups ration it. But inside your box the program is still <em>root</em>, and root can do things no namespace hides: mount filesystems, load kernel modules, trace other processes. Today you take those powers away permanently, then go one level lower and forbid system calls outright, with a filter you write by hand in the kernel’s own bytecode.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Every container escape starts with something the program was still <em>allowed</em> to ask the kernel for. Capabilities and seccomp are the two layers that shrink what it can ask. They’re also the two words in “almost no junior candidate can talk about seccomp”, and after today you’ll have written one.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Root is a bundle of powers</h2>
+
+<p>Since Linux 2.2, “root” isn’t one switch. Its powers are split into about forty <strong>capabilities</strong>, each one checked separately (<a href="https://man7.org/linux/man-pages/man7/capabilities.7.html">capabilities(7)</a>): <code>CAP_SYS_ADMIN</code> to mount filesystems and create most namespaces, <code>CAP_CHOWN</code> to change owners, <code>CAP_NET_RAW</code> to send raw packets, <code>CAP_SYS_PTRACE</code> to trace processes, and so on. A process carries several sets of them:</p>
+<ul>
+  <li><strong>effective</strong>: what the kernel checks right now;</li>
+  <li><strong>permitted</strong>: what it may switch on;</li>
+  <li><strong>bounding</strong>: the ceiling, which nothing can ever exceed again once it’s lowered.</li>
+</ul>
+
+<p><strong>Try it</strong> (2 minutes). The same “root”, with and without its powers:</p>
+<pre>unshare --user --map-root-user grep -E 'CapEff|CapBnd' /proc/self/status
+unshare --user --map-root-user unshare --mount true; echo "exit=$?"</pre>
+<p><code>CapEff</code> is a bitmask: <code>000001ffffffffff</code> means every capability is on (inside the user namespace). And with them, root can build itself a new mount namespace. Your guard will turn every one of those bits off.</p>
+
+<h3>The trap: exec refills root</h3>
+<p>Here’s the subtle part, and the lab tests it. You might clear the effective and permitted sets with <code>capset</code>, then <code>exec</code> the program, and find its <code>CapEff</code> full again. When a process running as uid 0 calls <code>execve</code>, the kernel <em>recomputes</em> its capabilities, and for root that means “everything the bounding set allows” (<a href="https://man7.org/linux/man-pages/man7/capabilities.7.html">capabilities(7)</a>, “Transformation of capabilities during execve()”). So you must lower the ceiling itself: <code>prctl(PR_CAPBSET_DROP, cap)</code> for every capability. That’s what <code>docker run --cap-drop ALL</code> does.</p>
+<p class="aside">This lesson was tested with exactly that mistake: without the bounding-set drop, <code>CapEff</code> after <code>exec</code> read <code>000001ffffffffff</code>, every power back.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. no_new_privs: no way up</h2>
+
+<p>Even a powerless process can still <code>exec</code> a <strong>setuid</strong> program, one that runs as its file’s owner. That’s how <code>sudo</code> and <code>passwd</code> work, and it’s a way back up. One flag closes it: <code>prctl(PR_SET_NO_NEW_PRIVS, 1)</code> promises that <code>execve</code> will never grant privileges again, setuid bits and file capabilities included (<a href="https://man7.org/linux/man-pages/man2/prctl.2.html">prctl(2)</a>). It’s inherited, and it can never be unset. Docker’s flag for it is <code>--security-opt no-new-privileges</code>.</p>
+<p>It also unlocks the next layer: an unprivileged process may install a seccomp filter only after setting it (<a href="https://man7.org/linux/man-pages/man2/seccomp.2.html">seccomp(2)</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. seccomp: a filter on every system call</h2>
+
+<p>Lesson 1 said a hostile program can only hurt you through system calls. <strong>seccomp</strong> takes that literally. You hand the kernel a small program, written in <strong>BPF</strong> (the kernel’s tiny bytecode), and the kernel runs it on <em>every</em> system call the process makes, before anything else happens. The program reads the call’s number and architecture, and returns an action:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Return</th><th>What the program sees</th></tr></thead>
+  <tbody>
+    <tr><td><code>SECCOMP_RET_ALLOW</code></td><td>the call runs normally</td></tr>
+    <tr><td><code>SECCOMP_RET_ERRNO | EPERM</code></td><td>the call fails with that error, as if the kernel had refused it. The program can react</td></tr>
+    <tr><td><code>SECCOMP_RET_KILL_PROCESS</code></td><td>instant death by <strong>SIGSYS</strong>, signal 31. It never sees the call return</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Your filter is a <strong>denylist</strong>: check the architecture (a 32-bit call has different numbers, which is a classic bypass), then refuse <code>socket</code> with EPERM, kill on <code>unshare</code> and <code>ptrace</code>, and allow the rest. Each line is a macro that builds one BPF instruction:</p>
+<pre><span class="c">// load the architecture</span>
+BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
+<span class="c">// x86-64? skip the next line</span>
+BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0),
+<span class="c">// anything else: die</span>
+BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+<span class="c">// load the call's number</span>
+BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+<span class="c">/* …one BPF_JUMP per call you refuse, each followed by its BPF_RET… */</span>
+<span class="c">// everything else</span>
+BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),</pre>
+<p>A <code>BPF_JUMP</code> has two offsets: how many instructions to skip if the test is true, and if it’s false. <code>(…, __NR_socket, 0, 1)</code> reads “if it’s <code>socket</code>, go to the next line (the refusal); otherwise skip it”. That’s the whole language you need.</p>
+
+<p class="aside">Docker’s default profile is the opposite, an <strong>allowlist</strong>: refuse everything, then allow the calls it names. In effect it “disables around 44 system calls out of 300+” (<a href="https://docs.docker.com/engine/security/seccomp/">Docker docs</a>). An allowlist fails safe when a new kernel adds a system call. That’s today’s challenge.</p>
+
+<p><strong>Before you build it, predict it.</strong> This drill mixes every wall from lessons 2 to 7, on purpose: telling them apart under pressure is what makes them stick.</p>
+<!-- drill:privileges -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>guard</code></h2>
+
+<div class="spec">
+  <p><strong>Usage:</strong> <code>./guard [-k] [-n] [-s] &lt;program&gt; [args...]</code></p>
+  <p>Forks a child that becomes root in a new user namespace (<code>0 &lt;your uid&gt; 1</code>, as in lesson 5), then, unless <code>-k</code> (keep) is given, drops <em>every</em> capability, bounding set included. <code>-n</code> sets <code>no_new_privs</code>. <code>-s</code> sets it too, then installs your filter: <code>socket</code> → EPERM, <code>unshare</code> and <code>ptrace</code> → kill, wrong architecture → kill, everything else allowed. Then it execs the program, and the parent prints <code>exit N</code> or <code>signal S</code>. No program: usage, exit 2.</p>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Remember</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/unshare.2.html"><code>unshare(CLONE_NEWUSER)</code></a></td><td>moves the <em>calling</em> process into a new user namespace. Then it writes its own <code>/proc/self/uid_map</code>, <code>setgroups</code>, <code>gid_map</code></td></tr>
+    <tr><td><code>prctl(PR_CAPBSET_DROP, cap, 0, 0, 0)</code></td><td>for every <code>cap</code> from 0 to the number in <code>/proc/sys/kernel/cap_last_cap</code></td></tr>
+    <tr><td><code>syscall(SYS_capset, &amp;hdr, data)</code></td><td><code>hdr = { _LINUX_CAPABILITY_VERSION_3, 0 }</code>, <code>data</code> = two zeroed <code>struct __user_cap_data_struct</code>; from <code>&lt;linux/capability.h&gt;</code></td></tr>
+    <tr><td><code>prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)</code></td><td><code>&lt;sys/prctl.h&gt;</code></td></tr>
+    <tr><td><code>prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &amp;prog)</code></td><td><code>struct sock_fprog prog = { count, instructions }</code>; headers <code>&lt;linux/seccomp.h&gt;</code>, <code>&lt;linux/filter.h&gt;</code>, <code>&lt;linux/audit.h&gt;</code>, <code>&lt;sys/syscall.h&gt;</code> (for <code>__NR_socket</code>…)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Root, then nothing</h3>
+    <label><input type="checkbox" data-key="lesson-0007-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0007-root-capabilities-seccomp</pre>
+  <p>Fork; in the child, become root in a user namespace, drop the capabilities (bounding set first, then <code>capset</code>), and exec. Make “Root inside, with no powers” green. If <code>CapEff</code> comes back full, you’ve met section 1’s trap.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>No new privileges</h3>
+    <label><input type="checkbox" data-key="lesson-0007-step-2"> done</label>
+  </div>
+  <p>Add <code>-n</code>. Two lines, and the next section depends on them.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>The filter</h3>
+    <label><input type="checkbox" data-key="lesson-0007-step-3"> done</label>
+  </div>
+  <p>Write the BPF program as an array of <code>struct sock_filter</code>, then install it after <code>no_new_privs</code>, as the last thing before <code>exec</code>. Make “The system-call filter” green: a Python socket fails with <code>PermissionError</code>, <code>unshare</code> dies with signal 31, and a plain shell still works.</p>
+  <details>
+    <summary>Why install the filter last?</summary>
+    <p>From the moment it’s installed, it applies to <em>you</em> too, and to everything you do afterwards, including the setup. Install it earlier, and your own <code>unshare</code> or <code>prctl</code> calls get filtered. The filter is inherited across <code>fork</code> and kept across <code>execve</code>, so installing it just before <code>exec</code> covers the program and everything it starts.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <h3>All green</h3>
+    <label><input type="checkbox" data-key="lesson-0007-step-4"> done</label>
+  </div>
+  <p>Run <code>bash check.sh</code> until all 14 cases pass.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: turn it into an allowlist</h3>
+    <label><input type="checkbox" data-key="lesson-0007-step-5"> done</label>
+  </div>
+  <p>Refuse everything by default (EPERM), and allow only what <code>/bin/sh -c 'echo hi'</code> and <code>python3 -c 'print(1)'</code> need. Find out which calls those are with <code>strace -f -c</code> (install it with <code>sudo apt install strace</code>), or by trial: add one call at a time until they run. You’ll discover how few system calls a program really needs, and why Docker’s list is long.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for a judge</h2>
+<ul>
+  <li><strong>Your sandbox is complete, and you built every layer:</strong> namespaces (what it sees), cgroups (what it uses), capabilities and <code>no_new_privs</code> (what root can do), seccomp (which calls it may make), and the deadline (how long).</li>
+  <li><strong>Docker gives you all of it, if you ask:</strong> <code>--cap-drop ALL</code>, <code>--security-opt no-new-privileges</code>, and its default seccomp profile, which applies unless you pass <code>seccomp=unconfined</code>. Lesson 8 maps every flag to the layer you wrote.</li>
+  <li><strong>Defence in depth.</strong> Mounting is blocked twice: no <code>CAP_SYS_ADMIN</code>, and Docker’s filter refuses <code>mount</code> too. A sandbox is a stack of walls, each assuming the one before it might fail.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write down the <code>docker run</code> flags your DockerCodeRunner will use for privileges, and for each one, the attack it stops: <code>--cap-drop ALL</code>, <code>--security-opt no-new-privileges</code>, <code>--user 65534:65534</code>. Then say why <code>--user</code> still matters when every capability is already gone (lesson 5 has the answer). In section 7’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://man7.org/linux/man-pages/man2/seccomp.2.html">seccomp(2)</a></strong>, the Linux manual page, maintained by Michael Kerrisk. Its “EXAMPLES” section builds a filter almost exactly like yours, with the architecture check explained. Read that, then the “Filter return values” list.</p>
+  <p>Then <a href="https://man7.org/linux/man-pages/man7/capabilities.7.html">capabilities(7)</a>, “Transformation of capabilities during execve()”, and <a href="https://docs.docker.com/engine/security/seccomp/">Docker’s seccomp page</a>, whose table lists what its default profile blocks, and why.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how the BPF jumps count, why the architecture check matters, what a file capability is, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0007</code></strong> message from section 7 and paste it in the terminal. For deeper questions, <a href="https://unix.stackexchange.com/questions/tagged/seccomp">Unix &amp; Linux Stack Exchange</a> has the people who write these filters.</p>
+</div>

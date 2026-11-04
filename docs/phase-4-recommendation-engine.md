@@ -82,6 +82,11 @@ first, expensive last, on a shrinking set.
 
 ---
 
+
+```check
+objective
+```
+
 <a name="part-c"></a>
 # Part C — The features
 
@@ -167,6 +172,11 @@ real engineering choice, not a beginner's crutch.
 
 ---
 
+
+```check
+features
+```
+
 <a name="part-d"></a>
 # Part D — Diversity: MMR
 
@@ -244,6 +254,11 @@ expert's numbers are bigger.
 
 ---
 
+
+```check
+diversity
+```
+
 <a name="part-f"></a>
 # Part F — Explore vs. exploit: multi-armed bandits
 
@@ -292,6 +307,11 @@ so it's the right *first* choice. (Defensible: "UCB1 first for simplicity and in
 consider Thompson sampling when I want to model uncertainty more richly.")
 
 ---
+
+
+```check
+bandits
+```
 
 <a name="part-g"></a>
 # Part G — Caching without lying
@@ -374,6 +394,11 @@ rankers pluggable) exists so you *can* run a live test later — even if you nev
 seam forces clean, swappable ranker code.
 
 ---
+
+
+```check
+measuring
+```
 
 <a name="worked"></a>
 # Part I — A complete ranker, end to end

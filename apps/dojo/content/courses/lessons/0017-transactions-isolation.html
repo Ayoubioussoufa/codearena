@@ -1,0 +1,172 @@
+<!--
+  Lesson 0017 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">A transaction is a promise that a group of statements happens all or nothing. It is <em>not</em> a promise that concurrent transactions can’t trip over each other. How much they can is set by the <strong>isolation level</strong>, and the default lets more through than most developers think. Today you watch each race happen with your own hands, in two terminals, then fix the one CodeArena has.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>When a verdict is Accepted, the worker records the solve and bumps the user’s score. Two deliveries of the same job (lesson 13), or two Accepted submissions for the same problem, arrive together: is the solve counted twice? This afternoon you pick the mechanism, write the test, and justify the level in an ADR.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Three levels, one question: what does a statement see?</h2>
+<p>Postgres keeps several versions of each row (that’s MVCC), so a reader never waits for a writer. Each statement reads from a <strong>snapshot</strong>: the database as of some moment. The isolation level decides which moment (<a href="https://www.postgresql.org/docs/current/transaction-iso.html">transaction isolation</a>):</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Level</th><th>Snapshot</th><th>Writes that conflict</th></tr></thead>
+  <tbody>
+    <tr><td><strong>READ COMMITTED</strong> (the default)</td><td>a new one for each statement</td><td>wait for the lock, then re-check the row’s newest version</td></tr>
+    <tr><td><strong>REPEATABLE READ</strong></td><td>one for the whole transaction</td><td>updating a row changed since your snapshot fails: retry</td></tr>
+    <tr><td><strong>SERIALIZABLE</strong></td><td>one for the whole transaction</td><td>also fails whenever the result couldn’t have come from running the transactions one at a time</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The pattern: stronger levels don’t make races disappear by magic. They turn them into <strong>errors you retry</strong>. Weaker levels let them through as wrong data.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Watch it happen, in two terminals</h2>
+<p>Open two terminals side by side. In each:</p>
+<pre>cd ~/CODEARENA/apps/dojo/labs/0017-transactions-isolation
+bash shell.sh            <span class="c"># the first one starts Postgres; both open psql</span></pre>
+<p>Each line says which terminal to type it in, <strong>T1</strong> or <strong>T2</strong>, without the label. Run them top to bottom. <code>\i /schema.sql</code> resets the tables between experiments. When you’re done: <code>bash shell.sh stop</code>.</p>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">A</span>
+    <h3>A non-repeatable read</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-a"> done</label>
+  </div>
+  <pre><span class="c">-- T1 and T2 are your two terminals; run the lines top to bottom</span>
+T1  BEGIN;
+T1  SELECT solved FROM users WHERE id = 3;      <span class="c">-- 0</span>
+T2  UPDATE users SET solved = 5 WHERE id = 3;
+T1  SELECT solved FROM users WHERE id = 3;      <span class="c">-- ?</span>
+T1  COMMIT;</pre>
+  <p>Predict the second read, then run it. Reset, and do it again with <code>BEGIN ISOLATION LEVEL REPEATABLE READ;</code>. Same transaction, two different answers: that’s why reports and anything that reads twice want a single snapshot.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">B</span>
+    <h3>Two increments: the lock, then the failure</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-b"> done</label>
+  </div>
+  <pre>T1  BEGIN;
+T2  BEGIN;
+T1  UPDATE counters SET n = n + 1 WHERE id = 1;
+T2  UPDATE counters SET n = n + 1 WHERE id = 1;   <span class="c">-- waits…</span>
+T1  COMMIT;                                       <span class="c">-- …and T2 resumes</span>
+T2  COMMIT;
+T1  SELECT n FROM counters;                       <span class="c">-- ?</span></pre>
+  <p>Terminal 2 <em>blocks</em> on the row lock until terminal 1 commits, then re-reads the row and adds 1 to the new value. Now reset and do it with both sessions at <code>REPEATABLE READ</code>: terminal 2 gets <code>could not serialize access due to concurrent update</code>. Its snapshot is older than the row it wants to change, so it can’t safely continue.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">C</span>
+    <h3>Write skew: the race no row lock sees</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-c"> done</label>
+  </div>
+  <pre>T1  BEGIN ISOLATION LEVEL REPEATABLE READ;
+T2  BEGIN ISOLATION LEVEL REPEATABLE READ;
+T1  SELECT count(*) FROM users WHERE is_admin;    <span class="c">-- 2</span>
+T2  SELECT count(*) FROM users WHERE is_admin;    <span class="c">-- 2</span>
+T1  UPDATE users SET is_admin = false WHERE id = 1;
+T2  UPDATE users SET is_admin = false WHERE id = 2;
+T1  COMMIT;
+T2  COMMIT;
+T1  SELECT count(*) FROM users WHERE is_admin;    <span class="c">-- ?</span></pre>
+  <p>Each checked “someone else is still admin”, each was right in its snapshot, and they wrote <em>different</em> rows, so nothing conflicted. Zero admins. Reset and redo it at <code>SERIALIZABLE</code>: the second <code>COMMIT</code> fails with <code>could not serialize access due to read/write dependencies among transactions</code>. Postgres tracked what each one read and saw the cycle.</p>
+</section>
+
+<p class="aside">This is <strong>write skew</strong>, from Martin Kleppmann’s <em>Designing Data-Intensive Applications</em>, chapter 7 (his example is two doctors going off call). Lesson 14’s claim and the starter in this lab are the same shape: check a condition, then write.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Three ways to make check-then-act safe</h2>
+<ol>
+  <li><strong>One statement that checks and writes</strong> (lesson 14). <code>SET n = n + 1</code>, or a conditional <code>UPDATE … WHERE</code>. Cheapest; works at READ COMMITTED.</li>
+  <li><strong>A constraint that makes the second write impossible.</strong> A unique key on <code>(user_id, problem_id)</code> plus <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code> (<a href="https://www.postgresql.org/docs/current/sql-insert.html">INSERT</a>): the row that comes back tells you whether you were first. The database enforces it for every code path, forever.</li>
+  <li><strong>A lock, or SERIALIZABLE.</strong> <code>SELECT … FOR UPDATE</code> on a row everyone touches serializes them (<a href="https://www.postgresql.org/docs/current/explicit-locking.html">explicit locking</a>). Or keep the naive logic, run it at SERIALIZABLE, and <strong>retry</strong> on failure (<a href="https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html">serialization failure handling</a>). That’s the most general tool, but every caller needs the retry loop.</li>
+</ol>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:isolation -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the three fixes</h2>
+<div class="spec">
+  <p>The full table is in the lab’s <code>README.md</code>. The checker fires 20 to 30 sessions at once at a fresh Postgres, shows each starter’s damage first, and, like a real worker, retries sessions that fail with a serialization failure.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The lost update</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-1"> done</label>
+  </div>
+  <pre>cp increment.start.sql increment.sql
+cp first-solve.start.sql first-solve.sql
+cp first-solve.start.sql serializable.sql
+bash check.sh  <span class="c"># watch the starters lose increments and double-count</span></pre>
+  <p>Fix <code>increment.sql</code>.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The first Accepted, at READ COMMITTED</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-2"> done</label>
+  </div>
+  <p>Make <code>first-solve.sql</code> count each (user, problem) once, without changing the level. You may add a <code>migration.sql</code>. Try two routes: a constraint, then a lock. Which would you rather defend in a review?</p>
+  <details>
+    <summary>Hint: one statement can do both writes</summary>
+    <p>A <code>WITH ins AS (INSERT … ON CONFLICT DO NOTHING RETURNING user_id)</code> followed by an <code>UPDATE … WHERE id IN (SELECT user_id FROM ins)</code> updates the user only when the insert happened.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>The same logic, at SERIALIZABLE</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-3"> done</label>
+  </div>
+  <p>Change only the <code>BEGIN</code> of <code>serializable.sql</code>. All 7 cases should pass, and the checker tells you how many serialization failures it retried. Each one would have been a double count.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a deadlock</h3>
+    <label><input type="checkbox" data-key="lesson-0017-step-4"> done</label>
+  </div>
+  <p>In your two terminals, make two transactions lock users 1 and 2 with <code>SELECT … FOR UPDATE</code> in opposite orders. Read Postgres’s <code>deadlock detected</code> message, then explain the standard fix in one sentence.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Prefer the constraint.</strong> A unique key on the solve is enforced for every code path, including the ones you’ll write next year.</li>
+  <li><strong>If you pick SERIALIZABLE,</strong> pass <code>{ isolationLevel: Prisma.TransactionIsolationLevel.Serializable }</code> to <code>$transaction</code>, and retry on error code <code>P2034</code>: in CodeArena’s Prisma 7.8 with the pg adapter, that’s what SQLSTATE 40001 and deadlocks become. Retry the <em>whole</em> transaction, with a limit.</li>
+  <li><strong>Test it concurrently.</strong> The test fires the same Accepted twice with <code>Promise.all</code> and asserts the score moved once. A sequential test can’t see a race.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>List the statements the worker runs when a verdict is Accepted, name the race between two of them, and choose the mechanism (constraint, single statement, lock or SERIALIZABLE), with one sentence on why. That’s the comment and the ADR for this afternoon. In section 7’s box.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL: Transaction Isolation</a></strong>, the manual’s section with the table of phenomena per level and exactly what each level does on conflict. Then Martin Kleppmann’s talk <a href="https://martin.kleppmann.com/2015/09/26/transactions-at-strange-loop.html">“Transactions: myths, surprises and opportunities”</a>, the best 40 minutes on why isolation levels are confusing.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why terminal 2 blocked, how SERIALIZABLE knows, when a lock beats a constraint, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0017</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

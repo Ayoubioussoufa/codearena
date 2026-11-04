@@ -6,7 +6,34 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { REPO_ROOT } from "../src/lib/repo";
+
+/**
+ * Mermaid only needs a DOM to sanitize labels (DOMPurify). Parsing doesn't, so
+ * stub the sanitizer on the very DOMPurify instance mermaid imports (same real
+ * file, so the same ES module), and every diagram gets a real parse headless.
+ */
+async function stubDomPurify(): Promise<boolean> {
+  try {
+    const mermaidDir = fs.realpathSync(path.join(REPO_ROOT, "apps/dojo/node_modules/mermaid"));
+    const dpDir = fs.realpathSync(path.join(mermaidDir, "..", "dompurify"));
+    const pkg = JSON.parse(fs.readFileSync(path.join(dpDir, "package.json"), "utf8")) as {
+      exports?: { ".": { import?: string | { default?: string } } };
+      module?: string;
+    };
+    const entry = pkg.exports?.["."].import;
+    const file = (typeof entry === "string" ? entry : entry?.default) ?? pkg.module;
+    if (!file) return false;
+    const mod = (await import(pathToFileURL(path.join(dpDir, file)).href)) as { default: Record<string, unknown> };
+    const dp = mod.default;
+    dp.sanitize = (s: string) => s;
+    for (const k of ["addHook", "removeHook", "removeHooks", "removeAllHooks", "setConfig", "clearConfig"]) dp[k] = () => {};
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const GUIDE_DIRS = [
   path.join(REPO_ROOT, "apps/dojo/content/supplements"),
@@ -89,6 +116,8 @@ async function main() {
   // genuine "Parse error" counts as a real failure.
   let parsed = 0;
   let skipped = 0;
+  const stubbed = await stubDomPurify();
+  if (!stubbed) console.log("(couldn't stub DOMPurify: some diagrams may be skipped)");
   try {
     const mermaid = (await import("mermaid")).default;
     mermaid.initialize({ startOnLoad: false });

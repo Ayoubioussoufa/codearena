@@ -1,0 +1,110 @@
+<!--
+  Lesson 0012 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Between “a request arrives” and “your controller runs”, NestJS passes it through five kinds of components, in a fixed order. Most bugs in a Nest API are a concern placed in the wrong one: validation that runs before authentication, an error message that leaks, a timer that misses half the work. Today you build the pipeline yourself, so the order stops being something to memorise.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Tomorrow’s <code>POST /submissions</code> touches every stage: the auth guard, the throttler, a validation pipe with a size cap, and the exception filter that I-3 says is dropping your messages. Knowing where each one runs is the difference between wiring them and debugging them.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Five stages, one order</h2>
+<p>NestJS documents its request lifecycle precisely (<a href="https://docs.nestjs.com/faq/request-lifecycle">request lifecycle</a>):</p>
+<pre>request → middleware → guards → interceptors (before) → pipes → handler
+        ← interceptors (after) ← result
+any error → exception filters → response</pre>
+<ul>
+  <li><strong>Middleware</strong> sees the raw request before Nest has even chosen a handler: plumbing like <code>cookie-parser</code>. It can answer on its own by never calling <code>next()</code>.</li>
+  <li><strong>Guards</strong> answer one question: may this request go on? <code>false</code> becomes <code>403 Forbidden resource</code>; throwing <code>UnauthorizedException</code> gives a 401 (<a href="https://docs.nestjs.com/guards">guards</a>).</li>
+  <li><strong>Interceptors</strong> wrap the handler on both sides: they can time it, cache it, or reshape its result (<a href="https://docs.nestjs.com/interceptors">interceptors</a>).</li>
+  <li><strong>Pipes</strong> prepare the handler’s arguments: transform them, or validate and refuse with a 400 (<a href="https://docs.nestjs.com/pipes">pipes</a>).</li>
+  <li><strong>Exception filters</strong> turn any exception thrown after middleware into a response (<a href="https://docs.nestjs.com/exception-filters">exception filters</a>).</li>
+</ul>
+<p>Within guards, interceptors and pipes, the order is global, then controller, then route. Two exceptions to remember: interceptors <strong>unwind in reverse</strong> after the handler (each wraps the next, like an onion), and filters <strong>resolve from the route up</strong> (route first, global last, and a handled exception stops there).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Fail safely</h2>
+<p>Every pipeline has a last line: an exception nobody handled. It must become a response that <strong>tells the client nothing about your internals</strong>. An <code>HttpException</code> (or your lab’s <code>HttpError</code>) was thrown on purpose, so its status and message are meant for the client. Anything else, a Prisma error or a bug, is a <code>500 Internal server error</code>, with its real message kept for your logs. An error text like <code>connect ECONNREFUSED db.internal:5432</code> in a response is a security bug, as OWASP’s guidance on error handling explains (<a href="https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html">Error Handling Cheat Sheet</a>).</p>
+<p class="aside">That’s also where I-3 lives. The <code>ValidationPipe</code> puts its messages in the exception’s <em>response</em>, and a filter that only reads <code>exception.message</code> replaces them with “Bad Request Exception”.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:pipeline -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build <code>pipeline.mjs</code></h2>
+<div class="spec">
+  <p>The shapes and rules are in <code>pipeline.start.mjs</code>: <code>createApp()</code> with <code>use</code>, global guards, interceptors, pipes and filters, <code>route(method, path, handler, { guards, interceptors, pipes, filters })</code>, and <code>handle(req)</code> returning <code>{ status, body }</code>. <code>http-error.mjs</code> is given.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Routes, guards, pipes</h3>
+    <label><input type="checkbox" data-key="lesson-0012-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0012-request-pipeline
+cp pipeline.start.mjs pipeline.mjs
+bash check.sh</pre>
+  <p>Find the route, run the guards (global then route), the pipes, then the handler. 201 for POST, 200 otherwise. The cases about guards and pipes should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Interceptors: the onion</h3>
+    <label><input type="checkbox" data-key="lesson-0012-step-2"> done</label>
+  </div>
+  <p>Chain the interceptors so each one’s <code>next()</code> runs the rest: the next interceptor, or, after the last, the pipes and the handler. The reverse order on the way out then comes for free.</p>
+  <details>
+    <summary>Hint: one recursive function</summary>
+    <p><code>const run = (i) =&gt; i &lt; chain.length ? chain[i](req, () =&gt; run(i + 1)) : pipesThenHandler();</code> Middleware chains the same way, around everything else.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Errors</h3>
+    <label><input type="checkbox" data-key="lesson-0012-step-3"> done</label>
+  </div>
+  <p>Catch everything after middleware; try the route’s filters, then the global ones; the first that returns a response wins. Otherwise: an <code>HttpError</code> becomes its own response, anything else a generic 500. All 16 cases should pass, including the one that makes sure a database password never reaches the client.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: route parameters</h3>
+    <label><input type="checkbox" data-key="lesson-0012-step-4"> done</label>
+  </div>
+  <p>Support <code>route("GET", "/submissions/:id", (body, req) =&gt; req.params.id)</code>, and a pipe that turns <code>params.id</code> into a number or answers 400, like Nest’s <code>ParseIntPipe</code>.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Authentication is a global guard</strong>, with <code>@Public()</code> as the way out: you already have it. <strong>Rate limiting</strong> is the throttler guard, which belongs on <code>POST /submissions</code>: judging is the most expensive thing you do.</li>
+  <li><strong>Validation is a pipe</strong> with a DTO: code as a string with a maximum size, the language from your enum, the problem id.</li>
+  <li><strong>The all-exceptions filter</strong> must pass validation messages through (I-3) and never leak anything else.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>For <code>POST /submissions</code>, name the component that handles each concern: authentication, rate limiting, the body’s shape and size, an unknown problem id, and the 202 response. One line each, in section 6’s box.</p>
+</div>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your answer to section 4, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.nestjs.com/faq/request-lifecycle">NestJS: Request lifecycle</a></strong>, one page with the exact order you just built, and the two exceptions (reversed interceptors, bottom-up filters). Then <a href="https://docs.nestjs.com/exception-filters">Exception filters</a> before you fix I-3.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why middleware can’t see the route, when to choose a guard over middleware, how <code>ValidationPipe</code> builds its messages, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0012</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

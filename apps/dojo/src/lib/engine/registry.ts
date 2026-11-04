@@ -18,6 +18,7 @@ import { javaSpringBootTopic } from "./topics/java-spring-boot";
 import { pythonTopic } from "./topics/python";
 import { testingTopic } from "./topics/testing";
 import { gitTopic } from "./topics/git";
+import { courseRecallTopic } from "../courses/recall";
 
 export const TOPICS: Topic[] = [
   reactTopic,
@@ -56,3 +57,21 @@ export interface PoolEntry {
 export const ALL_GENERATORS: PoolEntry[] = TOPICS.flatMap((t) =>
   t.generators.map((generator) => ({ generator, topicId: t.id })),
 );
+
+/**
+ * The spaced-review pool: every drill generator, plus the course lesson
+ * questions. Lesson questions stay out of Mixed: they enter review only once
+ * answered inside their lesson.
+ */
+export const REVIEW_POOL: PoolEntry[] = [
+  ...ALL_GENERATORS,
+  ...courseRecallTopic.generators.map((generator) => ({
+    generator,
+    topicId: courseRecallTopic.id,
+  })),
+];
+
+/** Display title of any topic id, the course recall topic included. */
+export function topicTitle(id: string): string | undefined {
+  return id === courseRecallTopic.id ? courseRecallTopic.title : getTopic(id)?.title;
+}

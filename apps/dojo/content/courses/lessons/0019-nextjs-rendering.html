@@ -1,0 +1,125 @@
+<!--
+  Lesson 0019 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">In a Next.js app, the same <code>.tsx</code> file can run on the server, in the browser, or both, and the code never says which out loud. Today you take the mystery out by building the machine yourself: a renderer that turns a component tree into HTML, decides which pieces the browser must download, and packs what it needs to bring them to life. Then you split CodeArena’s problem page with it.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon you build the problem page and the submit form. “Which parts are server components, and why?” is the first decision, and it’s a classic interview question for any React role. Get it right, and the page loads fast, ships little JavaScript, and never leaks a secret.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Three ways to build a page</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>The server sends</th><th>The browser then</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Client-side rendering</strong> (a classic SPA)</td><td>an empty <code>&lt;div id="root"&gt;</code> and a bundle</td><td>downloads all the code, fetches the data, builds the page</td><td>a blank screen until then; all code ships</td></tr>
+    <tr><td><strong>Server-side rendering</strong></td><td>the full HTML, plus the whole bundle</td><td>re-runs every component to <strong>hydrate</strong>: attach handlers to the existing HTML</td><td>fast first paint; still all code ships</td></tr>
+    <tr><td><strong>Server components</strong> (Next’s App Router)</td><td>the full HTML, plus code for the interactive parts only</td><td>hydrates just those parts, the <strong>islands</strong></td><td>fast first paint; little code</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The idea of pages as static HTML with a few interactive islands predates React’s version of it (<a href="https://www.patterns.dev/vanilla/islands-architecture/">patterns.dev: islands architecture</a>). React Server Components make it the default.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Server components, client components, and the payload</h2>
+<ul>
+  <li><strong>Server components</strong> are the default in the App Router. They run only on the server, can be <code>async</code>, can read the database and secrets directly, and their code never reaches the browser (<a href="https://nextjs.org/docs/app/getting-started/server-and-client-components">Next: server and client components</a>).</li>
+  <li><strong><code>'use client'</code> marks a boundary.</strong> That file, and everything it imports, becomes client code. Client components still render on the server for the first HTML; then the browser downloads their code and hydrates them. That’s where <code>useState</code>, effects, event handlers and browser APIs can live.</li>
+  <li><strong>The RSC payload</strong> is what crosses: the rendered server output, plus, for each client component, which one it is and its props. The browser uses it to hydrate and, on navigation, to update the page without a full reload.</li>
+</ul>
+<p>Every rule you’ll meet follows from that payload:</p>
+<ul>
+  <li><strong>Props from server to client must be serializable.</strong> React can carry plain objects, arrays, Date, Map, Set, promises and JSX, but not ordinary functions or class instances (<a href="https://react.dev/reference/rsc/use-client#serializable-types">React: serializable types</a>). Your lab keeps JSON’s stricter rules.</li>
+  <li><strong>A client component can’t import a server component,</strong> since its code would have to run in the browser. A server component can pass one in as <code>children</code>: it renders on the server, and the client component receives the result.</li>
+  <li><strong>Anything a client component receives ships.</strong> Pass the whole problem to a client component, and the statement crosses twice: once as HTML, once in the payload. Pass it a secret, and the secret is in the page.</li>
+</ul>
+<p class="aside">Two safety nets in Next: only environment variables prefixed with <code>NEXT_PUBLIC_</code> are inlined into client code (<a href="https://nextjs.org/docs/app/guides/environment-variables">environment variables</a>), and importing the <code>server-only</code> package in a module makes any client import of it a build error.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. One more danger: the payload is inside your HTML</h2>
+<p>The payload travels as JSON in a <code>&lt;script&gt;</code> tag. If a prop contains <code>&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code> and you paste the JSON in as is, the browser ends your script at the first <code>&lt;/script&gt;</code> and runs the attacker’s. That’s a stored XSS from a problem title. The fix is to write every <code>&lt;</code> in the JSON as <code><</code>: still valid JSON, and it can no longer close a tag. Frameworks do this for you; your renderer will too.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rsc -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the renderer</h2>
+<div class="spec">
+  <p><code>kit.mjs</code> gives you the tree: <code>h(tag, props, …children)</code>, <code>server(name, render)</code>, <code>client(name, render)</code>, <code>use(Component, props)</code>. <code>render.start.mjs</code> has the exact HTML rules and the errors to raise. The checker needs no Docker.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>HTML, then server components</h3>
+    <label><input type="checkbox" data-key="lesson-0019-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0019-nextjs-rendering
+cp render.start.mjs render.mjs
+bash check.sh</pre>
+  <p>One recursive <code>async</code> function that renders a node, carrying a context: is it inside a server or a client component, and which one? Make parts 1 and 2 green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Islands and the payload</h3>
+    <label><input type="checkbox" data-key="lesson-0019-step-2"> done</label>
+  </div>
+  <p>A client component met from server code opens an island and adds a payload entry; one met inside a client component renders inline. Check props before rendering, then the donut: node props are rendered first and become <code>{ $html }</code>.</p>
+  <details>
+    <summary>Hint: the serializability check</summary>
+    <p>Walk the value recursively with a path string. Primitives pass; arrays and objects whose prototype is <code>Object.prototype</code> recurse; everything else (functions, symbols, anything with another prototype) throws with the path.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>CodeArena’s problem page</h3>
+    <label><input type="checkbox" data-key="lesson-0019-step-3"> done</label>
+  </div>
+  <p><code>cp problem-page.start.mjs problem-page.mjs</code>, then choose <code>server</code> or <code>client</code> for each piece in <code>components.mjs</code> and compose the page. The checker verifies only the interactive parts ship, the statement isn’t shipped twice, and the token stays home. All 19 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: hydrate in a real browser</h3>
+    <label><input type="checkbox" data-key="lesson-0019-step-4"> done</label>
+  </div>
+  <p>Serve your page with <code>node:http</code>, plus an <code>islands.js</code> that reads <code>#__islands</code>, finds each <code>[data-island]</code>, and attaches a click handler for <code>SubmitButton</code>. Open it with JavaScript disabled, then enabled: that difference is hydration.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. In Next, the same decisions</h2>
+<ul>
+  <li><strong>Push <code>'use client'</code> down to the leaves.</strong> The page and the statement stay server components; the editor and the submit form are small client components that receive only what they need (<code>problemId</code>, the starter code).</li>
+  <li><strong>Fetch on the server when you can.</strong> An async server component awaits the problem; no loading spinner, no request waterfall in the browser.</li>
+  <li><strong>Mutations are client-side here.</strong> The submit form uses a TanStack Query <code>useMutation</code> to <code>POST /submissions</code>, shows the API’s validation message, then navigates to the submission page.</li>
+</ul>
+
+<h2>6. Your turn, in CodeArena</h2>
+<div class="callout">
+  <span class="label">Before this afternoon’s build</span>
+  <p>List the problem page’s pieces (title, difficulty, statement, examples, language picker, editor, submit button, the error message) and mark each server or client, with the reason in a few words. Then name the props each client component receives. In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your answer to section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://nextjs.org/docs/app/getting-started/server-and-client-components">Next.js: Server and Client Components</a></strong>, the official page for the App Router you use, with when to use each and how to interleave them. Then React’s reference for <a href="https://react.dev/reference/rsc/use-client"><code>'use client'</code></a>, which has the exact list of what can cross the boundary.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: what hydration really does, why a client component still renders on the server, how the payload drives navigation, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0019</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

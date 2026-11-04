@@ -1,0 +1,37 @@
+<p class="kicker">Reference · the judge</p>
+<h1>Verdicts, on one page</h1>
+<p class="meta">From <a href="/courses/lessons/0009-facts-to-verdicts">lesson 9</a> and <a href="/courses/lessons/0010-attack-your-sandbox">lesson 10</a>. The order a judge decides in, and what each verdict means.</p>
+
+<h2>Deciding one test, in order</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>The runner's facts say</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>timeout</code></td><td><strong>TLE</strong> Time Limit Exceeded</td></tr>
+    <tr><td>2</td><td><code>memory-limit</code> (OOM kill: <code>OOMKilled</code> / <code>oom_kill</code>)</td><td><strong>MLE</strong> Memory Limit Exceeded</td></tr>
+    <tr><td>3</td><td><code>output-limit</code></td><td><strong>OLE</strong> Output Limit Exceeded</td></tr>
+    <tr><td>4</td><td>a signal, or an exit code other than 0</td><td><strong>RE</strong> Runtime Error (output not read)</td></tr>
+    <tr><td>5</td><td>exit 0, tokens differ</td><td><strong>WA</strong> Wrong Answer</td></tr>
+    <tr><td>6</td><td>exit 0, tokens match</td><td>next test; all pass → <strong>AC</strong></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>Stop at the first failure</strong>; report its number (1-based) and the slowest time among the tests that ran.</li>
+  <li><strong>Your failure is not a verdict.</strong> Docker down, database down: throw, let the queue retry, dead-letter after the last try.</li>
+  <li><strong>No tests</strong> is a bug, never an Accepted.</li>
+</ul>
+
+<h2>The token checker</h2>
+<pre><span class="c">// spaces, tabs, \n, \r all separate</span>
+tokens(s) = s.split(/\s+/).filter(Boolean)
+<span class="c">// "1.0" ≠ "1", "YES" ≠ "yes"</span>
+match     = same length, and equal at every index</pre>
+<p>Codeforces' standard checker <code>wcmp</code> (<a href="https://github.com/MikeMirzayanov/testlib">testlib</a>) does the same. Floats need a checker with a tolerance; "any valid answer" problems need a custom checker.</p>
+
+<h2>Limits</h2>
+<ul>
+  <li>Calibrate on the reference solution: measure, then a few times that. Count container startup the same way in calibration and in production.</li>
+  <li>Report CPU time (cgroup <code>cpu.stat</code>) as the run's time; enforce wall time as the deadline.</li>
+  <li>Never show one user another user's stderr; cap it like stdout.</li>
+</ul>

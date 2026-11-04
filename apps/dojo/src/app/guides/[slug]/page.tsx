@@ -6,6 +6,10 @@ import { notFound } from "next/navigation";
 import { getAllGuides, getGuide } from "@/lib/content";
 import { TOPICS } from "@/lib/engine/registry";
 import { MarkdownView } from "@/components/MarkdownView";
+import { GuideReview } from "@/components/courses/GuideReview";
+import { Inline } from "@/components/courses/Inline";
+import { guideCheckSet } from "@/lib/guide-checks";
+import "../../courses/courses.css";
 
 interface GuidePageProps {
   params: Promise<{ slug: string }>;
@@ -27,6 +31,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
   if (!guide) notFound();
 
   const topic = TOPICS.find((t) => t.docSlug === guide.slug);
+  const checks = guideCheckSet(guide.slug);
   // Reference sub-pages (js-array, java-map, …) get a crumb back to their language index.
   const parent = guide.parent ? getGuide(guide.parent) : null;
   // …and the index itself lists its siblings, so you can hop between topics without going back.
@@ -65,7 +70,21 @@ export default async function GuidePage({ params }: GuidePageProps) {
 
       <div className="flex gap-10">
         <article className="min-w-0 flex-1">
+          {checks && (
+            <p className="mb-6 rounded-lg border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+              <strong className="text-slate-800 dark:text-slate-200">Read alongside:</strong>{" "}
+              <a href={checks.source.href} className="text-cyan-700 underline dark:text-cyan-400">
+                {checks.source.label}
+              </a>
+              . <Inline text={checks.source.note} /> Each part ends with a <em>Check yourself</em>: answer from memory, and{" "}
+              <a href="#get-corrected" className="text-cyan-700 underline dark:text-cyan-400">
+                the panel at the end
+              </a>{" "}
+              copies all your answers for an AI tutor to correct.
+            </p>
+          )}
           <MarkdownView markdown={guide.markdown} guideSlug={guide.slug} />
+          {checks && <GuideReview slug={guide.slug} title={guide.title} set={checks} />}
 
           {siblings.length > 0 && (
             <nav className="mt-10 rounded-xl border border-slate-200 bg-slate-50/60 p-5 dark:border-slate-800 dark:bg-slate-900/40">
@@ -124,6 +143,16 @@ export default async function GuidePage({ params }: GuidePageProps) {
                     </a>
                   </li>
                 ))}
+                {checks && (
+                  <li>
+                    <a
+                      href="#get-corrected"
+                      className="block font-semibold leading-5 text-cyan-700 hover:underline dark:text-cyan-400"
+                    >
+                      ✍ Get corrected
+                    </a>
+                  </li>
+                )}
               </ul>
             </div>
           </nav>

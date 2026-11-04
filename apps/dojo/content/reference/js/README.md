@@ -56,3 +56,8 @@ Each method is tagged like this:
 
 When a method has both forms, prefer the mutating one in a hot loop (no allocation) and the copying
 one everywhere else (no surprises).
+
+```check
+traps
+```
+

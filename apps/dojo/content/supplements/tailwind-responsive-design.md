@@ -173,6 +173,11 @@ is the `lg:` overrides layered on top. That's mobile-first in one line.
 
 ---
 
+
+```check
+basics
+```
+
 ## 4. Flexbox: line children up along ONE axis
 
 **Flexbox** is a layout mode for arranging children in a single line — a row *or* a column. You turn
@@ -363,6 +368,11 @@ this line.
 
 ---
 
+
+```check
+layout
+```
+
 ## 7. Dark mode: one class flips the whole page
 
 **Dark mode** is the dark-background colour theme. CodeArena implements it with the **"class
@@ -449,6 +459,11 @@ a single line with a "…" (remember it needs the `min-w-0` unlock from section 
 and `line-clamp-2` allows two lines then cuts with "…".
 
 ---
+
+
+```check
+dark
+```
 
 ## 9. Putting it together: the order to think in
 

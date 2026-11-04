@@ -1,0 +1,184 @@
+<!--
+  Lesson 0006 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Your box from lesson 5 sees almost nothing, but it can still <em>use</em> everything: allocate all your memory, start processes until the machine chokes, keep every core busy. Today you put a ceiling on all three, and the kernel enforces it. You do it by writing numbers into files.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Memory Limit Exceeded is a verdict, and so is the fork bomb a stranger will submit on day one. Today’s tool, the <strong>cgroup</strong>, decides both, and gives you a third fix for lesson 2’s escaper: one write to <code>cgroup.kill</code> stops every process in the box, whatever group or session it ran off to.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. A cgroup is a directory</h2>
+
+<p>A <strong>control group</strong> is a set of processes that the kernel accounts for, and limits, together. In cgroup v2 they form one tree, and the tree <em>is</em> a filesystem: every cgroup is a directory under <code>/sys/fs/cgroup</code>, and everything about it is a file (<a href="https://docs.kernel.org/admin-guide/cgroup-v2.html">the kernel’s cgroup v2 documentation</a>):</p>
+<ul>
+  <li><code>cgroup.procs</code> lists the processes in it. Write a PID there, and that process moves in.</li>
+  <li><strong>Controllers</strong> (memory, pids, cpu…) are switched on for a cgroup’s children in its <code>cgroup.subtree_control</code>.</li>
+  <li><strong>Limits</strong> are files you write: <code>memory.max</code>, <code>pids.max</code>, <code>cpu.max</code>.</li>
+  <li><strong>Results</strong> are files you read: <code>memory.events</code>, <code>pids.events</code>, <code>cpu.stat</code>.</li>
+</ul>
+<p>Children inherit their parent’s cgroup at <code>fork</code>, so moving one process into a cgroup before <code>exec</code> puts everything it ever starts in there too. Lesson 1 said where that move goes: the gap.</p>
+
+<p><strong>Try it</strong> (3 minutes). See where your shell lives, then let systemd set a memory limit for you:</p>
+<pre>cat /proc/self/cgroup
+systemd-run --user --scope --quiet -p MemoryMax=50M -p MemorySwapMax=0 \
+  python3 -c "b = bytearray(200 * 1024 * 1024); print('allocated')"
+echo "exit=$?"</pre>
+<p>No “allocated”: Python is killed, and the exit code is 137. That’s the OOM killer, inside the cgroup systemd created and wrote <code>memory.max</code> for. Today you write that file yourself.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Three limits, three behaviours</h2>
+
+<p>The three limits a judge needs do three different things when they’re hit, and the difference matters for your verdicts:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Write</th><th>When it’s hit</th><th>Read afterwards</th></tr></thead>
+  <tbody>
+    <tr><td><code>memory.max</code> (and <code>memory.swap.max</code> = 0)</td><td>the <strong>OOM killer</strong> kills a process in the cgroup: SIGKILL</td><td><code>memory.events</code>, line <code>oom_kill</code></td></tr>
+    <tr><td><code>pids.max</code></td><td><code>fork</code> <strong>fails</strong> with EAGAIN. Nothing dies</td><td><code>pids.events</code>, line <code>max</code></td></tr>
+    <tr><td><code>cpu.max</code>: <code>"quota period"</code> in µs</td><td>the program is <strong>throttled</strong>: it waits for the next period. Slower, never killed</td><td><code>cpu.stat</code>, line <code>usage_usec</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">Linux hands out memory lazily, so <code>malloc(4 GB)</code> usually <em>succeeds</em>. The kill comes when the program touches the pages. That’s why the lab’s <code>hog</code> writes to every byte it allocates.</p>
+<p>Two consequences. A fork bomb doesn’t get killed, it just stops growing, so <strong>your runner must still clean up</strong>. And a CPU limit is <strong>not a time limit</strong>: <code>cpu.max</code> at 25% makes a program four times slower, and only your wall-clock deadline from lesson 2 stops it. What <code>cpu.stat</code> gives you is the fair number to report as the run’s time: CPU time, the same on a busy machine as on an idle one.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Who may write where: delegation</h2>
+
+<p>The cgroup tree belongs to root. But systemd <strong>delegates</strong> a subtree to each logged-in user: under <code>/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/</code>, the files are yours. Run a command with <code>systemd-run --user --scope -p Delegate=yes</code>, and it starts in a fresh cgroup of its own, inside that subtree, with the <code>memory</code>, <code>pids</code> and <code>cpu</code> controllers available. That’s where your <code>cage</code> will work, with no sudo.</p>
+
+<p>One rule shapes your code: <strong>no internal processes</strong>. A cgroup that hands controllers down to its children can’t hold processes itself (<a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#no-internal-process-constraint">“No Internal Process Constraint”</a>). Your cage starts <em>inside</em> its scope, so before enabling controllers it must move itself into a leaf. The usual name for that leaf is <code>supervisor</code>, and the box gets a sibling leaf of its own:</p>
+<pre>run-….scope/                <span class="c"># your scope: no processes left here</span>
+├── cgroup.subtree_control  <span class="c"># "+memory +pids +cpu"</span>
+├── supervisor/             <span class="c"># cage itself, moved here first</span>
+└── box-4120/               <span class="c"># the program: memory.max, pids.max, cpu.max</span></pre>
+
+<p>And the cleanup tool: writing <code>1</code> to a cgroup’s <code>cgroup.kill</code> SIGKILLs every process in it at once, including ones that called <code>setsid</code>. Membership in a cgroup can’t be escaped by changing groups or sessions, because it isn’t a group or a session. That’s the third way to close lesson 2’s hole, after process groups (which fail) and PID namespaces (lesson 5).</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:cgroups -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>cage</code></h2>
+
+<div class="spec">
+  <p><strong>Usage:</strong> <code>./cage [-m bytes] [-p pids] [-c percent] &lt;program&gt; [args...]</code></p>
+  <p>Runs the program in a new cgroup with the limits asked for (none if a flag is absent), then kills anything left in it, and prints four lines after the program’s own output:</p>
+  <pre>exit N            <span class="c"># or: signal S</span>
+oom_kills=N
+pids_refused=N
+cpu_ms=N</pre>
+  <p>A value that isn’t a positive number, or no program: a usage line on stderr, exit 2. The checker runs your cage with <code>systemd-run --user --scope -p Delegate=yes</code>, plus a safety net of 300 processes, so even a cage with a broken <code>pids.max</code> can’t hurt your machine.</p>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Move</th><th>How</th></tr></thead>
+  <tbody>
+    <tr><td>Find your own cgroup</td><td>read <code>/proc/self/cgroup</code>: one line, <code>0::/the/path</code>; prefix <code>/sys/fs/cgroup</code></td></tr>
+    <tr><td>Make a cgroup</td><td><code>mkdir(path, 0755)</code>; remove it with <code>rmdir</code> once it’s empty</td></tr>
+    <tr><td>Move a process</td><td>write its PID (as text) to <code>&lt;cgroup&gt;/cgroup.procs</code></td></tr>
+    <tr><td>Enable controllers</td><td>write <code>"+memory +pids +cpu"</code> to the parent’s <code>cgroup.subtree_control</code></td></tr>
+    <tr><td>Set limits</td><td><code>memory.max</code> and <code>memory.swap.max</code> (<code>0</code>) · <code>pids.max</code> · <code>cpu.max</code> = <code>"&lt;percent × 1000&gt; 100000"</code></td></tr>
+    <tr><td>Read counters</td><td><code>fopen</code> the file, then <code>fscanf(f, "%63s %ld", key, &amp;value)</code> line by line</td></tr>
+    <tr><td>Kill everything</td><td>write <code>"1"</code> to <code>&lt;box&gt;/cgroup.kill</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>Look before you write</h3>
+    <label><input type="checkbox" data-key="lesson-0006-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0006-cgroups
+bash check.sh build
+systemd-run --user --scope -p Delegate=yes --quiet sh -c 'cat /proc/self/cgroup; d=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup); cat $d/cgroup.controllers; ls $d'</pre>
+  <p>That’s the empty cgroup your cage will start in, and the three controllers it may use.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Supervisor, controllers, box</h3>
+    <label><input type="checkbox" data-key="lesson-0006-step-1"> done</label>
+  </div>
+  <p>Parse the options (lesson 3’s <code>getopt</code>). Find your cgroup, move yourself into <code>supervisor</code>, enable the controllers, create <code>box-&lt;your pid&gt;</code> and write the limits you were given. Then fork; the child moves itself into the box (it writes its own PID) and execs. The parent waits and prints the four lines. “Memory” and “No limits asked” should go green.</p>
+  <details>
+    <summary>The write to <code>cgroup.subtree_control</code> fails?</summary>
+    <p>EBUSY means a process is still in the cgroup: did you move yourself to <code>supervisor</code> <em>first</em>? ENOENT means a controller you named isn’t available there: check <code>cgroup.controllers</code>. Print <code>errno</code> with <code>perror</code>: the kernel tells you which.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Processes and CPU</h3>
+    <label><input type="checkbox" data-key="lesson-0006-step-2"> done</label>
+  </div>
+  <p>Add <code>pids.max</code> and <code>cpu.max</code>, and read <code>pids.events</code> and <code>cpu.stat</code>. The fork bomb should stop at 15 children (16 processes, counting itself), and two seconds of spinning at 25% should cost about 500 ms of CPU.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Leave nothing behind, then all green</h3>
+    <label><input type="checkbox" data-key="lesson-0006-step-3"> done</label>
+  </div>
+  <p>After the program ends, write <code>1</code> to the box’s <code>cgroup.kill</code>, then <code>rmdir</code> the box (retry for a moment: the kill takes a few milliseconds to empty it). The fork bomb’s sleeping children and the background <code>sleep</code> must be gone. Run <code>bash check.sh</code> until all 11 cases pass.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a real sandbox, from your own two programs</h3>
+    <label><input type="checkbox" data-key="lesson-0006-step-4"> done</label>
+  </div>
+  <p>Put lesson 5’s box inside today’s cage, and you have namespaces <em>and</em> limits:</p>
+  <pre>systemd-run --user --scope -p Delegate=yes --quiet \
+  ./build/cage -m 64000000 -p 32 -c 50 \
+  ../0005-namespaces/build/box ../0005-namespaces/build/rootfs /bin/sh</pre>
+  <p>Inside, try a fork bomb (<code>:(){ :|:&amp; };:</code>), a memory hog, and <code>ip link</code>. That shell is, honestly, a container: you built every wall. Lesson 7 adds the last two: dropping root’s powers, and forbidding system calls.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for a judge</h2>
+<ul>
+  <li><strong>Docker’s flags are these files.</strong> <code>--memory</code> and <code>--memory-swap</code> write <code>memory.max</code> and <code>memory.swap.max</code>; <code>--pids-limit</code> writes <code>pids.max</code>; <code>--cpus</code> writes <code>cpu.max</code>. Lesson 8 maps every flag.</li>
+  <li><strong>MLE is a fact, not a guess.</strong> An OOM kill and your own deadline both end in SIGKILL; only the cgroup’s <code>oom_kill</code> counter tells them apart.</li>
+  <li><strong>Report CPU time, enforce wall time.</strong> <code>cpu.stat</code> is the fair runtime; lesson 2’s deadline is what stops a sleeper.</li>
+  <li><strong>Clean up by cgroup.</strong> Killing by membership is the one kill nothing can dodge.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Your DockerCodeRunner will see exit 137 for both an OOM kill and its own deadline kill. Which <code>docker inspect</code> field tells them apart, and in which order should the runner decide between <code>output-limit</code>, <code>timeout</code> and an OOM kill (memory limit)? Two sentences, in section 7’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.kernel.org/admin-guide/cgroup-v2.html">Control Group v2</a></strong>, the kernel’s own documentation, by the maintainers who wrote cgroup v2. Read “Basic Operations”, “No Internal Process Constraint”, “Delegation”, then the “Memory”, “PID” and “CPU” sections’ interface files. It’s long; those parts are what you built.</p>
+  <p>Then <a href="https://man7.org/linux/man-pages/man7/cgroups.7.html">cgroups(7)</a> for the history, and <a href="https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html">systemd.resource-control(5)</a> for <code>MemoryMax</code>, <code>TasksMax</code> and <code>Delegate</code>.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the supervisor leaf, why <code>malloc</code> doesn’t fail, what throttling looks like, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0006</code></strong> message from section 7 and paste it in the terminal. For deeper cgroup questions, <a href="https://unix.stackexchange.com/questions/tagged/cgroups">Unix &amp; Linux Stack Exchange</a> has them answered.</p>
+</div>

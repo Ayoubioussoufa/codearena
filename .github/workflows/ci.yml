@@ -99,6 +99,12 @@ jobs:
       # and every ```exercise id in a guide must resolve. A broken check tells
       # the learner correct code is wrong, which is worse than no check.
       - run: pnpm --filter dojo test:guide-exercises
+      # Spaced review's due-date rules, which the course quizzes now feed.
+      - run: pnpm --filter dojo test:scheduling
+      # Every written lesson: quiz options of equal length (the longest one
+      # mustn't give the answer away), links that resolve, labs that exist,
+      # warm-ups that point at real questions.
+      - run: pnpm --filter dojo test:courses
 
   commits:
     name: Commit messages

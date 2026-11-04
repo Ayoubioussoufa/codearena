@@ -1,0 +1,94 @@
+<p class="kicker">Reference · the sandbox track</p>
+<h1>Processes, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0001-run-a-program">1</a>, <a href="/courses/lessons/0002-time-limits">2</a>, <a href="/courses/lessons/0003-input-output">3</a> and <a href="/courses/lessons/0004-runner-in-node">4</a>. Keep it open while you work; it prints on two pages.</p>
+
+<h2>The kernel line</h2>
+<p>A process runs in <strong>user mode</strong> and can only touch its own memory. Anything else (files, network, other processes, starting programs) is a <strong>system call</strong>: the CPU enters kernel mode, the kernel checks and acts, then returns. <strong>A sandbox is a set of rules on system calls.</strong></p>
+
+<h2>Starting a program</h2>
+<ol>
+  <li><code>fork()</code> returns three ways: <code>-1</code> it failed · <code>0</code> you’re the child · <code>&gt; 0</code> you’re the parent, and that’s the child’s PID.</li>
+  <li><strong>Child, in the gap:</strong> <code>setpgid(0, 0)</code>, redirections (<code>dup2</code>), limits (<code>setrlimit</code>), later namespaces. Then <code>execvp</code>. If it returns, it failed: <code>perror</code>, <code>_exit(127)</code>.</li>
+  <li><strong>Parent:</strong> <code>setpgid(pid, pid)</code> too (closes the race), then wait. Always reap, or the child stays a zombie.</li>
+</ol>
+
+<h2>Reading a wait status</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Ask</th><th>Then read</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>WIFEXITED(s)</code></td><td><code>WEXITSTATUS(s)</code></td><td>ended by itself, with this code (0–255, low 8 bits only)</td></tr>
+    <tr><td><code>WIFSIGNALED(s)</code></td><td><code>WTERMSIG(s)</code></td><td>a signal killed it</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Exit codes worth knowing</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Code</th><th>Means</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code> · <code>1</code> · <code>2</code></td><td>success · general failure (and an uncaught exception in Python or Node) · wrong usage</td></tr>
+    <tr><td><code>120</code></td><td>Python failed to flush its output at exit (e.g. a file-size limit)</td></tr>
+    <tr><td><code>126</code> · <code>127</code></td><td>found but not executable · not found / exec failed</td></tr>
+    <tr><td><code>128 + N</code></td><td>the shell’s (and Docker’s) “killed by signal N”: ambiguous, a program can also exit with it</td></tr>
+    <tr><td><code>137</code> · <code>139</code> · <code>143</code> · <code>153</code></td><td>SIGKILL · SIGSEGV · SIGTERM · SIGXFSZ</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Signals you’ll meet in a judge</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Typical cause</th><th>Can be caught?</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td>SIGINT</td><td><kbd>Ctrl</kbd>+<kbd>C</kbd> (sent to the whole foreground group)</td><td>yes</td></tr>
+    <tr><td>6</td><td>SIGABRT</td><td><code>abort()</code>, a failed <code>assert</code></td><td>yes, but it still ends</td></tr>
+    <tr><td>8</td><td>SIGFPE</td><td>integer division by zero</td><td>yes</td></tr>
+    <tr><td>9</td><td>SIGKILL</td><td><code>kill -9</code>, the OOM killer, <code>docker kill</code>, a judge’s deadline</td><td><strong>never</strong></td></tr>
+    <tr><td>11</td><td>SIGSEGV</td><td>bad memory access</td><td>yes</td></tr>
+    <tr><td>13</td><td>SIGPIPE</td><td>writing to a pipe nobody reads</td><td>yes (Node and Python ignore it: EPIPE instead)</td></tr>
+    <tr><td>15</td><td>SIGTERM</td><td>polite “please stop”: plain <code>kill</code>, <code>docker stop</code></td><td>yes</td></tr>
+    <tr><td>25</td><td>SIGXFSZ</td><td>a write past <code>RLIMIT_FSIZE</code></td><td>yes (Python ignores it: EFBIG instead)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Deadlines</h2>
+<ul>
+  <li><strong>Two clocks:</strong> wall-clock time stops hangs; CPU time measures speed fairly. <code>time</code> shows both (<code>real</code> vs <code>user</code> + <code>sys</code>).</li>
+  <li>Measure with <code>CLOCK_MONOTONIC</code> (C) or <code>performance.now()</code> (Node), never the time of day: it can jump.</li>
+  <li>Wait with a deadline: <code>waitpid(…, WNOHANG)</code> + a 1 ms nap, or <code>pidfd_open</code> + <code>poll</code>.</li>
+  <li>At the deadline: <code>kill(-pgid, SIGKILL)</code>, then reap. No grace period.</li>
+  <li>Groups can be escaped (<code>setsid</code>). The real walls are a PID namespace and a cgroup.</li>
+</ul>
+
+<h2>File descriptors, pipes, limits</h2>
+<ul>
+  <li><strong>0, 1, 2</strong> = stdin, stdout, stderr. Inherited across <code>fork</code> and kept through <code>exec</code>.</li>
+  <li>Redirect in the gap: <code>open</code> → <code>dup2(fd, 0 or 1)</code> → <code>close(fd)</code>. Default stdin for a judge: <code>/dev/null</code>.</li>
+  <li><strong>Pipes:</strong> reading an empty pipe blocks while any write end is open; end of file only when <em>all</em> are closed. Writing to a full pipe (64 KiB) blocks. <code>waitpid</code> before reading = deadlock.</li>
+  <li><strong>Output cap:</strong> <code>RLIMIT_FSIZE</code> = cap + 1; decide <code>output-limit</code> from the file size, not from how it died.</li>
+</ul>
+
+<h2>The same thing, in Node</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>C</th><th>Node</th></tr></thead>
+  <tbody>
+    <tr><td><code>fork</code> + <code>exec</code></td><td><code>spawn(cmd, args)</code>: never <code>shell: true</code> with user input</td></tr>
+    <tr><td>exec failed</td><td><code>'error'</code>, <code>ENOENT</code>, then <code>'close'</code> with <code>-2</code></td></tr>
+    <tr><td><code>waitpid</code> + macros</td><td><code>'close'</code> <code>(code, signal)</code>: wait for <code>'close'</code>, not <code>'exit'</code></td></tr>
+    <tr><td>read while it runs</td><td><code>'data'</code> on <strong>both</strong> stdout and stderr; collect Buffers, decode once</td></tr>
+    <tr><td>close the write end</td><td><code>child.stdin.end()</code>, plus a <code>'error'</code> listener for EPIPE</td></tr>
+    <tr><td><code>setpgid</code> + <code>kill(-pgid)</code></td><td><code>{ detached: true }</code> + <code>process.kill(-child.pid, "SIGKILL")</code></td></tr>
+    <tr><td>avoid</td><td>the <code>timeout</code> option (SIGTERM, child only), <code>exec</code>/<code>maxBuffer</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Look at any process</h2>
+<pre>grep -E '^(Name|State|Pid|PPid)' /proc/&lt;pid&gt;/status
+ls -l /proc/&lt;pid&gt;/fd  <span class="c"># what its 0, 1, 2 point to</span>
+ps -o pid,ppid,pgid,stat,args -p &lt;pid&gt;
+echo $$ ; echo $?     <span class="c"># your shell's PID; how the last command ended</span></pre>

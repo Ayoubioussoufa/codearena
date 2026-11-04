@@ -1,0 +1,90 @@
+<p class="kicker">Reference · the shipping track</p>
+<h1>Shipping CodeArena, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0021-server-from-zero">21</a> to <a href="/courses/lessons/0025-observability">25</a>.</p>
+
+<h2 id="server">A server from zero</h2>
+<pre>ssh-keygen -t ed25519 -C "you@laptop"
+# /etc/ssh/sshd_config.d/50-hardening.conf
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+# the default, prohibit-password, lets root in with a key
+PermitRootLogin no
+AllowUsers deploy
+MaxAuthTries 3
+X11Forwarding no
+# before every restart; keep a second session open
+sshd -t
+
+ufw default deny incoming &amp;&amp; ufw default allow outgoing
+ufw limit 22/tcp &amp;&amp; ufw allow 80/tcp &amp;&amp; ufw allow 443/tcp
+# after allowing 22
+ufw enable</pre>
+<ul>
+  <li><code>~/.ssh</code> 700, <code>authorized_keys</code> 600, owned by the user (StrictModes).</li>
+  <li>Log in as <code>deploy</code>; root powers through <code>sudo</code>. The <code>docker</code> group is root-equivalent.</li>
+  <li><strong>Docker's published ports bypass ufw.</strong> Never publish internal services; bind to <code>127.0.0.1</code> if you must.</li>
+</ul>
+
+<h2 id="compose">Compose in production</h2>
+<pre>x-logging: &amp;logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+services:
+  api:
+    # pinned, built in CI
+    image: ghcr.io/you/codearena-api:${TAG:?set TAG}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      # from .env.prod, never in git
+      JWT_SECRET: ${JWT_SECRET:?}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+    networks: [edge, internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate:  { condition: service_completed_successfully }
+networks:
+  internal: { internal: true }</pre>
+<ul>
+  <li>Only the proxy publishes 80/443. Only the worker mounts the Docker socket (root on the host).</li>
+  <li><code>migrate</code>: one-shot, <code>restart: "no"</code>. Postgres data in a named volume. Memory limit on the worker.</li>
+  <li><code>docker compose -f docker-compose.prod.yml config</code> validates and shows the resolved file.</li>
+</ul>
+
+<h2 id="https">HTTPS</h2>
+<ul>
+  <li><strong>A certificate</strong> binds a public key to names (SAN), signed by an issuer. Clients check: chain to a trusted root, hostname in the SAN, dates.</li>
+  <li><strong>The private key never leaves the server.</strong> The CA signs a CSR (public key + names) and chooses the extensions: <code>CA:FALSE</code>, <code>serverAuth</code>, SAN.</li>
+  <li><strong>ACME HTTP-01:</strong> serve the token at <code>/.well-known/acme-challenge/&lt;token&gt;</code> on port 80. Let's Encrypt: 90-day certificates.</li>
+  <li><strong>Caddy:</strong> DNS pointing at the server, ports 80/443 open, a persistent data volume → certificates, renewals, HTTP→HTTPS redirects.</li>
+</ul>
+<pre># read a certificate
+openssl x509 -in server.crt -noout -text
+# check its chain
+openssl verify -CAfile ca.crt server.crt
+# see the handshake and the chain
+curl -vI https://example.com</pre>
+
+<h2 id="cicd">From merge to deploy</h2>
+<pre>push to main → test → build (tag: ${{ github.sha }})
+             → deploy (environment: production)
+deploy.sh &lt;sha&gt;: validate → pull → up -d --wait → curl /health
+                 → record | roll back</pre>
+<ul>
+  <li><code>permissions: { contents: read }</code> at the top; <code>packages: write</code> only on build.</li>
+  <li><code>uses: owner/action@&lt;40-char SHA&gt; # vX.Y.Z</code> (or GitHub's workflow lockfiles).</li>
+  <li>Never <code>${{ inputs.* }}</code> or <code>${{ github.event.* }}</code> inside <code>run:</code>; pass through <code>env:</code> and quote <code>"$VAR"</code>.</li>
+  <li><code>known_hosts</code> from a secret; never <code>StrictHostKeyChecking=no</code>.</li>
+  <li><code>concurrency: { group: production, cancel-in-progress: false }</code>; no deploys from pull requests.</li>
+  <li>Rollback: <code>workflow_dispatch</code> with a <code>tag</code> input → deploy an older SHA.</li>
+</ul>
+
+<h2 id="observability">Seeing production</h2>
+<ul>
+  <li><strong>Logs:</strong> one JSON object per line: time, level, msg, method, path (no query), status, durationMs, requestId. Never tokens, cookies or Authorization.</li>
+  <li><strong>Health:</strong> <code>/health</code> = alive (else restart); <code>/ready</code> = dependencies answer, each check with a timeout (else no traffic, no restart).</li>
+  <li><strong>Metrics:</strong> <code>text/plain; version=0.0.4</code>; counters and histograms (cumulative <code>le</code> buckets, <code>_sum</code>, <code>_count</code>); labels with bounded values only (route template, status), never ids.</li>
+  <li><strong>Golden signals:</strong> latency, traffic, errors, saturation, plus the judge queue's depth and age.</li>
+  <li><strong>Backups:</strong> <code>pg_dump --format=custom</code> nightly, keep 7, copy off the server; restore into a scratch database on a schedule and count rows.</li>
+</ul>

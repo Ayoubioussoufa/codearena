@@ -414,6 +414,11 @@ Other narrowing tools you should recognize: `typeof x === "string"`, `x instance
 
 ---
 
+
+```check
+typescript
+```
+
 <a name="part-b"></a>
 # Part B — NestJS: the module / provider / DI mental model
 
@@ -623,6 +628,11 @@ graph LR
 > both import; or invert one direction with events. `forwardRef()` exists as an escape hatch, but
 > treat needing it as a design smell, not a solution.
 
+
+```check
+di
+```
+
 ## B.4 The request lifecycle — the airport-security pipeline
 
 Every HTTP request to a NestJS app passes through a fixed sequence of checkpoints. Learn the order
@@ -729,6 +739,11 @@ read from `ConfigService`) — you pass a `useFactory` instead of a value. Every
 yourself, their signatures stop looking like magic.
 
 ---
+
+
+```check
+pipeline
+```
 
 <a name="part-c"></a>
 # Part C — Architecture: why the shape of code matters
@@ -1005,6 +1020,11 @@ consistency)**. That "slightly behind" trade-off is a Phase-5 conversation.
 
 ---
 
+
+```check
+architecture
+```
+
 <a name="part-d"></a>
 # Part D — The tools
 
@@ -1179,6 +1199,11 @@ docker image inspect X --format '{{.Size}}'   # is my image getting fat?
 ```
 
 ---
+
+
+```check
+tools
+```
 
 <a name="worked"></a>
 # Part E — One complete NestJS example, end to end

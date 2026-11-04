@@ -1,0 +1,97 @@
+<!--
+  Lesson 0013 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">A judging run takes seconds, needs Docker, and can crash halfway. None of that can happen inside an HTTP request. So the API hands the work to a <strong>queue</strong>, and a worker picks it up. Today you build that queue yourself on Redis, find each way it can lose or duplicate a job, and close them one by one. After that, BullMQ is a library whose every option you understand.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Tomorrow you wire <code>POST /submissions</code> → BullMQ → worker. Every bug there is one of today’s: a job lost when a worker dies, a job judged twice, a job pointing at a row that doesn’t exist yet. “Why not Kafka?” is your ADR-008, and you’ll be able to answer it.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Why a queue</h2>
+<p>The API’s job is to answer fast. So <code>POST /submissions</code> validates the body, writes a <code>PENDING</code> row, puts a job on the queue, and answers <strong>202 Accepted</strong>: “I have it, not done yet” (<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/202">MDN</a>). A worker, a separate process next to Docker, takes the job, judges it and writes the verdict. The client polls <code>GET /submissions/:id</code> (or gets pushed the result, lesson 20).</p>
+<ul>
+  <li><strong>The job carries the id, never the code.</strong> The row is the truth; the queue holds pointers to work, in Redis’s memory.</li>
+  <li><strong>The row is written before the job.</strong> The other order lets a fast worker take a job whose row isn’t there yet. That only fails under load.</li>
+  <li><strong>The queue absorbs bursts.</strong> 500 submissions at once don’t make 500 containers; workers take jobs at the pace the machine allows. That’s back pressure, from your system-design reading.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. A queue on Redis lists, and its first hole</h2>
+<p>A Redis list is a queue already: <code>LPUSH</code> adds on the left, <code>RPOP</code> takes from the right, oldest first. But Redis’s own documentation points out the hole: once a worker has taken a job with <code>RPOP</code>, the job exists only in that worker’s memory. If the worker crashes, the job is gone (<a href="https://redis.io/docs/latest/commands/lmove/">LMOVE, “Pattern: reliable queue”</a>).</p>
+<p>The fix is one command. <code>LMOVE waiting active RIGHT LEFT</code> takes the job <em>and</em> parks it in a processing list, atomically. When the work is done, the worker removes it with <code>LREM</code> (the <strong>ack</strong>). If the worker dies first, the job is still in <code>active</code>, and recovery can put it back. And because <code>LMOVE</code> is atomic, two workers can never take the same job.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. At least once, retries, dead letters</h2>
+<p>Recovery has a price. If a worker crashes <em>after</em> judging and <em>before</em> the ack, the job runs again. You can’t avoid that: from the queue’s side, “crashed before the work” and “crashed after it” look the same. So a crash-proof queue delivers <strong>at least once</strong>, and the work itself must make a second delivery harmless. That’s lesson 14.</p>
+<p>Failures come in two kinds, as in lesson 9. An <strong>infrastructure failure</strong> (Docker unreachable, database down) deserves a <strong>retry</strong>, a limited number of times. After the last attempt, or for a failure no retry can fix, the job goes to a <strong>dead-letter</strong> list, where a person or an alert can look at it instead of it vanishing. A wrong answer is neither: it’s a verdict, and the job succeeded.</p>
+<p class="aside">One more hole, for multiple workers: recovering <em>every</em> active job would steal jobs still being worked on. Real queues give each taken job a lease that the worker renews; a job whose lease expires counts as stalled. BullMQ does exactly this (<a href="https://docs.bullmq.io/guide/workers/stalled-jobs">stalled jobs</a>). It’s today’s challenge.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:queue -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>queue.mjs</code></h2>
+<div class="spec">
+  <p>The contract is in <code>queue.start.mjs</code>: <code>createQueue(redis, name, { maxAttempts })</code> with <code>enqueue</code> (duplicate ids refused, payloads over 1 KB refused), <code>take</code>, <code>ack</code>, <code>fail</code>, <code>recover</code> and <code>counts</code>. <code>../_lib/resp.mjs</code> is a given Redis client: <code>await redis.cmd("LPUSH", key, value)</code>. The checker starts a throwaway Redis in Docker for each run.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Enqueue, take, ack</h3>
+    <label><input type="checkbox" data-key="lesson-0013-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0013-queue-from-scratch
+cp queue.start.mjs queue.mjs
+bash check.sh</pre>
+  <p>Jobs are JSON strings; keep the exact string you took, because <code>LREM</code> matches it byte for byte. Use a set for the ids (<code>SADD</code> answers 1 for new, 0 for seen). Make “A queue” and “Two workers” green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Failures</h3>
+    <label><input type="checkbox" data-key="lesson-0013-step-2"> done</label>
+  </div>
+  <p><code>fail</code> removes the job from <code>active</code>, then pushes it back to <code>waiting</code> with <code>attempts + 1</code>, or to <code>dead</code>. <code>recover</code> moves everything in <code>active</code> back. All 10 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a visibility timeout</h3>
+    <label><input type="checkbox" data-key="lesson-0013-step-3"> done</label>
+  </div>
+  <p>Make recovery safe with many workers: when a job is taken, record a deadline in a sorted set (<code>ZADD q:leases &lt;deadline&gt; &lt;id&gt;</code>); a worker renews it while working; <code>recover()</code> only moves jobs whose deadline has passed. You’ve rebuilt BullMQ’s stalled-job check.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What BullMQ gives you, and why not Kafka</h2>
+<ul>
+  <li><strong>BullMQ</strong> (on Redis): <code>queue.add(name, data, { jobId, attempts, backoff })</code>, a <code>Worker</code> with locks and stalled-job recovery, delays, priorities and events (<a href="https://docs.bullmq.io/">BullMQ docs</a>). <code>jobId</code> set to the submission id is your duplicate-id set.</li>
+  <li><strong>Kafka</strong> is a replicated log: ordered partitions, consumers that track offsets, replay. It’s built for streams of events at very high volume. A judge needs per-job retries and acknowledgments for a few jobs a second, which is a job queue’s shape. The condition that would make you switch is your ADR-008.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Two decisions before today’s build. How does the worker read submissions and write verdicts: a shared database package, a client generated from the same Prisma schema, or the API doing every write? And do you use <code>@nestjs/bullmq</code> directly, or plain <code>bullmq</code> behind your own queue port? One sentence of reason each, in section 7’s box.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your two decisions from section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://redis.io/docs/latest/commands/lmove/">Redis: LMOVE</a></strong>, and its “Pattern: reliable queue” section: four paragraphs that explain the hole and the fix you built. Then <a href="https://docs.bullmq.io/guide/workers/stalled-jobs">BullMQ: stalled jobs</a> and <a href="https://docs.bullmq.io/guide/retrying-failing-jobs">retrying failing jobs</a>, now that you know what they solve.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>LREM</code> needs the exact string, how BullMQ’s lock renewal works, when Kafka would be right, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0013</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

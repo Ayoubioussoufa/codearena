@@ -1,0 +1,154 @@
+<!--
+  Lesson 0008 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You’ve built every wall by hand: namespaces, cgroups, dropped capabilities, <code>no_new_privs</code>, a system-call filter, a deadline, an output cap. Docker can set all of them at once, with flags. Today you read every flag as the layer you already wrote, then build the runner CodeArena’s worker needs.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>“Docker isn’t a sandbox by default” is true, and now you can say exactly why: by default a container keeps 14 capabilities, has a network, runs as root with no user namespace, and has no memory, process or CPU limit. Every flag below closes one of those, and you can name the kernel feature behind each. That’s the sentence that makes an interviewer lean forward.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. What docker run actually does</h2>
+
+<p><code>docker run</code> is a client (lesson 2). It asks the Docker daemon, which asks containerd, which runs <code>runc</code>, the component that does the real work. <code>runc</code> does what you did by hand: <code>clone</code> with namespace flags (lesson 5), cgroup files (lesson 6), capabilities, <code>no_new_privs</code> and a seccomp filter (lesson 7), mounts, then <code>exec</code>. Nothing magic happens anywhere: it’s your <code>box</code>, <code>cage</code> and <code>guard</code>, with more care.</p>
+
+<p><strong>Try it</strong> (2 minutes). The whole hardened run, then look at it from inside:</p>
+<pre>H="--rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+   --memory 128m --memory-swap 128m --pids-limit 64 --cpus 1 \
+   --cap-drop ALL --security-opt no-new-privileges --user 65534:65534"
+docker run $H python:3.12-alpine sh -c '
+  grep -E "CapEff|CapBnd|NoNewPrivs|Seccomp:" /proc/self/status
+  cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/pids.max /sys/fs/cgroup/cpu.max
+  id; ip -o link | wc -l; touch /x'</pre>
+<p>Every line is a lesson: capabilities and bounding set at zero (7), <code>NoNewPrivs: 1</code> and <code>Seccomp: 2</code> (7), the three cgroup files you wrote yourself (6), <code>nobody</code> (5 and 7), one interface (5), and “Read-only file system”.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Every flag is a layer you built</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Underneath</th><th>Stops</th><th>Lesson</th></tr></thead>
+  <tbody>
+    <tr><td><code>--network none</code></td><td>a network namespace with only <code>lo</code></td><td>sending your hidden tests anywhere</td><td>5</td></tr>
+    <tr><td><code>--read-only</code> + <code>--tmpfs /tmp:…noexec</code></td><td>read-only mounts; a small writable <code>/tmp</code> that can’t run programs</td><td>dropping a binary and running it</td><td>5</td></tr>
+    <tr><td><code>--memory 128m --memory-swap 128m</code></td><td><code>memory.max</code>, no swap</td><td>eating the host’s memory</td><td>6</td></tr>
+    <tr><td><code>--pids-limit 64</code></td><td><code>pids.max</code></td><td>fork bombs</td><td>6</td></tr>
+    <tr><td><code>--cpus 1</code></td><td><code>cpu.max</code> = <code>100000 100000</code></td><td>one submission starving the others</td><td>6</td></tr>
+    <tr><td><code>--cap-drop ALL</code></td><td>an empty bounding set</td><td>root’s powers, even after <code>exec</code></td><td>7</td></tr>
+    <tr><td><code>--security-opt no-new-privileges</code></td><td><code>no_new_privs</code></td><td>setuid escalation</td><td>7</td></tr>
+    <tr><td>(default)</td><td>Docker’s seccomp allowlist</td><td>about 44 dangerous system calls</td><td>7</td></tr>
+    <tr><td><code>--user 65534:65534</code></td><td>a non-root uid</td><td>an escape landing as root, since Docker uses no user namespace by default</td><td>5, 7</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">The default capability set is in Docker’s <a href="https://docs.docker.com/engine/containers/run/#runtime-privilege-and-linux-capabilities">runtime privilege docs</a>; Monday’s experiment showed it as <code>CapBnd: 00000000a80425fb</code>, 14 bits set. This lesson’s checker catches a runner that forgets <code>--cap-drop</code> by exactly that value.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Four decisions a runner makes</h2>
+<ol>
+  <li><strong>How the code gets in.</strong> Never as an argument: arguments are visible to every user in <code>ps</code>, and the kernel caps their size (<code>ARG_MAX</code>). Write it to a fresh temporary folder and bind-mount that folder <strong>read-only</strong> (<code>-v &lt;dir&gt;:/code:ro</code>); the test’s input goes on stdin (lesson 3). Make the folder and file world-readable, because the program runs as <code>nobody</code>.</li>
+  <li><strong>Which image.</strong> Pinned to an exact tag, never <code>latest</code>: the same interpreter every run, and the limits you calibrated still mean something.</li>
+  <li><strong>A name per run.</strong> <code>--name lab8-&lt;random&gt;</code>, so you can find the container again, whatever happens to your client.</li>
+  <li><strong>Kill and clean up through the daemon.</strong> At the deadline, <code>docker kill &lt;name&gt;</code>. Afterwards, ask <code>docker inspect -f '{{.State.OOMKilled}}' &lt;name&gt;</code> (so no <code>--rm</code>: the container must still exist to be asked), then <code>docker rm -f &lt;name&gt;</code> and delete the folder, in a <code>finally</code>. That’s I-17, fixed.</li>
+</ol>
+<p><strong>A cost to know:</strong> starting a container takes a few hundred milliseconds (about 0.45 s in this lesson’s tests). Measured around <code>docker run</code>, every solution pays it. Either measure the program inside (its cgroup’s CPU time), or calibrate your limits with it included, and write down which.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:docker-flags -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>docker-runner.mjs</code></h2>
+
+<div class="spec">
+  <p><strong>The contract</strong> is in <code>docker-runner.start.mjs</code>: <code>runInDocker({ source, input, timeoutMs, memoryMb, maxOutputBytes })</code> runs Python source in a fresh hardened <code>python:3.12-alpine</code> container named <code>lab8-…</code>, and resolves with <code>{ outcome, exitCode, stdout, stderr, timeMs }</code>, where <code>outcome</code> is <code>exit</code>, <code>timeout</code>, <code>output-limit</code>, <code>memory-limit</code> or <code>spawn-error</code>. Afterwards, no container and no temporary folder may remain. It builds on your lesson 4 runner: you reuse it as is.</p>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>Set up</h3>
+    <label><input type="checkbox" data-key="lesson-0008-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0008-docker-hardened
+cp ../0004-runner-in-node/runner.mjs .
+cp docker-runner.start.mjs docker-runner.mjs
+bash check.sh</pre>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>It runs, and it talks</h3>
+    <label><input type="checkbox" data-key="lesson-0008-step-1"> done</label>
+  </div>
+  <p>Write the source to a temporary folder (<code>mkdtempSync</code>), build the <code>docker run</code> arguments with <code>-i</code>, the name, the read-only mount and the image, and call your <code>run()</code> with <code>command: "docker"</code>. Clean up in a <code>finally</code>. The first two cases should pass.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Every flag</h3>
+    <label><input type="checkbox" data-key="lesson-0008-step-2"> done</label>
+  </div>
+  <p>Add the flags from section 2. Each case in “The walls” proves one of them from inside the container; the cgroup case reads the three files you wrote by hand in lesson 6.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Kill through the daemon, and memory</h3>
+    <label><input type="checkbox" data-key="lesson-0008-step-3"> done</label>
+  </div>
+  <p>When your <code>run()</code> reports <code>timeout</code> or <code>output-limit</code>, <code>docker kill</code> the container by name. Otherwise ask <code>docker inspect</code> for <code>State.OOMKilled</code>, and report <code>memory-limit</code> if it’s true. Then all 12 cases should pass.</p>
+  <details>
+    <summary>Hint: running <code>docker inspect</code> from Node</summary>
+    <p><code>spawnSync("docker", ["inspect", "-f", "{{.State.OOMKilled}}", name], { encoding: "utf8" }).stdout.trim() === "true"</code>. <code>spawnSync</code> is fine here: it’s a short, trusted command, after the untrusted program has finished.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: JavaScript, and measuring startup</h3>
+    <label><input type="checkbox" data-key="lesson-0008-step-4"> done</label>
+  </div>
+  <p>Add a <code>language</code> option: <code>"python"</code> or <code>"javascript"</code> (image <code>node:22-alpine</code>, command <code>node /code/main.js</code>). Then measure the cost of an empty program (<code>pass</code>, or an empty JS file) 20 times for each language: the median is what every submission pays. CodeArena starts with JavaScript, so that number goes into your ADR.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for a judge</h2>
+<ul>
+  <li><strong>You can defend every flag,</strong> because you built what it does. “Docker isn’t a sandbox by default” becomes a list, not a slogan.</li>
+  <li><strong>The runner reports facts.</strong> <code>memory-limit</code>, <code>timeout</code>, <code>output-limit</code>, an exit code: the verdict comes later, from the judge loop (lesson 9).</li>
+  <li><strong>Every run must clean up after itself,</strong> or a busy judge fills the host with dead containers and temporary files. The checker’s last case is a production habit.</li>
+  <li><strong>Stronger walls exist.</strong> gVisor intercepts system calls in a user-space kernel; Firecracker runs each submission in a micro-VM. At scale they’re the right answer, and saying why you don’t need them <em>yet</em> is ADR-007.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Today’s build (below) is CodeArena’s <code>DockerCodeRunner</code>. Before you code, decide and write down two things: does the worker drive Docker through the <code>docker</code> CLI (your lab) or the Engine API (<code>dockerode</code>), and does the code go in through a read-only mount or stdin? One sentence of reason for each, in section 7’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Say it in your own words</h2>
+<p>Your two decisions from section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.docker.com/reference/cli/docker/container/run/">The <code>docker container run</code> reference</a></strong>, read now with a different eye: for each flag in section 2, find its entry and say which layer it writes. Then Docker’s <a href="https://docs.docker.com/engine/security/">Docker security</a> overview, which explains the daemon’s attack surface and why the socket is root-equivalent (ADR-007).</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why no <code>--rm</code>, why the folder must be world-readable, what the daemon’s socket gives whoever holds it, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0008</code></strong> message from section 7 and paste it in the terminal. Then build today’s CodeArena task, just below.</p>
+</div>

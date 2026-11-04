@@ -1,0 +1,124 @@
+<!--
+  Lesson 0021 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">A cloud provider hands you a server with a public IP address, a root account, and port 22 open to the whole internet. Scanners will find it quickly, and your SSH log will start filling with password guesses. The first five minutes decide whether that matters. Today you do those five minutes on a disposable “VM” in a container, and another container attacks it to check your work.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon you create CodeArena’s real server. Your sandbox lessons assumed the host is the last wall; if it falls, the attacker owns everything on it. That’s why the plan is “one small VM running Docker Compose and nothing else”, locked down before anything is deployed.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Keys, not passwords</h2>
+<p>With <strong>public-key authentication</strong>, you hold a private key that never leaves your machine, and the server holds the matching public key in <code>~/.ssh/authorized_keys</code>. To log in, your client signs a challenge with the private key; the server checks the signature with the public key. Nothing guessable crosses the network, and a stolen <code>authorized_keys</code> file is useless to a thief.</p>
+<pre><span class="c"># a modern, short key: ~/.ssh/id_ed25519(.pub)</span>
+ssh-keygen -t ed25519 -C "you@laptop"
+<span class="c"># or paste the .pub line into authorized_keys</span>
+ssh-copy-id deploy@203.0.113.7</pre>
+<p>sshd is picky about that file, on purpose: with <code>StrictModes</code> (the default), it refuses keys in files or folders that other users could write (<a href="https://man.openbsd.org/sshd_config">sshd_config</a>). The convention is <code>700</code> for <code>~/.ssh</code> and <code>600</code> for <code>authorized_keys</code>, owned by the user.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. sshd’s defaults, and the five lines that fix them</h2>
+<p>OpenSSH’s defaults favour getting in over keeping out. Two surprise most people: <code>PermitRootLogin</code> defaults to <code>prohibit-password</code>, so <strong>root can log in with a key</strong>, and <code>MaxAuthTries</code> is 6. Put your settings in a <strong>drop-in</strong> file, <code>/etc/ssh/sshd_config.d/50-hardening.conf</code>, which the main config includes, so package upgrades don’t overwrite them:</p>
+<pre>PasswordAuthentication no
+<span class="c"># the other way to ask for a password</span>
+KbdInteractiveAuthentication no
+PermitRootLogin no
+<span class="c"># everyone else is refused, whatever keys they hold</span>
+AllowUsers deploy
+MaxAuthTries 3
+X11Forwarding no</pre>
+<p><strong>Never lock yourself out.</strong> Run <code>sshd -t</code> before restarting (a typo can stop sshd from starting, and you’re connected through it). Keep your current session open, and prove the new login works from a second terminal before closing it.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. One user, least privilege</h2>
+<p>Create a <code>deploy</code> user, put it in the admin group (<code>sudo</code> on Ubuntu, <code>wheel</code> on Alpine), and log in only as that user. Day to day you don’t need root, so you shouldn’t have it by default; when you do, <code>sudo</code> asks and logs what ran. That’s <strong>least privilege</strong>, the same principle as dropping capabilities in lesson 7.</p>
+<p class="aside">Alpine’s <code>adduser -D</code> creates a <em>locked</em> account (password field <code>!</code>), and OpenSSH refuses every login to a locked account, keys included: “User deploy not allowed because account is locked”. <code>usermod -p '*' deploy</code> sets a password field no password can match, without locking. The lab will show you this message if you forget.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. A default-deny firewall, and the hole Docker makes in it</h2>
+<pre>ufw default deny incoming
+ufw default allow outgoing
+ufw limit 22/tcp  <span class="c"># deny an address after 6 new connections in 30 s</span>
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw enable        <span class="c"># after allowing 22, or you cut your own connection</span></pre>
+<p><code>limit</code> blunts brute-force scripts (<a href="https://manpages.ubuntu.com/manpages/noble/man8/ufw.8.html">ufw(8)</a>). Then the trap that catches almost everyone: <strong>ports published by Docker bypass ufw</strong>. Docker routes them in the nat table, before the chains ufw filters, and its own documentation calls the two incompatible (<a href="https://docs.docker.com/engine/network/packet-filtering-firewalls/">Docker and ufw</a>). A Compose file with <code>5432:5432</code> exposes Postgres to the internet, firewall or not. Lesson 22 closes that hole.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:server -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build it: provision a fresh “VM”</h2>
+<div class="spec">
+  <p>The lab’s <code>README.md</code> has the full story. The checker starts a container playing a new cloud VM: your key in root’s account, an old <code>ops</code> account with it too, fake Postgres and Redis listening on every interface. It runs your <code>setup.sh</code> there, starts sshd, then a second container (“the internet”) tries to log in every way it can and probes the ports.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>A key, and the defaults</h3>
+    <label><input type="checkbox" data-key="lesson-0021-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0021-server-from-zero
+mkdir -p keys
+ssh-keygen -t ed25519 -f keys/deploy -N "" -C "deploy@codearena-lab"
+touch setup.sh 50-hardening.conf
+<span class="c"># the defaults: watch root log in, and passwords be offered</span>
+bash check.sh</pre>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The user and sshd</h3>
+    <label><input type="checkbox" data-key="lesson-0021-step-2"> done</label>
+  </div>
+  <p>Write <code>setup.sh</code>: the user, its group, its key with the right owner and modes (<code>install -d -m 700 -o deploy -g deploy …</code> does it in one line), and your drop-in. Then make sshd’s settings and the login cases green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>The firewall</h3>
+    <label><input type="checkbox" data-key="lesson-0021-step-3"> done</label>
+  </div>
+  <p>Add the ufw rules. Run it again: 5432 and 6379 still listen inside the VM, but the internet can no longer reach them. All 16 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: cloud-init</h3>
+    <label><input type="checkbox" data-key="lesson-0021-step-4"> done</label>
+  </div>
+  <p>Most providers accept <strong>user data</strong> when you create a VM, run by cloud-init on first boot. Rewrite <code>setup.sh</code> as a <code>#cloud-config</code> file (<code>users:</code> with <code>ssh_authorized_keys</code>, <code>write_files:</code> for the drop-in, <code>runcmd:</code> for ufw), using the <a href="https://cloudinit.readthedocs.io/en/latest/reference/examples.html">cloud-init examples</a>. Then the server is hardened before you ever log in.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for CodeArena</h2>
+<ul>
+  <li><strong>The VM runs Docker and nothing else.</strong> Install Docker from Docker’s own repository, add <code>deploy</code> to the <code>docker</code> group (which is root-equivalent: know that you’re doing it), and turn on automatic security updates (<code>unattended-upgrades</code> on Ubuntu).</li>
+  <li><strong>Write it down as a runbook</strong>, in <code>docs/ops/</code>: the commands in order, with the lockout checks. You’ll redo it the day the VM needs replacing.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write your provisioning runbook for this afternoon, in order: from creating the VM to <code>docker compose up</code>, including the two “before you close this session” checks. In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your runbook from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://man.openbsd.org/sshd_config">sshd_config(5)</a></strong>, the OpenSSH manual page: every setting you used, with its default. Read <code>PermitRootLogin</code>, <code>AllowUsers</code> and <code>StrictModes</code>. Then Docker’s <a href="https://docs.docker.com/engine/network/packet-filtering-firewalls/">packet filtering and firewalls</a> page, before you write tomorrow’s Compose file.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how the key signature works, why the docker group is root-equivalent, which provider to pick, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0021</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

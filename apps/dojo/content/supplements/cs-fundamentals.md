@@ -141,6 +141,11 @@ breaks hold-and-wait by giving up; or one big coarse lock over everything.)
 
 ---
 
+
+```check
+concurrency
+```
+
 ## 2. Memory and scheduling
 
 ### Stack vs heap — named after the two crashes they cause
@@ -196,6 +201,11 @@ network), it makes a **system call** that jumps into the powerful "kernel mode."
 boundary costs time — which is *why* I/O is "expensive" and why we batch and buffer it.
 
 ---
+
+
+```check
+memory
+```
 
 ## 3. Networking
 
@@ -306,6 +316,11 @@ memorizing it.
   many services — your own Docker Compose file is the example: 443 web, 5432 Postgres, 6379 Redis.
 
 ---
+
+
+```check
+networking
+```
 
 ## 4. Databases
 
@@ -420,6 +435,11 @@ query.) Two facts that decide follow-up questions:
 
 ---
 
+
+```check
+databases
+```
+
 ## 5. OOP and design
 
 **OOP** (object-oriented programming) organizes code into **objects** — bundles of data plus the
@@ -482,6 +502,11 @@ sentence beats five memorized ones.
 
 ---
 
+
+```check
+design
+```
+
 ## 6. Complexity (Big-O) — from zero
 
 **Big-O** answers one question: *as the input gets big, how fast does the work grow?* It ignores exact
@@ -526,6 +551,11 @@ The data-structure cheat table (the "n" is the number of items; "avg" = typical 
 | B-tree (DB index) | O(log n) | O(log n) | O(log n) | O(log n) | wide + shallow → few disk hops |
 
 ---
+
+
+```check
+bigo
+```
 
 ## Mastery checklist — you can…
 

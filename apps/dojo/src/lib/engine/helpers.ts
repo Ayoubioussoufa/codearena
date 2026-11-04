@@ -68,7 +68,10 @@ export function numeric(spec: NumericSpec): InputExercise {
     prompt: spec.prompt,
     answer: spec.display ?? String(spec.answer),
     accept: (raw) => {
-      const value = Number(raw.trim().replace(",", "."));
+      const cleaned = raw.trim().replace(",", ".");
+      // Number("") is 0: without this, an empty answer passes whenever the answer is 0.
+      if (cleaned === "") return false;
+      const value = Number(cleaned);
       return Number.isFinite(value) && Math.abs(value - spec.answer) <= tol;
     },
     placeholder: spec.placeholder ?? "number",

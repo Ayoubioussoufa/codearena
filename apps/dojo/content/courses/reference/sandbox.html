@@ -1,0 +1,79 @@
+<p class="kicker">Reference · the sandbox track</p>
+<h1>The sandbox, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0005-namespaces">5</a> to <a href="/courses/lessons/0008-docker-hardened">8</a>. What each wall hides or limits, how to build it by hand, and the Docker flag that does it for you.</p>
+
+<h2>Namespaces: what it can see</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Own copy of</th><th>Docker</th></tr></thead>
+  <tbody>
+    <tr><td><code>CLONE_NEWPID</code></td><td>process numbers; PID 1 inside</td><td>always</td></tr>
+    <tr><td><code>CLONE_NEWNS</code></td><td>mount table (+ <code>chroot</code>/<code>pivot_root</code>)</td><td>always</td></tr>
+    <tr><td><code>CLONE_NEWUTS</code></td><td>hostname</td><td>always</td></tr>
+    <tr><td><code>CLONE_NEWIPC</code></td><td>System V IPC</td><td>always</td></tr>
+    <tr><td><code>CLONE_NEWNET</code></td><td>interfaces, routes (new = only <code>lo</code>)</td><td>own bridge by default; <code>--network none</code> = only <code>lo</code></td></tr>
+    <tr><td><code>CLONE_NEWUSER</code></td><td>user IDs (<code>uid_map</code>: <code>inside outside count</code>)</td><td><strong>not by default</strong>: root inside = root outside</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>Unprivileged containers:</strong> create every namespace <em>together with</em> a user namespace; the parent writes <code>uid_map</code>, <code>setgroups</code>=<code>deny</code>, <code>gid_map</code>; the child waits on a pipe until then.</li>
+  <li><strong>PID 1:</strong> when it dies, the kernel SIGKILLs the whole namespace. It only receives signals it has a handler for (SIGKILL/SIGSTOP from outside are forced).</li>
+  <li><strong>Files:</strong> make <code>/</code> private, set up <code>/dev</code> (tmpfs + bind <code>null</code>, <code>zero</code>, <code>urandom</code>), <code>chroot</code> + <code>chdir("/")</code> (or <code>pivot_root</code>), mount <code>/proc</code>.</li>
+</ul>
+<pre><span class="c"># all of it, from a shell</span>
+unshare --user --map-root-user --pid --fork --mount-proc --uts --net sh
+<span class="c"># which namespaces a process is in</span>
+ls -l /proc/$$/ns</pre>
+
+<h2>cgroups: what it can use</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Write</th><th>At the limit</th><th>Read</th><th>Docker</th></tr></thead>
+  <tbody>
+    <tr><td><code>memory.max</code> + <code>memory.swap.max 0</code></td><td>OOM killer: SIGKILL</td><td><code>memory.events</code> → <code>oom_kill</code></td><td><code>--memory</code> = <code>--memory-swap</code></td></tr>
+    <tr><td><code>pids.max</code></td><td><code>fork</code> fails (EAGAIN)</td><td><code>pids.events</code> → <code>max</code></td><td><code>--pids-limit</code></td></tr>
+    <tr><td><code>cpu.max</code> = <code>quota period</code></td><td>throttled, never killed</td><td><code>cpu.stat</code> → <code>usage_usec</code></td><td><code>--cpus</code></td></tr>
+    <tr><td><code>cgroup.kill</code> ← <code>1</code></td><td colspan="2">SIGKILL to every member, no escape</td><td><code>docker kill</code></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li>A cgroup is a directory under <code>/sys/fs/cgroup</code>; <code>cgroup.procs</code> lists members; children inherit their parent's cgroup.</li>
+  <li><strong>No internal processes:</strong> move yourself into a leaf (<code>supervisor</code>) before writing <code>+memory +pids +cpu</code> to <code>cgroup.subtree_control</code>.</li>
+  <li><strong>Without sudo:</strong> <code>systemd-run --user --scope -p Delegate=yes …</code> starts you in a cgroup you own.</li>
+  <li>A CPU limit is not a time limit. Report CPU time; enforce wall time.</li>
+</ul>
+
+<h2>Privileges and system calls: what root can do</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>By hand</th><th>Stops</th><th>Docker</th></tr></thead>
+  <tbody>
+    <tr><td><code>prctl(PR_CAPBSET_DROP, c)</code> for all <code>c</code>, then <code>capset</code> to zero</td><td>root's special powers, permanently (exec can't refill above the bounding set)</td><td><code>--cap-drop ALL</code></td></tr>
+    <tr><td><code>prctl(PR_SET_NO_NEW_PRIVS, 1)</code></td><td>setuid programs and file capabilities gaining privileges</td><td><code>--security-opt no-new-privileges</code></td></tr>
+    <tr><td>a BPF filter via <code>PR_SET_SECCOMP</code></td><td>forbidden system calls: <code>RET_ERRNO</code> (fails) or <code>RET_KILL_PROCESS</code> (SIGSYS, 31)</td><td>default profile (an allowlist; ~44 of 300+ blocked)</td></tr>
+    <tr><td>run as a non-root uid</td><td>root-owned files on the host if anything escapes (Docker has no user namespace by default)</td><td><code>--user 65534:65534</code></td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li>Order in the child: user namespace → drop capabilities → <code>no_new_privs</code> → filter (last, it filters you too) → <code>exec</code>.</li>
+  <li>Check: <code>grep -E 'CapEff|CapBnd|NoNewPrivs|Seccomp' /proc/self/status</code>.</li>
+  <li>Filter skeleton: check <code>arch</code> (kill if wrong) → load <code>nr</code> → one <code>BPF_JUMP</code> + <code>BPF_RET</code> per call → <code>RET_ALLOW</code>.</li>
+</ul>
+
+<h2>The hardened run, and a runner's four decisions</h2>
+<pre><span class="c"># -i: the input arrives on stdin</span>
+docker run -i --name run-&lt;unique&gt; \
+  --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+  --memory 128m --memory-swap 128m --pids-limit 64 --cpus 1 \
+  --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 \
+  -v &lt;tmpdir&gt;:/code:ro  python:3.12-alpine  python3 /code/main.py</pre>
+<ol>
+  <li><strong>Code in:</strong> a read-only bind mount (or stdin), never an argument (<code>ps</code>, <code>ARG_MAX</code>).</li>
+  <li><strong>Image:</strong> pinned tag (or digest), never <code>latest</code>.</li>
+  <li><strong>Name:</strong> unique per run, so the daemon can find it.</li>
+  <li><strong>End:</strong> deadline → <code>docker kill &lt;name&gt;</code>; then <code>docker inspect -f '{{.State.OOMKilled}}'</code>; then <code>docker rm -f</code> + delete the folder, in a <code>finally</code>.</li>
+</ol>
+<p>Default Docker keeps 14 capabilities (<code>CapBnd 00000000a80425fb</code>), a network, root, and no limits: that's "not a sandbox by default". Startup costs a few hundred ms per run: measure inside, or calibrate with it.</p>

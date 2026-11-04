@@ -90,6 +90,11 @@ fighting the compiler about "types that are the same but named differently."
 structural-typing
 ```
 
+
+```check
+inference
+```
+
 ---
 
 ## 3. Unions and narrowing
@@ -145,6 +150,11 @@ type-guard
 
 ```exercise
 unknown-not-any
+```
+
+
+```check
+narrowing
 ```
 
 ---
@@ -205,6 +215,11 @@ accepts anything with a numeric `length` (strings, arrays…) while preserving t
 doesn't exist.
 ```exercise
 generic-function
+```
+
+
+```check
+literals
 ```
 
 ---
@@ -295,6 +310,11 @@ type Key = `greeting.${Lang}`; // "greeting.en" | "greeting.fr"
 
 **The bug it prevents.** Hand-writing and re-writing derived types every time a source type changes — mapped and
 conditional types recompute them for you.
+
+```check
+toolbox
+```
+
 ---
 
 ## 9. `satisfies` and function overloads
@@ -344,6 +364,11 @@ definite-assignment
 
 ```exercise
 exact-optional
+```
+
+
+```check
+satisfies
 ```
 
 ---

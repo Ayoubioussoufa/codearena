@@ -1,0 +1,128 @@
+<!--
+  Lesson 0009 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Your runner reports facts: how a program ended, what it printed, how long it took. A judge turns those facts into one word a user cares about: Accepted, or what went wrong. Today you write that logic, test-first, against a fake runner you script line by line. It’s the part of CodeArena an interviewer can read in one sitting, so it has to be exactly right.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Two distinctions decide whether users trust your judge. First, <strong>whitespace must never decide a verdict</strong>: a missing final newline is the most common Wrong Answer that should have been Accepted. Second, <strong>a user’s failure is a verdict, and your failure is an error</strong>: if Docker is down, the submission didn’t fail, your judge did.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Six verdicts, one order</h2>
+
+<p>Every test ends one of six ways, and the order you check them in matters, because a program can hit several at once (crash <em>and</em> print the right answer, flood <em>and</em> time out):</p>
+<ol>
+  <li><strong>TLE</strong>, Time Limit Exceeded: your deadline stopped it (lesson 2).</li>
+  <li><strong>MLE</strong>, Memory Limit Exceeded: the OOM killer, inside its cgroup (lessons 6 and 8).</li>
+  <li><strong>OLE</strong>, Output Limit Exceeded: it printed past the cap (lesson 3).</li>
+  <li><strong>RE</strong>, Runtime Error: killed by a signal, or a non-zero exit code (lesson 1). Its output isn’t even read.</li>
+  <li><strong>WA</strong>, Wrong Answer: it ended normally, but the output doesn’t match.</li>
+  <li>Otherwise this test passed; when every test passes, <strong>AC</strong>, Accepted.</li>
+</ol>
+<p>Limits first, then how it ended, and only then what it printed. A program that prints the right answer and then segfaults gets RE, not AC: the judge never got as far as reading.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Compare tokens, not bytes</h2>
+
+<p>Expected <code>5\n</code>, the program printed <code>5</code>: byte-for-byte that’s different, and the answer is still right. So judges compare <strong>tokens</strong>: split both outputs on any whitespace (spaces, tabs, newlines, <code>\r</code>), and compare the two sequences. That’s what Codeforces’ standard checker, <code>wcmp</code> in <a href="https://github.com/MikeMirzayanov/testlib">testlib</a>, does, and what your ADR-006 says. Tokens themselves are compared exactly: <code>1.0</code> isn’t <code>1</code>, and <code>YES</code> isn’t <code>yes</code>.</p>
+<p class="aside">Problems with floating-point answers need a checker with a tolerance, and problems that accept any valid answer need a custom checker that verifies it. Both are the challenge, not the core.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The loop, and what isn’t a verdict</h2>
+
+<p>The judge runs a problem’s tests <strong>in order</strong>, and <strong>stops at the first failure</strong>: the verdict and the failing test’s number are known, and every further run would cost a container start for nothing. It reports the slowest time among the tests that ran. Two things must never become verdicts:</p>
+<ul>
+  <li><strong>An infrastructure failure.</strong> If the runner can’t reach Docker, it throws, and the judge lets the error through. The queue will retry the job (lesson 14). Turning it into RE would blame the user for your outage.</li>
+  <li><strong>An empty test list.</strong> A problem with no tests can’t accept anything. It’s a bug in your data, so it’s an error too.</li>
+</ul>
+
+<h3>Test it with a fake</h3>
+<p>The judge depends on a runner, but its tests must not start containers: they’d be slow and need Docker. So the judge takes the runner as a parameter (in CodeArena, the <code>CODE_RUNNER</code> port), and the tests pass a <strong>fake</strong> that returns scripted facts and counts its calls. “A wrong answer on test 2” becomes: script test 1 to pass and test 2 to print <code>nope</code>, then assert the verdict, the test number, <em>and</em> that the runner was called exactly twice. That’s the port-and-adapter shape your worker already has, paying off.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:verdicts -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>judge.mjs</code></h2>
+
+<div class="spec">
+  <p>Two pure functions, specified in <code>judge.start.mjs</code>: <code>compareTokens(expected, actual)</code> and <code>async judge(tests, runOne)</code>, which returns <code>{ verdict, failedTest, maxTimeMs }</code> or rejects. The checker scripts a fake <code>runOne</code> for every case.</p>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The token checker</h3>
+    <label><input type="checkbox" data-key="lesson-0009-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0009-facts-to-verdicts
+cp judge.start.mjs judge.mjs
+bash check.sh</pre>
+  <p>Make the twelve <code>compareTokens</code> cases green. Watch the empty ones: <code>""</code> against <code>"\n  \n"</code> is a match.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The loop</h3>
+    <label><input type="checkbox" data-key="lesson-0009-step-2"> done</label>
+  </div>
+  <p>Run the tests in order, decide each in section 1’s order, stop at the first failure. Make “judge: facts become verdicts” green: nine cases, including the one that crashes after printing the right answer.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>What isn’t a verdict</h3>
+    <label><input type="checkbox" data-key="lesson-0009-step-3"> done</label>
+  </div>
+  <p>Don’t catch the runner’s errors, and reject an empty test list. All 23 cases should pass.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a float checker</h3>
+    <label><input type="checkbox" data-key="lesson-0009-step-4"> done</label>
+  </div>
+  <p>Write <code>compareFloats(expected, actual, eps)</code>: tokens that both parse as numbers match if their absolute <em>or</em> relative difference is at most <code>eps</code>; other tokens must be equal. Then decide: should a problem choose its checker, and where would that choice live in CodeArena’s schema?</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for a judge</h2>
+<ul>
+  <li><strong>The checker is domain logic.</strong> Pure, no input/output, tested with a table of cases: it belongs in the worker’s <code>domain</code> folder.</li>
+  <li><strong>The loop is application logic.</strong> It depends on the <code>CODE_RUNNER</code> port, never on Docker, so the fake from your worker’s first day becomes its test double.</li>
+  <li><strong>Verdicts are for users, errors are for you.</strong> The queue’s retries and dead-letter state (lesson 14) only work if the judge never hides an error inside a verdict.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Before today’s build, write down where each piece goes in <code>apps/worker/src/</code>: the token checker, the judge loop, and the mapping from runner facts to a verdict. Then name the one change the <code>Verdict</code> type in <code>run-result.entity.ts</code> needs, now that the runner reports facts. In section 7’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://github.com/MikeMirzayanov/testlib">testlib</a></strong>, the checker library Codeforces problems are built with, by Mike Mirzayanov, Codeforces’ founder. Its README shows a checker in a dozen lines; <code>checkers/wcmp.cpp</code> is your token checker, and <code>checkers/rcmp6.cpp</code> is the float challenge.</p>
+  <p>Then your own <code>docs/adr/006-leetcode-codeforces-hybrid.md</code>: compare what it says about checking with what you just built.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why limits before output, what a fake should and shouldn’t do, how Codeforces handles interactive problems, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0009</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

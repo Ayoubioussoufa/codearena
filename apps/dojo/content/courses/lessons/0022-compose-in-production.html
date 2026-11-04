@@ -1,0 +1,124 @@
+<!--
+  Lesson 0022 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">CodeArena’s <code>docker-compose.yml</code> is a good development file: one command, everything up, ports open so your tools can poke at the database. Every one of those conveniences is a production risk. Today you write the file the server will run, one rule at a time, each with the failure it prevents, checked by the same parser Docker uses.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon this file goes onto the VM you hardened in lesson 21. A firewall can’t save a Compose file that publishes Postgres, and a perfect sandbox can’t save a host whose Docker socket is mounted into the API. This file is where those lessons meet.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Read the dev file like a reviewer</h2>
+<p>Open the lab’s <code>docker-compose.dev.yml</code>, a copy of CodeArena’s. On a laptop, each line is fine. On a server:</p>
+<ul>
+  <li><code>POSTGRES_PASSWORD: codearena</code> is a secret in git, forever.</li>
+  <li><code>ports: "5433:5432"</code> and <code>"6379:6379"</code> publish the database and Redis. Docker’s published ports bypass ufw (lesson 21), so they’re on the internet.</li>
+  <li><code>postgres:16-alpine</code> and <code>dpage/pgadmin4:latest</code> change under you: the server may run something different tomorrow than today.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. What the server runs, and nothing more</h2>
+<ul>
+  <li><strong>Images, never builds.</strong> CI builds each image once and pushes it to a registry (lesson 24); the server only pulls. App images use <code>ghcr.io/you/codearena-api:${TAG}</code>, so a deploy is “set TAG, up”, and a rollback is “set the old TAG, up”.</li>
+  <li><strong>Pin everything else.</strong> <code>postgres:16.4-alpine</code>, not <code>16-alpine</code>, and never <code>latest</code>. Upgrades become decisions instead of surprises.</li>
+  <li><strong>Secrets from the environment, loudly.</strong> <code>${POSTGRES_PASSWORD:?set it in .env.prod}</code> takes the value from <code>.env.prod</code> on the server, and if it’s missing, Compose stops with your message instead of starting with an empty password (<a href="https://docs.docker.com/reference/compose-file/interpolation/">interpolation</a>). Commit a <code>.env.prod.example</code> listing every variable, with no values.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Who can reach what</h2>
+<ul>
+  <li><strong>One door.</strong> Only the proxy publishes ports, 80 and 443. Containers reach each other by service name on the Compose network: the API connects to <code>postgres:5432</code> without anything being published.</li>
+  <li><strong>Two networks.</strong> An <code>edge</code> network for proxy, web and API; an <code>internal</code> one for the API, worker, Postgres and Redis, declared <code>internal: true</code>, which isolates it from the outside world (<a href="https://docs.docker.com/reference/compose-file/networks/">networks</a>). The proxy has no route to the database at all.</li>
+  <li><strong>The socket in one place.</strong> Access to <code>/var/run/docker.sock</code> is root on the host: it can start a privileged container that mounts <code>/</code>. OWASP’s first Docker rule is not to expose it, even to containers (<a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html">Docker Security Cheat Sheet</a>). The worker needs it to start runners. Nothing else gets it.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Running for months</h2>
+<ul>
+  <li><strong>Restart policies.</strong> <code>unless-stopped</code> brings services back after a crash or a reboot, but respects a manual stop.</li>
+  <li><strong>Start order that means something.</strong> <code>depends_on: [postgres]</code> waits only for the container to <em>start</em>. With a health check on Postgres and <code>condition: service_healthy</code>, the API waits until it answers. A one-shot <code>migrate</code> service, with <code>condition: service_completed_successfully</code>, makes the API start only on a schema that matches its code (<a href="https://docs.docker.com/reference/compose-file/services/">services: depends_on</a>). <code>migrate</code> itself never restarts: a failed migration should stay failed, and visible.</li>
+  <li><strong>Disks fill.</strong> The json-file log driver’s <code>max-size</code> defaults to unlimited (<a href="https://docs.docker.com/engine/logging/drivers/json-file/">json-file</a>). Set <code>max-size</code> and <code>max-file</code> on every service; an <code>x-logging</code> extension field with a YAML anchor writes it once (<a href="https://docs.docker.com/reference/compose-file/extension/">extensions</a>).</li>
+  <li><strong>Blast radius.</strong> A memory limit on the worker means a leak kills the worker, not the VM. Postgres’s data lives in a named volume, which outlives every container.</li>
+</ul>
+
+<p><strong>Before you write it, review some lines:</strong></p>
+<!-- drill:compose -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build <code>docker-compose.prod.yml</code></h2>
+<div class="spec">
+  <p>The 14 rules are in the lab’s <code>README.md</code>. The checker finds the variables your file uses, runs <code>docker compose config</code> with dummy values (and again without <code>TAG</code> and the password, which must fail), and checks the result. No image is pulled.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Services and images</h3>
+    <label><input type="checkbox" data-key="lesson-0022-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0022-compose-in-production
+cat README.md docker-compose.dev.yml
+bash check.sh  <span class="c"># once you have a first docker-compose.prod.yml</span></pre>
+  <p>Start with the seven services, their images and the required variables. Then rules 1 to 4 should be green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Reach</h3>
+    <label><input type="checkbox" data-key="lesson-0022-step-2"> done</label>
+  </div>
+  <p>Ports, the socket, the two networks.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Months of uptime</h3>
+    <label><input type="checkbox" data-key="lesson-0022-step-3"> done</label>
+  </div>
+  <p>Restart policies, health checks, conditions, the volume, logging through an anchor, the memory limit, and <code>.env.prod.example</code>. All 14 cases should pass.</p>
+  <details>
+    <summary>Hint: anchors and merge keys</summary>
+    <p><code>x-logging: &amp;logging { driver: json-file, options: { max-size: "10m", max-file: "3" } }</code> at the top, then <code>logging: *logging</code> in each service. A second anchor, <code>x-app: &amp;app { restart: unless-stopped, logging: *logging }</code>, merged with <code>&lt;&lt;: *app</code>, saves two lines per service.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: bring the data tier up for real</h3>
+    <label><input type="checkbox" data-key="lesson-0022-step-4"> done</label>
+  </div>
+  <p>With a throwaway <code>.env.prod</code>, run <code>docker compose -f docker-compose.prod.yml up -d postgres redis</code> and watch <code>docker compose ps</code> go from “starting” to “healthy”. Then try <code>nc -z localhost 5432</code>: nothing answers, because nothing is published. Tear it down with <code>down -v</code>.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Keep both files.</strong> <code>docker-compose.yml</code> stays the comfortable dev file; <code>docker-compose.prod.yml</code> is what the VM runs. Different jobs, different rules.</li>
+  <li><strong>The worker’s runner containers</strong> are started by the host’s daemon, through the socket, with lesson 8’s hardened flags. They aren’t on any Compose network.</li>
+  <li><strong>Today’s done-when</strong> is <code>curl http://&lt;vm-ip&gt;/health</code> answering from the VM, with <code>prisma migrate deploy</code> having run through <code>migrate</code>.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Go through CodeArena’s <code>docker-compose.yml</code> line by line and write what changes in the production file, and why, in a few words each. In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your review from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.docker.com/reference/compose-file/services/">Compose file reference: services</a></strong>, the specification for every key you used: <code>depends_on</code> conditions, <code>healthcheck</code>, <code>restart</code>, <code>logging</code>. Then the <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html">OWASP Docker Security Cheat Sheet</a>, rules 1 to 5, as a second reviewer.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>internal: true</code> doesn’t break the worker, how to rotate a secret, when Compose stops being enough, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0022</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

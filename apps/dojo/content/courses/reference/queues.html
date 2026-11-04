@@ -1,0 +1,28 @@
+<p class="kicker">Reference · the backend track</p>
+<h1>Queues and idempotency, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0013-queue-from-scratch">13</a> and <a href="/courses/lessons/0014-idempotency">14</a>.</p>
+
+<h2>The submission pipeline</h2>
+<pre>POST /submissions → validate → INSERT row (PENDING)
+                  → enqueue { id } (jobId = id) → 202 { id }
+worker: take job → load row → claim → judge → write verdict → ack
+GET /submissions/:id → the row (owner only; others get 404)</pre>
+
+<h2>A reliable queue on Redis</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Step</th><th>Command</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>enqueue</td><td><code>SADD q:ids id</code> then <code>LPUSH q:waiting job</code></td><td>refuse duplicate ids; newest on the left</td></tr>
+    <tr><td>take</td><td><code>LMOVE q:waiting q:active RIGHT LEFT</code></td><td>atomic: one worker per job, and it stays visible</td></tr>
+    <tr><td>ack</td><td><code>LREM q:active 1 job</code></td><td>done: nothing left to redeliver</td></tr>
+    <tr><td>fail</td><td><code>LREM</code>, then back to <code>waiting</code> (attempts + 1) or to <code>dead</code></td><td>retry infrastructure errors only</td></tr>
+    <tr><td>recover</td><td>move <code>active</code> back to <code>waiting</code></td><td>a crash redelivers: at-least-once</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>202, not 201:</strong> accepted, not finished. <strong>Row first, then the job.</strong> <strong>The id, never the code.</strong></li>
+  <li><strong>BullMQ</strong> does all of this, plus locks with renewal (a worker that stops renewing is "stalled" and its job redelivered), backoff, delays, priorities, events. <code>jobId</code> = submission id dedupes enqueues.</li>
+  <li>Exactly-once delivery doesn't exist across crashes: <strong>at-least-once delivery + idempotent processing</strong>.</li>
+</ul>

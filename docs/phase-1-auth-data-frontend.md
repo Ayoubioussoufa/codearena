@@ -269,6 +269,11 @@ default (`connection_limit`, default = `num_cpus * 2 + 1`). Two consequences tha
 > default isolation level is, one anomaly it permits, why `UPDATE … SET bal = bal + 10` is safer than
 > read-then-write, and what a `40001` error means.
 
+
+```check
+transactions
+```
+
 ## A.3 Indexes — from phone book to B-tree
 
 ### The problem, measured
@@ -469,6 +474,11 @@ the typed client. You review the generated SQL like any code.
 
 ---
 
+
+```check
+queries
+```
+
 <a name="part-b"></a>
 # Part B — Authentication, gradually
 
@@ -531,6 +541,11 @@ Everything fits in one string in one column. Verify with `bcrypt.compare(attempt
 
 ```exercise
 timing-attack
+```
+
+
+```check
+passwords
 ```
 
 ## B.2 The stateless problem: sessions vs tokens
@@ -627,6 +642,11 @@ Details that are actually the interview answers:
 rotation-order
 ```
 
+
+```check
+tokens
+```
+
 ## B.4 Where the client stores tokens — XSS vs CSRF
 
 Two browser attack classes decide this choice; understand both before the storage debate makes sense.
@@ -716,6 +736,11 @@ controller `@Roles("admin")` and loosen one route.
 
 ---
 
+
+```check
+storage
+```
+
 <a name="part-c"></a>
 # Part C — NestJS patterns for this phase
 
@@ -779,6 +804,11 @@ touches the raw request. Each piece is independently testable; that's the pipeli
 earning its keep.
 
 ---
+
+
+```check
+validation
+```
 
 <a name="part-d"></a>
 # Part D — React server state: TanStack Query
@@ -899,6 +929,11 @@ plus a small buffer, absolutely positioned inside one tall spacer div, swapping 
 scroll. 10,000-row list, ~30 mounted nodes, 60fps. Use it for any list you can't bound.
 
 ---
+
+
+```check
+serverstate
+```
 
 <a name="worked"></a>
 # Part E — One complete schema, end to end

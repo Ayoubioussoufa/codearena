@@ -1,0 +1,41 @@
+<p class="kicker">Reference · the backend track</p>
+<h1>NestJS, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0011-di-from-scratch">11</a> and <a href="/courses/lessons/0012-request-pipeline">12</a>. What Nest does for you, said as what you built by hand.</p>
+
+<h2>Dependency injection</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Your container</th><th>NestJS</th></tr></thead>
+  <tbody>
+    <tr><td><code>register(Cls, { useClass: Cls, deps: [...] })</code></td><td><code>@Injectable()</code> + listing it in a module's <code>providers</code>; deps come from constructor types (<code>emitDecoratorMetadata</code>)</td></tr>
+    <tr><td><code>register(TOKEN, { useClass: Adapter })</code></td><td><code>{ provide: TOKEN, useClass: Adapter }</code></td></tr>
+    <tr><td><code>{ useValue }</code>, <code>{ useFactory, inject }</code></td><td>the same names, in custom providers</td></tr>
+    <tr><td>a Symbol token for a port</td><td><code>@Inject(CODE_RUNNER) private runner: CodeRunner</code> (interfaces don't exist at runtime)</td></tr>
+    <tr><td>singleton / transient</td><td><code>Scope.DEFAULT</code> (singleton) · <code>Scope.REQUEST</code> · <code>Scope.TRANSIENT</code></td></tr>
+    <tr><td>the cycle error</td><td>"Nest can't resolve dependencies…"; <code>forwardRef()</code> exists, a redesign is better</td></tr>
+  </tbody>
+</table>
+</div>
+<ul>
+  <li><strong>Modules</strong> are containers with borders: a provider is visible inside its module, and to others only if the module <code>exports</code> it and they <code>import</code> the module.</li>
+  <li><strong>Never</strong> keep request data in a singleton's fields: every request shares it.</li>
+  <li><code>app.get(Token)</code> (or <code>moduleRef.get</code>) is <code>resolve()</code>; <code>Test.createTestingModule(...).overrideProvider(TOKEN).useValue(fake)</code> is the adapter swap for tests.</li>
+</ul>
+
+<h2>The request pipeline</h2>
+<pre>request → middleware → guards → interceptors (before) → pipes → handler
+        ← interceptors (after, reversed) ← result
+any error after middleware → exception filters
+                             (route → controller → global) → response</pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Stage</th><th>Its question</th><th>In CodeArena</th></tr></thead>
+  <tbody>
+    <tr><td>middleware</td><td>raw request plumbing, before routing</td><td><code>cookie-parser</code>, request ids</td></tr>
+    <tr><td>guard</td><td>may this request go on? (<code>false</code> → 403)</td><td>the auth guard, roles, the throttler</td></tr>
+    <tr><td>interceptor</td><td>wrap the handler: time it, map its result</td><td>logging, response shaping</td></tr>
+    <tr><td>pipe</td><td>shape and validate the arguments (→ 400)</td><td><code>ValidationPipe</code>, parsing ids</td></tr>
+    <tr><td>exception filter</td><td>turn an exception into a response</td><td>the all-exceptions filter (I-3); never leak internal messages</td></tr>
+  </tbody>
+</table>
+</div>

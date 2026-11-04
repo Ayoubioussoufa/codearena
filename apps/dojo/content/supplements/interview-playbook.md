@@ -48,7 +48,7 @@ Principles**. The ones that generate the most questions:
 - **Ownership** — "Tell me about a time you took on something outside your responsibility."
 - **Dive Deep** — "Walk me through the hardest bug you've debugged."
 - **Bias for Action** / **Deliver Results** — deadlines, trade-offs, shipping.
-- **Earn Trust** / **Disagree and Commit** — conflict, feedback, being wrong.
+- **Earn Trust** / **Have Backbone; Disagree and Commit** — conflict, feedback, being wrong.
 - **Invent and Simplify** — a time you replaced complexity with something simpler.
 - **Learn and Be Curious** — CodeArena *is* this answer.
 

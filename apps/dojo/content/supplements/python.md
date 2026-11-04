@@ -325,12 +325,12 @@ async def main():
     results = await asyncio.gather(fetch(a), fetch(b))  # overlap them
 ```
 
-(CPython 3.13 ships an *experimental* no-GIL build, but the above is still the practical reality.)
+(CPython 3.13 added an experimental free-threaded, no-GIL build; 3.14 made it officially supported ([PEP 779](https://docs.python.org/3/whatsnew/3.14.html)), with a 5–10% single-thread cost. It's a separate build you opt into: the default `python` still has the GIL, so the advice above is still the practical reality.)
 
 ## The gotchas that catch everyone
 
 - **Mutable default arguments.** `def f(x, acc=[])` — the `[]` is created once and shared, so it accumulates across calls. Use `acc=None` + `if acc is None: acc = []`.
-- **`is` vs `==`.** `==` compares *values*; `is` compares *identity*. Use `is` only for `None`/`True`/`False` (`if x is None`). `1000 is 1000` can be `False` (only small ints -5..256 are cached).
+- **`is` vs `==`.** `==` compares *values*; `is` compares *identity*. Use `is` only for `None`/`True`/`False` (`if x is None`). Two equal ints above 256 can be different objects: `a = 1000; b = int("1000"); a is b` is `False`, because CPython caches only -5..256. (A literal `1000 is 1000` prints `True` with a `SyntaxWarning`: the interpreter itself telling you to use `==`.)
 - **Late-binding closures.** `[lambda: i for i in range(3)]` all return `2` — closures capture the *variable*, not its value. Fix with a default: `lambda i=i: i`.
 - **Shallow vs deep copy.** `b = a` binds the *same* object. `a.copy()`/`a[:]` copies the outer container but shares nested objects; only `copy.deepcopy(a)` clones all the way down.
 - **Mutating while iterating.** Don't add/remove from a list (or dict) you're looping over — iterate a copy (`for x in items[:]`) or build a new list.

@@ -38,7 +38,6 @@ The anti-pattern is the **ice-cream cone**: mostly E2E, few units. Symptoms are 
 which-layer
 ```
 
-
 ## Vitest: the anatomy of a test
 
 Every test in every framework is the same triple — a **named case**, an **actual** value, and a **matcher** stating the **expected**:
@@ -100,7 +99,6 @@ async-await
 test-the-negative
 ```
 
-
 ## React Testing Library: test what the user sees
 
 RTL's guiding principle: **the more your tests resemble how the software is used, the more confidence they give.** So you render the component and interact with it the way a person (or a screen reader) would — not by poking at internal state.
@@ -158,7 +156,6 @@ Skip the `await` and your assertion runs against the pre-render DOM. Use regex n
 ```exercise
 rtl-query
 ```
-
 
 ## Test doubles: spy, stub, mock
 
@@ -237,7 +234,6 @@ A test that passes and fails without a code change is **flaky**, and flakiness a
 Bias toward **behaviour** (observable output for a given input) over **implementation** (private state, which helpers got called, giant HTML snapshots). Behaviour tests survive refactors and still fail when the code is genuinely wrong; implementation tests break on every harmless change and don't verify what the user experiences.
 
 Concretely, spend your tests on: the **happy path**, the **edge cases** (empty, zero, boundary, max), and the **error paths** (what happens when the fetch rejects, the input is invalid). One clear **Act** per test, with assertions focused on that single behaviour (Arrange–Act–Assert) — not a script that acts five times and asserts ten things and fails ambiguously.
-
 ## Mastery checklist — you can…
 
 - Explain the pyramid and diagnose a top-heavy suite.

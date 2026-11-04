@@ -93,8 +93,12 @@ several, then combine them. Here are the ones that matter, each an application o
 If a problem is too easy you learn nothing; too hard and you bounce off, frustrated. Learning
 happens in the **zone of proximal development** — challenging but achievable. Using Phase 3's IRT
 model, you can compute `P(solve)` for this user on this problem: `sigmoid(a*(θ - b))`. The sweet
-spot is **not** the hardest solvable problem — research and intuition put peak learning around
-`P(solve) ≈ 0.7` (a 70% chance: mostly winnable, but you have to stretch).
+spot is **not** the hardest solvable problem. *How* easy, exactly, is debated: one well-known study
+derives about 85% success as optimal for gradient-descent learners on simple two-choice tasks, and
+its authors say extending that to humans is less certain
+([Wilson et al., 2019, "The Eighty Five Percent Rule"](https://pmc.ncbi.nlm.nih.gov/articles/PMC6831579)).
+This guide uses `P(solve) ≈ 0.7` as a starting point (mostly winnable, but you have to stretch).
+Make the peak a parameter, and let Part H's measurements move it.
 
 So the difficulty-fit feature is highest when `P(solve)` is near 0.7 and falls off on both sides:
 

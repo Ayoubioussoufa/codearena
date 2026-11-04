@@ -129,7 +129,6 @@ it's all about users. A file called `Helpers` with `formatDate`, `parseCSV`, `se
 2. **What can I change without breaking everything else?**
 
 Hold those two in mind. The rest of this guide is machinery for answering them.
-
 ---
 
 # Part 2 — The one rule
@@ -144,8 +143,10 @@ Not by *what it does* — by **how often it changes for reasons outside your con
 | **Application** — use cases | a feature changes | sometimes | your product |
 | **Adapters** — Prisma, Stripe, email | a vendor or protocol changes | often | **someone else** |
 
-That last column is the point. Prisma 7 removed `datasourceUrl` and you had to change code. **You
-didn't ask for that.** A vendor decided, and your code had to move.
+That last column is the point. Prisma 7 changed how you construct the client: it now requires a
+driver adapter for every database, so v6 code that passed `datasourceUrl` had to change
+([Prisma 7 upgrade guide](https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-to-prisma-7)).
+**You didn't ask for that.** A vendor decided, and your code had to move.
 
 Now the rule:
 
@@ -203,7 +204,6 @@ know `P2002` means "duplicate". Six months of that discipline is the difference 
 you can reason about and one you can only poke at.
 
 The swap is a bonus. The vocabulary boundary is the point.
-
 ---
 
 # Part 3 — The five layers, in depth
@@ -431,7 +431,6 @@ model to suit one consumer).
 http-thin
 ```
 
-
 ---
 
 # Part 4 — Domain modelling: the vocabulary you'll be asked about
@@ -504,7 +503,6 @@ translation step, and translation steps are where bugs breed. If a domain expert
 type names, your model has drifted from the thing it models.
 
 **Cheap test:** show `domain/` to someone non-technical. They should recognise most of the nouns.
-
 ---
 
 # Part 5 — Ports and adapters, mechanically
@@ -637,7 +635,6 @@ decays.
 audit-command
 ```
 
-
 ---
 
 # Part 7 — Errors deserve their own architecture
@@ -714,7 +711,6 @@ translate-at-boundary
 ```exercise
 silent-catch
 ```
-
 
 ---
 
@@ -842,7 +838,6 @@ flowchart LR
 ```
 
 Three doors, one room. That's what "use case" means.
-
 ---
 
 # Part 10 — Sizing and chunking
@@ -1038,7 +1033,6 @@ judgement. Most professional codebases live happily at stage 3.
 
 > The interesting question in an interview is never "do you know clean architecture" — it's **"how
 > do you know when you need it?"** Stages and triggers are the answer.
-
 ---
 
 # Part 14 — Testing, layer by layer
@@ -1152,7 +1146,6 @@ catch (e) { console.log(e); }
 ```
 The bug is now invisible and permanent.
 **Fix:** catch only what you can handle. Rethrow the rest.
-
 ---
 
 # Part 16 — The same skeleton elsewhere

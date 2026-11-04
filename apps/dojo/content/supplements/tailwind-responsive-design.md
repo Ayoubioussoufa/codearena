@@ -370,6 +370,16 @@ strategy"**: there's a single CSS class named `dark` sitting on the top-level `<
 that class is present, every `dark:` utility on the page switches on; remove it and they all switch
 off. One class, whole-page flip.
 
+That's not Tailwind v4's default: out of the box, `dark:` follows the operating system's setting (the
+`prefers-color-scheme` media query). The class strategy is one line of CSS, right after the import,
+and it's line 11 of CodeArena's `apps/web/src/app/globals.css`
+([Tailwind docs: dark mode](https://tailwindcss.com/docs/dark-mode)):
+
+```css
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
 How you write it — **style both colours right next to each other, as you go:**
 
 ```html

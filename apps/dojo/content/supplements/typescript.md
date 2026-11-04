@@ -90,7 +90,6 @@ fighting the compiler about "types that are the same but named differently."
 structural-typing
 ```
 
-
 ---
 
 ## 3. Unions and narrowing
@@ -147,7 +146,6 @@ type-guard
 ```exercise
 unknown-not-any
 ```
-
 
 ---
 
@@ -208,7 +206,6 @@ doesn't exist.
 ```exercise
 generic-function
 ```
-
 
 ---
 
@@ -298,20 +295,25 @@ type Key = `greeting.${Lang}`; // "greeting.en" | "greeting.fr"
 
 **The bug it prevents.** Hand-writing and re-writing derived types every time a source type changes — mapped and
 conditional types recompute them for you.
-
 ---
 
 ## 9. `satisfies` and function overloads
 
-**`satisfies`** validates a value against a type *without widening it* — you keep the precise inferred type:
+**`satisfies`** validates a value against a type *without replacing* its inferred type, so you keep its exact
+shape:
 
 ```ts
 const routes = { home: "/", profile: "/me" } satisfies Record<string, string>;
-// validated as string→string, but routes.home is still the literal "/"
+// validated as string→string, and the keys are kept: routes.home works, routes.homee is a compile error
 ```
 
-Contrast: a plain annotation (`const routes: Record<string, string> = …`) validates but *widens* (you lose the
-literal keys/values); no annotation keeps the type but skips validation. `satisfies` gives you both.
+Contrast: a plain annotation (`const routes: Record<string, string> = …`) validates but *widens* the object to
+"any string key", so TypeScript forgets which keys exist and `routes.homee` type-checks (then is `undefined` at
+runtime); no annotation keeps the keys but skips validation. `satisfies` gives you both.
+
+One thing it does **not** do by itself: keep literal *values*. Here `routes.home` is `string`, not `"/"`, because
+the constraint's `string` is what the property is checked against (self-quiz 5 shows why, and when it differs).
+For literal values too, write `as const satisfies Record<string, string>`.
 
 **Overloads** let one function advertise several precise signatures over a broader implementation:
 
@@ -343,7 +345,6 @@ definite-assignment
 ```exercise
 exact-optional
 ```
-
 
 ---
 

@@ -1057,13 +1057,23 @@ Compose runs *other people's* images (Postgres, Redis). To run **your** app you 
 **Dockerfile**: an ordered recipe, where **every instruction becomes a cached layer**.
 
 ```dockerfile
-FROM node:22-alpine          # the base image to start from (alpine = small)
-WORKDIR /app                 # cd, and create it if needed
-COPY package.json ./         # copy dependency manifests FIRST
-RUN npm install --omit=dev   # install — this is the slow step
-COPY . .                     # only now bring in the source
-CMD ["node", "index.js"]     # the default command when the container starts
+# the base image to start from (alpine = small)
+FROM node:22-alpine
+# cd, and create it if needed
+WORKDIR /app
+# copy dependency manifests FIRST
+COPY package.json ./
+# install: this is the slow step
+RUN npm install --omit=dev
+# only now bring in the source
+COPY . .
+# the default command when the container starts
+CMD ["node", "index.js"]
 ```
+
+(Comments go on their own lines: in a Dockerfile, a `#` anywhere but the start of a line "is treated as
+an argument" — [Dockerfile reference](https://docs.docker.com/reference/dockerfile/) — so
+`WORKDIR /app  # cd` would break.)
 
 **The rule: order instructions from least- to most-frequently-changing.** Docker caches each layer
 and reuses it *only if that instruction and everything before it are unchanged*. One layer misses →
@@ -1108,20 +1118,26 @@ need none of them. A **multi-stage** build compiles in one image and copies only
 clean second one:
 
 ```dockerfile
-FROM node:22-alpine AS build           # ── stage 1: has the whole toolchain
+# ── stage 1: has the whole toolchain
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json tsconfig.json ./
-RUN npm install                        # ALL deps, including dev
+# ALL deps, including dev
+RUN npm install
 COPY src ./src
-RUN npm run build                      # → dist/
+# → dist/
+RUN npm run build
 
-FROM node:22-alpine AS runtime         # ── stage 2: a fresh, empty image
+# ── stage 2: a fresh, empty image
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json ./
 RUN npm install --omit=dev && npm cache clean --force
-COPY --from=build /app/dist ./dist     # ← copy ONLY the compiled output
-USER node                              # don't run as root
+# copy ONLY the compiled output
+COPY --from=build /app/dist ./dist
+# don't run as root
+USER node
 CMD ["node", "dist/index.js"]
 ```
 

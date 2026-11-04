@@ -1,0 +1,88 @@
+<!--
+  Lesson 0032 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">C reports failure with <code>-1</code> and <code>errno</code>, which you can forget to check. TypeScript throws, which nothing in a function’s type tells you about. Rust puts the failure in the return type: a function that can fail returns a <code>Result</code>, and the caller has to decide what to do with the error. Today you parse a problem’s limits file into types, with every failure a value that names its line and its reason, and no <code>unwrap</code> anywhere.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>A judge reads files written by people: problem configs, test cases, submissions. Each of those inputs will be wrong one day. The difference between “line 2: memory_mb is not a number: "256MB"” and a crash with a stack trace is the difference between a problem setter fixing it in ten seconds and opening an issue.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. <code>Result</code>, and panics for bugs</h2>
+<p><code>Result&lt;T, E&gt;</code> is an ordinary enum, <code>Ok(T)</code> or <code>Err(E)</code>, so everything from lesson 31 applies: you <code>match</code> it, and the compiler won’t let you use the value without handling the error (<a href="https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html">The Book, §9.2</a>).</p>
+<p>Rust splits failures in two. <strong>Recoverable</strong> ones (a missing file, bad input, a refused connection) are <code>Result</code>s. <strong>Bugs</strong> (an index past the end, a broken invariant) <strong>panic</strong>: the thread stops with a message. <code>unwrap()</code> converts the first kind into the second, which is right in tests and wrong for anything a user can cause (<a href="https://doc.rust-lang.org/book/ch09-03-to-panic-or-not-to-panic.html">§9.3</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. <code>?</code>, the early return</h2>
+<pre>fn load(path: &amp;Path) -> Result&lt;Limits, LoadError&gt; {
+    let text = std::fs::read_to_string(path)?;   // Err(io::Error)?  return it
+    Ok(parse(&amp;text)?)                            // Err(ConfigError)? return it
+}</pre>
+<p>On <code>Ok(v)</code>, <code>expr?</code> is <code>v</code>. On <code>Err(e)</code>, it returns <code>Err(From::from(e))</code> from the function. That <code>From</code> is how one function can return two kinds of error: <code>LoadError</code> has a variant for each, and a <code>From</code> impl per variant lets <code>?</code> convert them. <code>?</code> also works on <code>Option</code>, in functions returning <code>Option</code>.</p>
+<p>Three tools keep the code flat: <code>ok_or(err)</code> turns an <code>Option</code> into a <code>Result</code>; <code>map_err(|e| …)</code> changes the error, for instance to add the line number; <code>split_once('=')</code> returns <code>Option&lt;(&amp;str, &amp;str)&gt;</code>. The <code>|e| …</code> is a closure, an inline function; lesson 35 covers them properly.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Errors people can read: <code>Display</code></h2>
+<p><code>{:?}</code> prints the <code>Debug</code> form for developers; <code>{}</code> prints the <code>Display</code> form, for users. You write <code>Display</code> yourself: an <code>impl fmt::Display for ConfigError</code> with one <code>fmt</code> method that <code>match</code>es on the variant and calls <code>write!(f, "…")</code>. That’s your first trait implementation; lesson 33 explains traits. Implementing <code>std::error::Error</code> too makes the type usable anywhere Rust expects an error, such as <code>Box&lt;dyn Error&gt;</code>.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-errors -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the parser</h2>
+<div class="spec">
+  <p>The format is in <code>src/lib.start.rs</code>: one <code>key = value</code> per line, comments and blank lines ignored, three required numbers and an optional checker (<code>tokens</code>, <code>exact</code>, <code>float:1e-6</code>). The error enum is given; each variant carries the line. You write <code>parse</code>, <code>load</code>, two <code>Display</code> impls and two <code>From</code> impls. The checker also refuses <code>unwrap()</code>, <code>expect()</code> and <code>panic!</code>.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3><code>parse</code>, one rule at a time</h3>
+    <label><input type="checkbox" data-key="lesson-0032-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0032-errors-as-values
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # 12 red, and the no-unwrap rule already green</pre>
+  <p>Keep each required value in an <code>Option</code> (<code>None</code> until seen, which also detects duplicates). <code>text.lines().enumerate()</code> numbers the lines from 0. At the end, <code>time_ms.ok_or(ConfigError::Missing { key: "time_ms" })?</code> turns each missing value into its error. A small helper, <code>fn number(line, key, value) -> Result&lt;u64, ConfigError&gt;</code>, keeps the <code>match</code> on keys short.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3><code>Display</code>, <code>From</code>, <code>load</code></h3>
+    <label><input type="checkbox" data-key="lesson-0032-step-2"> done</label>
+  </div>
+  <p>The test <code>messages_speak_to_the_user</code> has the exact strings. <code>{key:?}</code> inside <code>write!</code> prints a string with its quotes. Once both <code>From</code> impls exist, <code>load</code> is two lines.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>How does CodeArena’s API report a bad environment variable or a malformed request body today? In section 7’s box, compare it with this lab: where is the failure visible in a type, and where is it only visible at runtime?</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: <code>thiserror</code></h3>
+    <label><input type="checkbox" data-key="lesson-0032-step-3"> done</label>
+  </div>
+  <p>Real projects rarely write <code>Display</code> and <code>From</code> by hand. In a copy of the lab, <code>cargo add thiserror</code>, then <code>#[derive(Debug, thiserror::Error)]</code> with <code>#[error("line {line}: expected key = value")]</code> on each variant and <code>#[from]</code> on <code>LoadError</code>’s fields (<a href="https://docs.rs/thiserror">docs.rs/thiserror</a>). Count the lines you deleted. Its docs point to <code>anyhow</code> for application code; write in section 7 when you’d pick each.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your comparison from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch09-00-error-handling.html">The Book, chapter 9: Error Handling</a></strong>, all three sections, ending with “To panic! or Not to panic!”, the clearest statement of when each is right. Then <a href="https://doc.rust-lang.org/std/result/">std::result</a>’s module docs for the combinators.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>parse</code> needs a type annotation, what <code>Box&lt;dyn Error&gt;</code> costs, how to keep the line number on every error without repeating it, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0032</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

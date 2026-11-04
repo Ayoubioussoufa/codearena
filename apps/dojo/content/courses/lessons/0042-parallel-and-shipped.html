@@ -1,0 +1,104 @@
+<!--
+  Lesson 0042 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">The last lesson of the track does three things a real team would. It makes <code>fasttok</code> use every core with <strong>rayon</strong>, behind the same Python call. It holds the code to the bar a Rust CI enforces: <code>cargo fmt</code> and <code>cargo clippy</code> with warnings as errors. And it turns fifteen lessons into the two-minute story you’ll tell when an interviewer asks why you learned Rust.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Preprocessing a training corpus means tokenizing millions of documents, each one independent: the kind of work that scales with cores. And the story matters as much as the code. A specific claim backed by your own measurements (“about 25 times faster than pure Python, 5.5 times more on 12 cores”) beats “Rust is the future” every time.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. rayon: <code>iter</code> becomes <code>par_iter</code></h2>
+<pre>use rayon::prelude::*;
+fn encode_batch(&amp;self, py: Python&lt;'_&gt;, texts: Vec&lt;String&gt;) -> Vec&lt;Vec&lt;u32&gt;&gt; {
+    py.detach(|| texts.par_iter().map(|t| self.inner.encode(t)).collect())
+}</pre>
+<p>rayon is a data-parallelism library: <code>par_iter()</code> runs the same chain on a global pool of threads, sized by default to the number of logical CPUs (<code>RAYON_NUM_THREADS</code> overrides it), with idle threads stealing work from busy ones. <code>collect</code> keeps the original order, and it “guarantees data-race free executions” (<a href="https://docs.rs/rayon/latest/rayon/">rayon docs</a>): the closure gets <code>&amp;self</code>, so the borrow rules from lesson 38 still hold. Releasing the GIL first means the Python caller’s other threads keep running too.</p>
+<p>It helps only for independent pieces that are each big enough. BPE <em>training</em> is a chain, where each merge needs the counts the previous one left, so the steps can’t run side by side. Measured speedups are rarely the core count: uneven pieces, shared memory bandwidth and the sequential parts all cost time (Amdahl’s law).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. The bar a Rust team sets</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Command</th><th>Catches</th></tr></thead>
+  <tbody>
+    <tr><td><code>cargo fmt --check</code></td><td>any file not in rustfmt’s standard style; <code>cargo fmt</code> fixes it</td></tr>
+    <tr><td><code>cargo clippy -- -D warnings</code></td><td>hundreds of lints (<code>&amp;String</code> parameters, needless clones), each a failing error</td></tr>
+    <tr><td><code>cargo test</code></td><td>broken behaviour</td></tr>
+    <tr><td><code>cargo audit</code></td><td>dependencies with RustSec advisories (install <code>cargo-audit</code> first)</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Formatting and lint rules settled by a tool are arguments code review never has to have (<a href="https://doc.rust-lang.org/clippy/">the Clippy book</a>). The checker runs fmt and clippy before your tests, as CI would.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-ship -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build <code>fasttok</code> 0.2</h2>
+<div class="spec">
+  <p>Start from your lesson-41 module. Add <code>encode_batch</code>, then make fmt and clippy pass. The Python tests check that a batch gives exactly what one-by-one encoding gives, in order, and, on a machine with two or more cores, that it runs at least 1.3 times faster. The checker prints the speedup it measured.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Parallel batches</h3>
+    <label><input type="checkbox" data-key="lesson-0042-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0042-parallel-and-shipped
+cp ../0041-pyo3-extension/src/bpe.rs ../0041-pyo3-extension/src/lib.rs src/
+bash check.sh        # rayon is already in Cargo.toml</pre>
+  <p>Add <code>use rayon::prelude::*;</code> inside the module and the method from section 1. Then run the checker and read its fmt and clippy lines first.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Formatted and lint-free</h3>
+    <label><input type="checkbox" data-key="lesson-0042-step-2"> done</label>
+  </div>
+  <p><code>cargo fmt</code> fixes formatting by itself. Fix each clippy lint by hand, reading its explanation link: it’s one of the fastest ways to learn idiomatic Rust. (My own reference solution failed the fmt check the first time.)</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Your Rust story</h2>
+<p>Use the STAR shape from <a href="/courses/lessons/0026-star-stories">lesson 26</a>, in about two minutes:</p>
+<ul>
+  <li><strong>Situation:</strong> a judge and a tokenizer, both hot loops over bytes; you knew C from 42 and TypeScript from CodeArena.</li>
+  <li><strong>Task:</strong> learn Rust by rebuilding real parts: the runner, the comparator, the judge, then a tokenizer for Python.</li>
+  <li><strong>Action:</strong> one decision you made and why (a borrow instead of a clone, a channel instead of a lock, <code>spawn_blocking</code>, <code>py.detach</code>).</li>
+  <li><strong>Result:</strong> your numbers from lessons 41 and 42, and one bug class the compiler removed, honestly stated next to one it didn’t (deadlocks, a wrong worker count).</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Write the story in section 6’s box, then say it out loud with a timer. Cut whatever pushes it past two minutes. Keep the numbers.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: CI for the crate</h3>
+    <label><input type="checkbox" data-key="lesson-0042-step-3"> done</label>
+  </div>
+  <p>Write a GitHub Actions workflow that runs fmt, clippy and the Rust tests on every push, using lesson 24’s structure. Compare it with what <code>maturin generate-ci github</code> writes for building wheels: which jobs would you keep for a real package?</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your story from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.rs/rayon/latest/rayon/">rayon’s documentation</a></strong>, its front page and the <code>ParallelIterator</code> trait, then <a href="https://doc.rust-lang.org/clippy/">the Clippy book</a>’s “Usage” chapter. For where to go next, <a href="https://doc.rust-lang.org/book/">The Book</a>’s chapters 17 to 20 cover what this track skipped: async in depth, patterns, and advanced traits.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>par_iter</code> needs the closure to be <code>Sync</code>, what a clippy lint means, how to rehearse the story, what to learn after this track, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0042</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

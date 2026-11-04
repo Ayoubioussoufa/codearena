@@ -1,0 +1,105 @@
+<!--
+  Lesson 0033 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Lesson 9’s judge compared tokens, and its challenge mentioned problems that need another rule: a float answer within a tolerance, any valid path in a graph. In CodeArena you’d write an interface and a few classes. In Rust, the shared behaviour is a <strong>trait</strong>, each checker is a type that implements it, and you choose how calls are resolved: at compile time with <strong>generics</strong>, or at runtime with <strong>trait objects</strong>. Today you build both, and learn which to pick.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Traits are how Rust does everything you used interfaces and dependency injection for in NestJS, and how the standard library works: <code>Display</code>, <code>Iterator</code>, <code>From</code>, <code>Send</code>. “Static or dynamic dispatch?” is also a classic systems interview question, and after today you can answer it with numbers: one inlined call, or one pointer jump.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. A trait is a promise</h2>
+<pre>pub trait Checker {
+    fn check(&amp;self, expected: &amp;str, actual: &amp;str) -> bool;   // required
+    fn name(&amp;self) -> String;                                  // required
+    fn failures(&amp;self, cases: &amp;[(&amp;str, &amp;str)]) -> Vec&lt;usize&gt; {
+        // a default method: written once, in terms of check
+    }
+}
+impl Checker for Tokens {
+    fn check(&amp;self, expected: &amp;str, actual: &amp;str) -> bool { /* … */ }
+    fn name(&amp;self) -> String { "tokens".to_string() }
+}</pre>
+<p>A type implements a trait explicitly, with <code>impl Checker for Tokens</code>, like Java’s <code>implements</code> rather than TypeScript’s structural matching. There’s no inheritance of fields: data lives in structs, shared behaviour in traits (<a href="https://doc.rust-lang.org/book/ch10-02-traits.html">The Book, §10.2</a>). You already implemented two standard traits in lesson 32, <code>Display</code> and <code>From</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Generics: one copy per type</h2>
+<pre>pub fn count_passed&lt;C: Checker&gt;(checker: &amp;C, cases: &amp;[(&amp;str, &amp;str)]) -> usize</pre>
+<p><code>C: Checker</code> is a <strong>trait bound</strong>: any type, as long as it implements <code>Checker</code>. Inside, you may use only what the bound promises. The compiler then <strong>monomorphizes</strong>: it writes one copy of <code>count_passed</code> for each type you call it with, each calling its checker directly, so the optimizer can inline <code>check</code> into the loop (<a href="https://doc.rust-lang.org/book/ch10-01-syntax.html#performance-of-code-using-generics">§10.1, “Performance of Code Using Generics”</a>). Generic structs work the same way: <code>IgnoreCase&lt;C&gt;</code> wraps any checker, at no runtime cost.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Trait objects: one type for many</h2>
+<p>A problem’s config names its checker, so the type is only known at runtime, and a <code>Vec</code> of checkers would hold different types. Both need one type that stands for “some checker”: <code>Box&lt;dyn Checker&gt;</code>, a <strong>trait object</strong>. It’s two pointers, one to the value and one to a <strong>vtable</strong> (that type’s table of method addresses), and each call goes through the table: <strong>dynamic dispatch</strong>, as in C++ virtual calls (<a href="https://doc.rust-lang.org/book/ch18-02-trait-objects.html">§18.2</a>).</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>You need</th><th>Use</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td>the type known at compile time, speed</td><td>generics: <code>&lt;C: Checker&gt;</code> or <code>impl Checker</code></td><td>bigger binary</td></tr>
+    <tr><td>types chosen at runtime, an open set, mixed collections</td><td><code>Box&lt;dyn Checker&gt;</code>, <code>&amp;dyn Checker</code></td><td>a pointer jump per call, no inlining</td></tr>
+    <tr><td>a fixed set of kinds, each with its own data</td><td>an enum and <code>match</code> (lesson 31)</td><td>adding a kind means editing the enum</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Not every trait can be a <code>dyn</code>: a generic method, or one returning <code>Self</code>, needs the concrete type, which a trait object has forgotten. The compiler says “not dyn compatible” (E0038).</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-traits -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build the checkers</h2>
+<div class="spec">
+  <p><code>src/lib.start.rs</code> declares the trait, four types and their <code>impl</code> blocks with <code>todo!()</code> bodies: <code>Exact</code> (byte for byte), <code>Tokens</code> (lesson 9), <code>Float { eps }</code> (numbers within an absolute or relative tolerance, other tokens exact, the rule testlib’s float checkers use) and <code>IgnoreCase&lt;C&gt;</code>. Then the default method <code>failures</code>, the generic <code>count_passed</code>, and <code>checker_for</code>, which picks a checker from a config string.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Three checkers and a wrapper</h3>
+    <label><input type="checkbox" data-key="lesson-0033-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0033-traits-and-generics
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # 8 red</pre>
+  <p>For <code>Float</code>, walk both token iterators together as in lesson 30, and for each pair try <code>x.parse::&lt;f64&gt;()</code> on both: two <code>Ok</code>s compare by tolerance, anything else compares exactly. <code>IgnoreCase</code> lowercases both sides with <code>to_ascii_lowercase()</code> and asks <code>self.0</code>, the checker it wraps.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The default method, the generic, the factory</h3>
+    <label><input type="checkbox" data-key="lesson-0033-step-2"> done</label>
+  </div>
+  <p>Write <code>failures</code> inside the trait using <code>self.check</code>; then all four types have it. <code>checker_for</code> is a <code>match</code> on the name returning <code>Some(Box::new(…))</code>, with a last arm for <code>float:</code>: <code>strip_prefix</code> and <code>parse().ok()</code> both return <code>Option</code>s, so <code>?</code> keeps it to two lines.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Write CodeArena’s <code>CODE_RUNNER</code> port (lesson 11) as a Rust trait in section 7’s box: its method signature, a fake implementation for tests, and the Docker one. Would the worker hold it as a generic or as a <code>Box&lt;dyn CodeRunner&gt;</code>? Say why.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: the enum version</h3>
+    <label><input type="checkbox" data-key="lesson-0033-step-3"> done</label>
+  </div>
+  <p>Rewrite <code>checker_for</code> to return an <code>enum AnyChecker { Exact, Tokens, Float(f64), … }</code> that implements <code>Checker</code> with a <code>match</code>. No <code>Box</code>, no vtable. In section 7, write what you gained, what you lost (who can add a checker now?), and which you’d ship.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your trait from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/book/ch10-00-generics.html">The Book, chapter 10: Generic Types, Traits, and Lifetimes</a></strong>, sections 1 and 2 (section 3 is lesson 34), then <a href="https://doc.rust-lang.org/book/ch18-02-trait-objects.html">§18.2 on trait objects</a>. For the float rule, testlib’s <a href="https://github.com/MikeMirzayanov/testlib">checkers folder</a> is what Codeforces runs.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: what <code>&amp;self</code> means in a trait, why <code>impl Trait</code> can’t return two types, how a vtable is laid out, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0033</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

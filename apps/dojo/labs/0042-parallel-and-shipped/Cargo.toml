@@ -1,0 +1,12 @@
+[package]
+name = "fasttok"
+version = "0.2.0"
+edition = "2024"
+
+[lib]
+name = "fasttok"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.30"
+rayon = "1.12"

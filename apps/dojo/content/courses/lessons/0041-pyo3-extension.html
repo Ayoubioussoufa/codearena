@@ -1,0 +1,102 @@
+<!--
+  Lesson 0041 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Your tokenizer is fast, and the people who need it write Python. Today you close that gap the way Hugging Face, Polars and Pydantic do: you compile the Rust into a Python <strong>extension module</strong> with <strong>PyO3</strong>, build and install it with <strong>maturin</strong>, and call it with <code>import fasttok</code>. Then you measure it against a pure-Python version of the same algorithm, and prove it lets other Python threads run while it works.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This is the concrete, defensible meaning of “Rust in AI”: Python stays the language people use, and the hot loop underneath moves to Rust. Being able to say “I wrote the core in Rust, exposed it with PyO3, and measured the speedup” is a rare and specific line on a CV.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. How Python loads Rust</h2>
+<p>CPython can import <strong>extension modules</strong>: shared libraries (<code>.so</code> files on Linux) with a C interface and an init function. <code>crate-type = ["cdylib"]</code> asks Cargo for exactly that. <strong>PyO3</strong> generates the C interface from Rust attributes and converts values at the boundary: a Python <code>str</code> arrives as <code>&amp;str</code>, a <code>list[int]</code> as <code>Vec&lt;u32&gt;</code>, and a returned <code>Vec&lt;(u32, u32)&gt;</code> becomes a list of tuples (<a href="https://pyo3.rs/latest/conversions/tables.html">conversion tables</a>). <strong>maturin</strong> builds the library and installs it: <code>maturin develop</code> into the active virtualenv, or <code>maturin build --release</code> into a <strong>wheel</strong> anyone can <code>pip install</code> (<a href="https://www.maturin.rs/">maturin guide</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. A module in PyO3 0.30</h2>
+<pre>#[pyo3::pymodule]
+mod fasttok {                                  // the module Python imports
+    use pyo3::prelude::*;
+
+    #[pyclass]                                 // a Python class backed by a Rust struct
+    struct Tokenizer { inner: crate::bpe::Tokenizer }
+
+    #[pymethods]
+    impl Tokenizer {
+        #[staticmethod]
+        fn train(text: &amp;str, vocab_size: usize) -> Self { … }
+        fn decode(&amp;self, ids: Vec&lt;u32&gt;) -> PyResult&lt;String&gt; { … }   // Err → raises
+        #[getter]
+        fn merges(&amp;self) -> Vec&lt;(u32, u32)&gt; { … }                    // tok.merges
+        fn __len__(&amp;self) -> usize { … }                              // len(tok)
+    }
+}</pre>
+<p>PyO3 0.30 declares a module as an inline <code>mod</code> (<a href="https://pyo3.rs/latest/">PyO3 guide</a>); older tutorials show a function taking <code>&amp;Bound&lt;PyModule&gt;</code>, which still works. Errors cross as exceptions: <code>Err(PyValueError::new_err("…"))</code> raises <code>ValueError</code> in the caller, so <code>Result</code> on the Rust side becomes <code>try</code>/<code>except</code> on the Python side.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The GIL, and letting go of it</h2>
+<p>CPython’s <strong>global interpreter lock</strong> lets one thread run Python at a time, and an extension holds it while it runs. For long work on Rust data, release it: <code>py.detach(|| self.inner.encode(text))</code> runs the closure without the GIL, so other Python threads keep going (<a href="https://pyo3.rs/latest/parallelism.html">PyO3: parallelism</a>). Inside the closure you mustn’t touch Python objects; for a call that takes microseconds, detaching costs more than it saves. PyO3’s docs also point to free-threaded Python, officially supported since 3.14, where there’s no GIL at all.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-pyo3 -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>fasttok</code></h2>
+<div class="spec">
+  <p>Your lesson-40 tokenizer becomes <code>src/bpe.rs</code>, untouched. <code>src/lib.start.rs</code> declares the module and the class; you fill in five methods. <code>check.sh</code> creates a <code>.venv</code> the first time, installs maturin, runs <code>maturin develop --release</code>, then the Python tests: the same merges and tokens as <code>tests/reference.py</code> (pure Python), round trips, a <code>ValueError</code> on broken UTF-8, a speed comparison, and the GIL test.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Bring your tokenizer, write the class</h3>
+    <label><input type="checkbox" data-key="lesson-0041-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0041-pyo3-extension
+cp ../0040-bpe-tokenizer/src/lib.rs src/bpe.rs
+cp src/lib.start.rs src/lib.rs
+bash check.sh        # first run: venv, maturin, pyo3 (needs python3-venv)</pre>
+  <p>Each method is one or two lines over <code>self.inner</code>. <code>decode</code> turns bytes into a <code>String</code> with <code>String::from_utf8</code>, and maps its error into a <code>PyValueError</code>. <code>encode</code> wraps its work in <code>py.detach</code>.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Use it from Python yourself</h3>
+    <label><input type="checkbox" data-key="lesson-0041-step-2"> done</label>
+  </div>
+  <pre>source .venv/bin/activate
+python -c "import fasttok; t = fasttok.Tokenizer.train(open('tests/corpus.txt').read(), 400); print(len(t), t.encode('the judge'))"</pre>
+  <p>Try a wrong type, <code>t.encode(42)</code>, and read the <code>TypeError</code> PyO3 raises for you.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>The checker prints the speedup it measured. In section 6’s box, explain where it comes from, why it’s not one universal number (try a text 10 times longer), and why releasing the GIL didn’t change this single-threaded timing at all.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: ship a wheel</h3>
+    <label><input type="checkbox" data-key="lesson-0041-step-3"> done</label>
+  </div>
+  <p><code>maturin build --release</code>, then install the wheel from <code>target/wheels/</code> into a brand-new virtualenv and import it there. Then read what <code>maturin generate-ci github</code> writes: a workflow that builds wheels for Linux, macOS and Windows, which is how real packages reach <code>pip install</code>.</p>
+</section>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your answer from section 4, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://pyo3.rs/latest/">The PyO3 user guide</a></strong>: “Getting started”, then “Python modules”, “Python classes” and “Parallelism”, the four chapters this lab uses. Then <a href="https://www.maturin.rs/">the maturin user guide</a> for building and publishing.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why a <code>#[pyclass]</code> must be <code>Sync</code>, what happens to a Rust panic inside a Python call, how to type-hint the module with a <code>.pyi</code> file, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0041</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

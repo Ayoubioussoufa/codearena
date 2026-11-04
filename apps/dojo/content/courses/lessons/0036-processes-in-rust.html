@@ -1,0 +1,97 @@
+<!--
+  Lesson 0036 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">In lesson 2 you wrote <code>run -t</code> in C: fork, exec, a monotonic clock, <code>waitpid</code> with <code>WNOHANG</code>, a process group, one <code>kill</code> to end them all. Today you write the same program in Rust, and lesson 2’s own checker grades it, case for case. Most of the C turns into safe library calls. One line stays a raw system call, and that line teaches you what <code>unsafe</code> really means.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This is where Rust earns its place in infrastructure: the same control over processes and signals as C, without the buffer and lifetime bugs around them. Comparing your two versions line by line is also an interview story: “I wrote the sandbox runner in C, then in Rust, and here’s which bugs each one could still have.”</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. <code>std::process</code>: lesson 2 in safe calls</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>In <code>run.c</code></th><th>In Rust</th></tr></thead>
+  <tbody>
+    <tr><td><code>fork</code> + <code>execvp</code>; <code>_exit(127)</code> if exec fails</td><td><code>Command::new(p).args(rest).spawn()</code>: <code>Err</code> if it can’t start</td></tr>
+    <tr><td><code>setpgid(0, 0)</code> in the child</td><td><code>.process_group(0)</code> (from <code>CommandExt</code>)</td></tr>
+    <tr><td><code>waitpid(pid, &amp;st, WNOHANG)</code></td><td><code>child.try_wait()</code>: <code>Ok(None)</code> while it runs</td></tr>
+    <tr><td><code>WEXITSTATUS</code> · <code>WTERMSIG</code></td><td><code>status.code()</code> · <code>status.signal()</code> (from <code>ExitStatusExt</code>)</td></tr>
+    <tr><td><code>clock_gettime(CLOCK_MONOTONIC)</code></td><td><code>Instant::now()</code>, <code>start.elapsed()</code></td></tr>
+    <tr><td><code>kill(-pgid, SIGKILL)</code></td><td>no std call: <code>libc::kill</code>, in <code>unsafe</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>CommandExt</code> and <code>ExitStatusExt</code> live in <code>std::os::unix::process</code>: extension traits (lesson 33) that add Unix-only methods to portable types (<a href="https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html">CommandExt</a>, <a href="https://doc.rust-lang.org/std/os/unix/process/trait.ExitStatusExt.html">ExitStatusExt</a>). <code>spawn</code> reports a failed exec back to the parent as an <code>Err</code>, so you never hold a <code>Child</code> that didn’t really start.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. The one line std can’t do</h2>
+<p><code>Child::kill</code> sends SIGKILL to the child alone. Its children survive, which is lesson 2’s escape. Signalling a whole group needs <code>kill(2)</code> with a negative PID, and std doesn’t wrap it. So you call it through the <code>libc</code> crate, which declares C’s functions for Rust:</p>
+<pre>// SAFETY: kill(2) with a negative pid signals a process group.
+// It reads no memory of ours; the worst it can do is fail.
+unsafe {
+    libc::kill(-pgid, libc::SIGKILL);
+}</pre>
+<p>Calling a foreign function is <code>unsafe</code> because the compiler can’t see inside it. What <code>unsafe</code> does <em>not</em> do is switch anything off: the borrow checker and type checks still run inside the block. It allows a handful of extra operations (dereferencing a raw pointer, calling an unsafe or foreign function, using a mutable static, implementing an unsafe trait), and you promise they’re sound (<a href="https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html">The Book, §20.1</a>). The <code>// SAFETY:</code> comment is the promise in writing; the standard library writes one above every <code>unsafe</code> block. The <a href="https://docs.rs/nix">nix</a> crate wraps calls like this one in safe functions, if you’d rather not write the block yourself.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:rust-process -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build <code>run</code></h2>
+<div class="spec">
+  <p>The same contract as lesson 2: <code>run -t &lt;ms&gt; &lt;program&gt; [args…]</code> prints “exit N”, “signal S” or “timeout”, then <code>time_ms=N</code>; at the deadline it kills the whole group; called wrong, it prints nothing on stdout and exits 2. One addition: a program that can’t be started prints <code>exit 127</code>, as a shell would. <code>check.sh</code> is lesson 2’s checker, building your Rust binary instead of <code>run.c</code>, with lesson 2’s test programs in <code>progs/</code>.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Arguments first</h3>
+    <label><input type="checkbox" data-key="lesson-0036-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0036-processes-in-rust
+cp src/main.start.rs src/main.rs
+bash check.sh        # everything red until main is written</pre>
+  <p><code>parse_args</code> is a <code>match</code> on a slice pattern: <code>[flag, ms, command @ ..] if flag == "-t" &amp;&amp; !command.is_empty()</code> binds the rest of the arguments to <code>command</code>. Then parse <code>ms</code>, and refuse 0 (<code>bool::then_some</code> reads well).</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Spawn, poll, kill, report</h3>
+    <label><input type="checkbox" data-key="lesson-0036-step-2"> done</label>
+  </div>
+  <p>Start the clock, spawn with <code>.process_group(0)</code> (on <code>Err</code>, report <code>exit 127</code>), then loop on <code>try_wait()</code>: a status means report it; past the deadline means kill the group, <code>wait()</code> to reap, report <code>timeout</code>; otherwise sleep 2 ms. A <code>match</code> on <code>(status.code(), status.signal())</code> picks the line. All three “Nothing left behind” cases need the group kill.</p>
+</section>
+<div class="callout">
+  <span class="label">Your turn</span>
+  <p>Open your <code>run.c</code> next to <code>main.rs</code>. In section 6’s box, list the bugs the C version could have (a missed <code>wait</code>, a buffer, an unchecked return, an int overflow on milliseconds) and say which ones the Rust version can still have. Be honest: not all of them disappear.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: no polling</h3>
+    <label><input type="checkbox" data-key="lesson-0036-step-3"> done</label>
+  </div>
+  <p>The 2 ms sleep wastes wake-ups and adds up to 2 ms of error. Instead, move the <code>Child</code> into a thread that calls <code>wait()</code> and sends the status down a channel; the main thread uses <code>recv_timeout(deadline - now)</code>. That needs lesson 38’s tools, so peek at <a href="https://doc.rust-lang.org/std/sync/mpsc/struct.Receiver.html#method.recv_timeout">recv_timeout</a> and come back to it after Wednesday.</p>
+</section>
+
+<h2>4. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>5. Say it in your own words</h2>
+<p>Your comparison from section 3, the challenge if you did it, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://doc.rust-lang.org/std/process/index.html">std::process</a></strong>, the module page: spawning, waiting, piping, with examples. Then <a href="https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html">The Book, §20.1: Unsafe Rust</a>, which lists exactly what <code>unsafe</code> allows and what it doesn’t.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how slice patterns bind <code>command @ ..</code>, why <code>wait()</code> is needed after the kill, what <code>libc</code> actually contains, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0036</code></strong> message from section 5 and paste it in the terminal.</p>
+</div>

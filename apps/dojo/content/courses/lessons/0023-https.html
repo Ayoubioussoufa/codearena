@@ -1,0 +1,118 @@
+<!--
+  Lesson 0023 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">The padlock in the address bar answers one question: is this really the server for this name, and is nobody in between? Today you see how that answer is built, by doing the certificate authority’s job yourself with <code>openssl</code>, then watching a real TLS client accept your certificate, and refuse it for exactly the right reasons. After that, Caddy’s “automatic HTTPS” is no longer magic: it’s this lab, run for you every couple of months.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon CodeArena gets a domain and HTTPS. Logins and submissions carry passwords and tokens; over plain HTTP, anyone on the café Wi-Fi can read them. And “what happens when you type a URL and press Enter?” is an interview classic. The TLS part is the half most people wave through.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. The problem encryption alone doesn’t solve</h2>
+<p>Encrypting traffic is easy: the two sides agree on a key, and nobody else can read it. The hard part is <em>who</em> you agreed it with. An attacker in the middle can happily encrypt with you while pretending to be the server. So the server must prove its identity, and that’s the certificate’s job.</p>
+<p>A <strong>certificate</strong> binds a <strong>public key</strong> to <strong>names</strong>, signed by an <strong>issuer</strong>. In the handshake, the server sends it, then proves it holds the matching private key by signing the handshake with it. The browser checks three things:</p>
+<ol>
+  <li><strong>The chain:</strong> the issuer’s signature verifies, up to a root certificate in the browser’s trust store. Roots sign intermediates, intermediates sign your certificate (a <strong>chain of trust</strong>).</li>
+  <li><strong>The name:</strong> the hostname you typed is in the certificate’s <strong>subject alternative name</strong> (SAN). Browsers ignore the older Common Name (CN) field.</li>
+  <li><strong>The dates:</strong> it’s within its validity period.</li>
+</ol>
+<p class="aside">A certificate proves the key belongs to the name, nothing more: not that the site is honest. Phishing sites have valid certificates too.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. How a certificate is made</h2>
+<pre><span class="c"># the server: a private key that never leaves it, and a request (CSR)
+# holding its public key and names</span>
+openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+  -keyout server.key -out server.csr -subj "/CN=codearena.test" \
+  -addext "subjectAltName=DNS:codearena.test,DNS:www.codearena.test"
+
+<span class="c"># the CA: checks you control those names, then signs,
+# choosing the extensions itself</span>
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
+  -days 90 -extfile server.ext -out server.crt</pre>
+<ul>
+  <li><strong>The private key never travels.</strong> The CA signs the <strong>CSR</strong>, which holds only the public key.</li>
+  <li><strong>The CA decides the extensions.</strong> <code>basicConstraints=CA:FALSE</code> (this certificate can’t sign others), <code>extendedKeyUsage=serverAuth</code> (it’s for a TLS server), the SAN.</li>
+  <li><strong>Short lives.</strong> Let’s Encrypt issues 90-day certificates, to limit the damage of a stolen key or a mis-issued certificate, and to force automation (<a href="https://letsencrypt.org/2015/11/09/why-90-days/">why ninety days</a>).</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Automatic HTTPS: ACME, Let’s Encrypt, Caddy</h2>
+<p>A public CA must check that you control the domain before signing. The <strong>ACME</strong> protocol automates it (<a href="https://datatracker.ietf.org/doc/html/rfc8555">RFC 8555</a>). With the <strong>HTTP-01 challenge</strong>, Let’s Encrypt gives your client a token, your server publishes it at <code>http://&lt;domain&gt;/.well-known/acme-challenge/&lt;token&gt;</code>, and Let’s Encrypt fetches it over port 80 after resolving your domain (<a href="https://letsencrypt.org/docs/challenge-types/">challenge types</a>).</p>
+<p><strong>Caddy</strong> does all of it by default: if the domain’s DNS records point to the server, ports 80 and 443 are open, and its data directory persists, it gets the certificate, renews it, and redirects HTTP to HTTPS (<a href="https://caddyserver.com/docs/automatic-https">Caddy: automatic HTTPS</a>). That’s why the Caddyfile in lesson 22 is six lines, and why <code>caddy_data</code> is a named volume: lose it, and Caddy asks for new certificates on every restart, until the CA’s rate limits refuse.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:https -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build it: be the CA</h2>
+<div class="spec">
+  <p>The lab’s <code>README.md</code> lists the five files <code>make-certs.sh</code> must create. The checker reads them with <code>openssl</code>, then serves your certificate with Node’s <code>https</code> module and connects four ways: trusting your CA, for both names; not trusting it; for the wrong name; and through someone else’s CA.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The CA</h3>
+    <label><input type="checkbox" data-key="lesson-0023-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0023-https
+cat README.md
+bash check.sh</pre>
+  <p>One <code>openssl req -x509</code> creates a key and a self-signed certificate. Mark it a CA with <code>-addext "basicConstraints=critical,CA:TRUE"</code>. Write keys with <code>umask 077</code> in effect, so they’re born <code>600</code>.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The server’s key, request and certificate</h3>
+    <label><input type="checkbox" data-key="lesson-0023-step-2"> done</label>
+  </div>
+  <p>A key and a CSR, then <code>openssl x509 -req</code> signed by your CA, with an extensions file (<code>-extfile</code>) holding the SAN, <code>serverAuth</code> and <code>CA:FALSE</code>. Inspect the result with <code>openssl x509 -in out/server.crt -noout -text</code>. All 14 cases should pass.</p>
+  <details>
+    <summary>Hint: why the extensions go in -extfile</summary>
+    <p><code>openssl x509 -req</code> doesn’t copy extensions from the CSR by default: the CA decides what it signs. Without <code>-extfile</code>, your SAN silently disappears.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: an intermediate CA</h3>
+    <label><input type="checkbox" data-key="lesson-0023-step-3"> done</label>
+  </div>
+  <p>Real roots never sign servers directly. Add an intermediate (signed by the root, <code>CA:TRUE, pathlen:0</code>) that signs the server, serve <code>server.crt</code> followed by the intermediate as the chain, and check that a client trusting only the root accepts it. Then remove the intermediate from the chain and read the error.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. In production, all of this is one Caddy block</h2>
+<ul>
+  <li><strong>DNS first:</strong> an <code>A</code> record (and <code>AAAA</code> for IPv6) pointing the domain at the VM, before Caddy starts.</li>
+  <li><strong>Ports 80 and 443</strong> open in ufw and published by the proxy, and nothing else (lessons 21 and 22).</li>
+  <li><strong>Check it from outside:</strong> <code>curl -vI https://your-domain</code> shows the chain and dates; <code>http://</code> should redirect.</li>
+</ul>
+
+<h2>6. Your turn, in CodeArena</h2>
+<div class="callout">
+  <span class="label">Before this afternoon’s build</span>
+  <p>Write the steps from “I bought a domain” to “the padlock shows”, and for each, the command that proves it worked (<code>dig</code>, <code>curl -vI</code>, <code>docker compose logs proxy</code>…). In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your steps from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://letsencrypt.org/how-it-works/">Let’s Encrypt: how it works</a></strong>, a short, precise walk through domain validation and issuance. Then Caddy’s <a href="https://caddyserver.com/docs/automatic-https">automatic HTTPS</a> page, for what your proxy will do on its own.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how the handshake agrees on keys, what HSTS adds, when you’d need DNS-01, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0023</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

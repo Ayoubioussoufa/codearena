@@ -1,0 +1,115 @@
+<!--
+  Lesson 0024 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Until today, deploying CodeArena means SSH-ing in and typing commands, which works until the day you’re tired and type the wrong one. Today you build the pipeline that makes deploying boring: merge to main, tests run, images are built once and tagged with the commit, the server pulls them, checks they’re healthy, and rolls itself back if they aren’t. You test the rollback before you ever need it.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>“Merge to main → images to the registry → deploy over SSH, and a rollback you’ve actually tried” is this afternoon’s task, word for word. And a deploy workflow holds your server’s SSH key and a token that can push images: it’s a security boundary, reviewed like one.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. The shape of the pipeline</h2>
+<pre>push to main
+  └► test
+      └► build: 3 images, each tagged with the commit SHA
+          └► deploy, in the production environment
+              └► ssh deploy@server ./deploy.sh &lt;sha&gt;
+                  pull → up -d --wait → check /health
+                  → record the tag, or roll back</pre>
+<ul>
+  <li><strong>Build once, deploy that.</strong> The image the tests passed against is the image that runs, tagged with the commit SHA. A tag that never changes means “what’s running?” has a one-word answer, and every past version is still in the registry.</li>
+  <li><strong>Rollback is a deploy.</strong> A <code>workflow_dispatch</code> input <code>tag</code> lets you redeploy any earlier SHA from GitHub’s UI, with no rebuild.</li>
+  <li><strong>The server decides it’s healthy.</strong> <code>docker compose up -d --wait</code> returns only when services are running or healthy, and fails otherwise (<a href="https://docs.docker.com/reference/cli/docker/compose/up/">compose up</a>). Then a request to <code>/health</code> through the proxy. Either failing restores the previous tag.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. A workflow is a security boundary</h2>
+<p>The deploy job holds your SSH key; the build job holds a token that can push images. GitHub’s guide on secure use is the checklist (<a href="https://docs.github.com/en/actions/reference/security/secure-use">secure use</a>):</p>
+<ul>
+  <li><strong>Least privilege for <code>GITHUB_TOKEN</code>.</strong> A top-level <code>permissions: { contents: read }</code>, and <code>packages: write</code> only on the job that pushes (<a href="https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication">token permissions</a>).</li>
+  <li><strong>Pin actions to a commit SHA.</strong> Tags move. In March 2025, <code>tj-actions/changed-files</code> was compromised and its tags pointed at code that dumped secrets into logs (<a href="https://www.cisa.gov/news-events/alerts/2025/03/18/supply-chain-compromise-third-party-tj-actionschanged-files-cve-2025-30066-and-reviewdogaction">CISA alert</a>). Workflows pinned to a SHA kept running the reviewed code. GitHub now also offers <a href="https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles">workflow dependency lockfiles</a>, which pin transitive dependencies too and supersede SHA pinning where adopted.</li>
+  <li><strong>No script injection.</strong> <code>${{ }}</code> is replaced in the script’s <em>text</em> before bash runs it, so <code>run: ./deploy.sh ${{ inputs.tag }}</code> turns a crafted tag into code. Pass it through <code>env:</code> and use <code>"$TAG"</code>: then it’s only ever data.</li>
+  <li><strong>Verify the server.</strong> <code>StrictHostKeyChecking=no</code> means anyone who can redirect the connection receives your deploy, and your key. Store the server’s host key (from <code>ssh-keyscan</code>, checked by hand once) in a secret, and write it to <code>known_hosts</code>.</li>
+  <li><strong>Never deploy from a pull request,</strong> and put the deploy job in a <code>production</code> environment, where secrets can be scoped and approvals required (<a href="https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment">environments</a>).</li>
+  <li><strong>Deploys queue, never overlap.</strong> One <code>concurrency</code> group, with <code>cancel-in-progress: false</code>: cancelling a deploy halfway can leave the server between versions.</li>
+</ul>
+
+<p><strong>Before you write it, review some lines:</strong></p>
+<!-- drill:ci -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build the pipeline</h2>
+<div class="spec">
+  <p>The contracts are in the lab’s <code>README.md</code>. The checker runs <code>deploy.sh</code> against fake <code>docker</code> and <code>curl</code> that record every call and fail on demand, then lints <code>deploy.yml</code> with <strong>actionlint</strong> (which runs shellcheck on your scripts) and checks the security rules.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>deploy.sh, and its rollback</h3>
+    <label><input type="checkbox" data-key="lesson-0024-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0024-ci-cd
+cat README.md
+touch deploy.yml &amp;&amp; bash check.sh</pre>
+  <p>Start with <code>set -euo pipefail</code>, a <code>cd</code> to the script’s own folder, and the tag check with a regex (<code>[[ $tag =~ ^[0-9a-f]{7,40}$ ]]</code>). Make the six <code>deploy.sh</code> cases green, especially the two rollbacks.</p>
+  <details>
+    <summary>Hint: set -e and the rollback</summary>
+    <p>Under <code>set -e</code>, a failing command ends the script before your rollback runs. Put the risky part in an <code>if</code>: <code>if TAG="$tag" docker compose … up -d --wait &amp;&amp; curl -fsS …; then record; exit 0; fi</code>, then roll back below it. Commands in an <code>if</code> condition don’t trigger <code>set -e</code>.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>deploy.yml</h3>
+    <label><input type="checkbox" data-key="lesson-0024-step-2"> done</label>
+  </div>
+  <p>Three jobs. Look up the real commit SHA of each action you use on its releases page (or with <code>gh api repos/actions/checkout/commits/v4.2.2 --jq .sha</code>), and keep the version in a comment: <code>uses: actions/checkout@11bd719… # v4.2.2</code>. Run until actionlint and every rule pass: all 15 cases.</p>
+  <details>
+    <summary>Hint: one tag, two sources</summary>
+    <p>In the deploy step: <code>env: { TAG: ${{ inputs.tag || github.sha }} }</code>, then <code>ssh "deploy@$HOST" /srv/codearena/deploy.sh "$TAG"</code>. shellcheck warns (SC2029) that <code>$TAG</code> expands on the client: here that’s the point, and <code>deploy.sh</code> refuses anything but a SHA. Say so in a comment above <code># shellcheck disable=SC2029</code> (<a href="https://www.shellcheck.net/wiki/SC2029">SC2029</a>).</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a real rollback, timed</h3>
+    <label><input type="checkbox" data-key="lesson-0024-step-3"> done</label>
+  </div>
+  <p>Once CodeArena deploys for real: push a commit whose API fails its health check on purpose, watch the pipeline roll back, and time how long the site was wrong. Then run the manual rollback with the <code>tag</code> input. Write both down: that’s the “rollback you’ve actually tried”.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Your CI already runs on pull requests</strong> (lint, typecheck, tests). The deploy workflow is a separate file that runs on main only.</li>
+  <li><strong>Secrets:</strong> <code>DEPLOY_SSH_KEY</code> (a key made only for CI, in <code>deploy</code>’s <code>authorized_keys</code>), <code>DEPLOY_KNOWN_HOSTS</code>, <code>DEPLOY_HOST</code>, scoped to the <code>production</code> environment. The registry login uses the built-in <code>GITHUB_TOKEN</code>.</li>
+  <li><strong>Each fix to the pipeline</strong> goes into the dojo’s team-workflow guide, part 14, like the others.</li>
+</ul>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Your turn, in CodeArena</h2>
+<div class="callout">
+  <span class="label">Before this afternoon’s build</span>
+  <p>List every secret and setting the pipeline needs (repository secrets, the environment, the server’s <code>/srv/codearena</code> files), where each lives, and who can read it. Then the box below.</p>
+</div>
+
+<h2>7. Say it in your own words</h2>
+<p>Your list from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.github.com/en/actions/reference/security/secure-use">GitHub: Secure use reference</a></strong>, the official checklist for workflows: script injection, third-party actions, token permissions. Read it once now, and again whenever you add an action.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how the registry login works, why <code>--wait</code> needs health checks, how to do zero-downtime deploys, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0024</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

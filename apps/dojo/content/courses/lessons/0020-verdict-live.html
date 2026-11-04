@@ -1,0 +1,125 @@
+<!--
+  Lesson 0020 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">The user clicks Submit and sees PENDING. A few seconds later, a worker in another process writes the verdict to the database. How does a page that’s already loaded find out? Either the browser keeps asking, or the server tells it. Today you build both, and you learn the two bugs that make live features flaky: requests that pile up, and updates that fall between two lines of code.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon’s task is the live verdict: polling first, then push if you choose. The test that’s already in your plan, “polling stops once a verdict arrives (no request after it)”, is one of the cases you’re about to make pass by hand.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Polling, done properly</h2>
+<p>Polling is the simplest live feature: ask <code>GET /submissions/:id</code> again and again until the status is final. Five details separate a polling loop that behaves from one that hurts:</p>
+<ol>
+  <li><strong>One request at a time.</strong> Schedule the next request with <code>setTimeout</code> after each answer, not with <code>setInterval</code>, which fires whether the last answer came back or not. A slow API then gets more requests, exactly when it can least afford them.</li>
+  <li><strong>Stop on the verdict.</strong> No request after the final state.</li>
+  <li><strong>Stop on unmount.</strong> The user navigates away: an <code>AbortSignal</code> ends the loop, or it keeps polling for a page nobody is looking at.</li>
+  <li><strong>Give up eventually.</strong> A judge that never answers shouldn’t leave a spinner forever: time out, and show a message.</li>
+  <li><strong>Survive a blip</strong>, with a limited number of retries.</li>
+</ol>
+<p>In CodeArena you won’t write this loop. TanStack Query runs it when <code>refetchInterval</code> is a function of the latest data: return a number to keep polling, <code>false</code> to stop (<a href="https://tanstack.com/query/latest/docs/framework/react/reference/useQuery">useQuery reference</a>):</p>
+<pre>useQuery({
+  queryKey: ["submission", id],
+  queryFn: () =&gt; api.getSubmission(id),
+  refetchInterval: (query) =&gt;
+    query.state.data?.status === "DONE" ? false : 1000,
+});</pre>
+<p>The cost is simple to compute: 1,000 users waiting, polling every second, is 1,000 requests a second, nearly all answering “still PENDING”. Fine at CodeArena’s size. Not at a much larger one.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Push: server-sent events</h2>
+<p>With <strong>server-sent events</strong>, the browser makes one request and the server keeps the response open, writing an event whenever something changes. On the wire it’s plain text with the type <code>text/event-stream</code> (<a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">MDN: using server-sent events</a>):</p>
+<pre>event: status
+data: {"id":"7","status":"RUNNING"}
+
+: ping
+
+event: status
+data: {"id":"7","status":"DONE","verdict":"ACCEPTED"}
+</pre>
+<ul>
+  <li>A blank line ends an event. A line starting with <code>:</code> is a comment: servers send them as <strong>heartbeats</strong>, because proxies close connections that stay silent too long.</li>
+  <li>The browser side is <code>new EventSource(url)</code>, which <strong>reconnects by itself</strong> after a drop.</li>
+  <li>Without HTTP/2, a browser allows only 6 open SSE connections per domain, across all its tabs, as MDN warns. Behind an HTTP/2 proxy, that limit goes away.</li>
+</ul>
+<p class="aside"><strong>WebSockets</strong> are the other push channel: a full two-way connection after an HTTP upgrade (<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API">MDN: WebSockets</a>). Worth it when the browser talks back continuously, like a chat. A verdict only flows one way, so SSE is the simpler tool.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The race that loses verdicts</h2>
+<p>An SSE handler needs two things: the submission’s <em>current</em> state (it may already be judged), and every <em>change</em> after it. Read first, then subscribe, and there’s a gap: a verdict published after your read but before your subscription reaches nobody. The page shows RUNNING forever. It only happens when timing is unlucky, so it passes every manual test and fails in production.</p>
+<p>The fix is to <strong>subscribe first, buffer, then read</strong>: everything published after the subscription is caught, and the worst case is seeing a state twice, which you filter out. The same thinking applies to where the events come from. In CodeArena, the worker and the API are separate processes, so the worker publishes on a Redis channel after the database commit. Redis Pub/Sub is <strong>at-most-once</strong>: a message published while nobody is subscribed is gone (<a href="https://redis.io/docs/latest/develop/pubsub/">Redis: Pub/Sub</a>). That’s acceptable only because the database stays the truth, and every client starts by reading it.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:live -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build both</h2>
+<div class="spec">
+  <p><code>poll.start.mjs</code> and <code>sse.start.mjs</code> hold the exact contracts. The checker drives your poller with a fake API that counts calls and concurrency, then runs your SSE server on a random port against 10 simultaneous clients, and against the race itself.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The polling loop</h3>
+    <label><input type="checkbox" data-key="lesson-0020-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0020-verdict-live
+cp poll.start.mjs poll.mjs
+cp sse.start.mjs sse.mjs
+bash check.sh</pre>
+  <p>A <code>for (;;)</code> loop around <code>await fetchStatus()</code>, with an abortable sleep between calls. Make “Polling” green.</p>
+  <details>
+    <summary>Hint: an abortable sleep</summary>
+    <p>A promise that resolves after a <code>setTimeout</code>, or rejects when the signal fires (listen for <code>"abort"</code>, and clear the timer). Remove the listener when the timer wins, or long polls accumulate listeners.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The SSE endpoint</h3>
+    <label><input type="checkbox" data-key="lesson-0020-step-2"> done</label>
+  </div>
+  <p>Subscribe to the bus, then read the store, then write the headers, the current state, and any buffered events. End after DONE; ping on a timer; on <code>req</code>’s <code>"close"</code>, remove the listener and the timer. All 14 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: resume with Last-Event-ID</h3>
+    <label><input type="checkbox" data-key="lesson-0020-step-3"> done</label>
+  </div>
+  <p>Give each event an <code>id:</code> line. When <code>EventSource</code> reconnects, it sends the last id it saw in a <code>Last-Event-ID</code> header (<a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">the SSE standard</a>). Use it to skip the states the client already has.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Start with polling.</strong> <code>refetchInterval</code> as a function, a test that asserts no request after the verdict, and a timeout message. It’s the right answer at your scale, and you can say why.</li>
+  <li><strong>If you add push,</strong> publish after the commit, subscribe before reading, and keep polling as the fallback when the stream drops.</li>
+  <li><strong>I-12 to I-14</strong> are in the same files today: logout’s empty 200, <code>useMe</code> written as a mutation, and dead code.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Decide: polling only, or polling plus SSE? Write the interval, the timeout and what the user sees when it fires. If you push, write where the worker publishes and where the API subscribes. In section 7’s box.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your decision from section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">MDN: Using server-sent events</a></strong>, the format, the browser API, and the connection limit, in one page. Then TanStack Query’s <a href="https://tanstack.com/query/latest/docs/framework/react/reference/useQuery"><code>useQuery</code> reference</a> for <code>refetchInterval</code> and its neighbours.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the race only shows up in production, how Next route handlers stream a response, when WebSockets win, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0020</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

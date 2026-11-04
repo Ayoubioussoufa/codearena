@@ -9,6 +9,7 @@ import { useState } from "react";
 import { ThemeToggle } from "./theme";
 
 const NAV_LINKS = [
+  { href: "/courses", label: "Courses" },
   { href: "/guides", label: "Guides" },
   { href: "/practice", label: "Practice" },
   { href: "/coding", label: "Coding" },

@@ -1,0 +1,134 @@
+<!--
+  Lesson 0016 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Lesson 15 gave you the indexes. Today you learn to read what Postgres does with them, node by node, and to spot the four shapes behind almost every slow query. Then you rewrite three real CodeArena queries, one of which fixes I-10, keeping each answer identical and cutting the work by ten to a hundred times.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon’s deliverable is <code>docs/perf/</code>: before/after plans with the reason each fix works. “I read the plan, found 6,000 heap fetches for a count, and made it index-only” is the kind of sentence that separates someone who uses a database from someone who understands one.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. How to read a plan</h2>
+<p>A plan is a tree. Each node pulls rows from the nodes below it, so you read it <strong>from the innermost, most indented lines outward</strong>; the top line produces the final result. This is the slow version of today’s third query, simplified:</p>
+<pre class="wide">Limit  (cost=0.71..64.95 rows=20)
+       (actual time=2.83..5.12 rows=20 loops=1)
+  Buffers: shared hit=6355 read=13
+  -&gt;  GroupAggregate  (actual rows=20 loops=1)
+        -&gt;  Nested Loop Left Join  (actual rows=6575 loops=1)
+              -&gt;  Index Scan using problems_pkey on problems p
+                    (actual rows=21 loops=1)
+              -&gt;  Index Scan using submissions_problem_status on submissions s
+                    (actual rows=313 loops=21)
+                    Buffers: shared hit=6352 read=13</pre>
+<ul>
+  <li><strong><code>cost=…</code></strong> is the planner’s <em>estimate</em>, in arbitrary units: startup cost, then total. <strong><code>actual time</code></strong> is measured, in milliseconds (<a href="https://www.postgresql.org/docs/current/using-explain.html">using EXPLAIN</a>).</li>
+  <li><strong><code>rows</code> and <code>time</code> are per loop.</strong> The inner scan ran 21 times, once per problem, at 313 rows each: about 6,573 rows in all. Multiply by <code>loops</code>, always.</li>
+  <li><strong><code>Buffers</code></strong> counts pages: <code>hit</code> from Postgres’s memory, <code>read</code> from the operating system. Here, 6,352 of the 6,368 pages belong to one node. That’s where to look.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Four shapes of slow</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>In the plan</th><th>What it means</th><th>The fix</th></tr></thead>
+  <tbody>
+    <tr><td>a <code>Limit</code> returning 20 above a node with <code>rows=1000</code></td><td>rows produced only to be thrown away: OFFSET</td><td>keyset pagination</td></tr>
+    <tr><td>estimated <code>rows=3</code>, actual <code>rows=48000</code></td><td>the planner chose for the wrong data</td><td><code>ANALYZE</code>; then check again</td></tr>
+    <tr><td>an <code>Index Scan</code> with thousands of buffers, for columns the index already holds</td><td>a heap fetch per row, for nothing</td><td>make it an <code>Index Only Scan</code></td></tr>
+    <tr><td>the same small query, thousands of times, in your logs</td><td>N+1: one query per row</td><td>one query, with a join or <code>= ANY($1)</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Keyset pagination</h3>
+<p><code>OFFSET 980</code> can’t jump: it produces 980 rows and discards them, so page 50 costs fifty times page 1. <strong>Keyset pagination</strong> (also called the seek method) asks for “the 20 rows after the last one I saw”: <code>WHERE user_id = $1 AND (created_at, id) &lt; ($ts, $id) ORDER BY created_at DESC, id DESC LIMIT 20</code>. With an index on <code>(user_id, created_at DESC, id DESC)</code>, it lands on the cursor and reads 20 entries, whatever the page (<a href="https://use-the-index-luke.com/sql/partial-results/fetch-next-page">Use The Index, Luke: fetch next page</a>). The <code>id</code> breaks ties between equal timestamps, so no row is skipped or shown twice.</p>
+<p class="aside">The cursor must carry the <em>values</em>, not just an id. A cursor that’s only an id forces the query to look that row up, and once it’s deleted, there’s nothing to look up: the next page comes back empty. That’s I-10, exactly.</p>
+
+<h3>N+1 and counting</h3>
+<p>An ORM loop that fetches each row’s relation separately sends N+1 queries; each pays a round trip, parsing and planning. Prisma documents the problem and its fixes (<a href="https://www.prisma.io/docs/orm/prisma-client/queries/query-optimization-performance">query optimization</a>). For counts, remember that <code>count(*)</code> counts rows while <code>count(column)</code> counts non-null values (<a href="https://www.postgresql.org/docs/current/functions-aggregate.html">aggregate functions</a>): over a <code>LEFT JOIN</code>, that difference is a wrong answer.</p>
+
+<p><strong>Before you rewrite, read some plans:</strong></p>
+<!-- drill:plans -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Rewrite three queries</h2>
+<div class="spec">
+  <p>The slow versions and the rules are in the lab’s <code>README.md</code>: <code>page.sql</code> (keyset, and surviving a deleted cursor row), <code>solved.sql</code> (one statement instead of N+1) and <code>list.sql</code> (the problems list with acceptance counts, at most 200 buffers). The checker compares every answer with the slow version’s, and prints the slow plan for <code>list.sql</code> node by node.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Keyset pagination</h3>
+    <label><input type="checkbox" data-key="lesson-0016-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0016-reading-plans
+cat README.md
+touch page.sql solved.sql list.sql &amp;&amp; bash check.sh</pre>
+  <p>Write <code>page.sql</code> with a row comparison. psql variables: <code>:user</code>, <code>:'cursor_ts'</code> (a string: cast it with <code>::timestamptz</code>), <code>:cursor_id</code>. Make the four page cases green, I-10 included.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>One query, not N+1</h3>
+    <label><input type="checkbox" data-key="lesson-0016-step-2"> done</label>
+  </div>
+  <p><code>solved.sql</code>: each solved problem once. A plain <code>JOIN</code> returns a problem once per accepted submission; think about what “has at least one” is in SQL.</p>
+  <details>
+    <summary>Hint: two ways</summary>
+    <p><code>SELECT DISTINCT</code> over the join works. <code>WHERE EXISTS (SELECT 1 FROM submissions s WHERE …)</code> says what you mean, and lets Postgres stop at the first match per problem.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Read the plan, then fix it</h3>
+    <label><input type="checkbox" data-key="lesson-0016-step-3"> done</label>
+  </div>
+  <p>Before changing <code>list.sql</code>, read the slow plan the checker prints: which node holds the buffers, and why does it need the heap? Then make it read at most 200 buffers, with a problem nobody tried still showing 0 and 0. All 11 cases should pass.</p>
+  <details>
+    <summary>Hint: what does the index hold?</summary>
+    <p>The index is on <code>(problem_id, status)</code>. <code>count(s.id)</code> needs <code>id</code>, which isn’t in it, so every row costs a heap fetch. Count something the index has. Then check the zero case.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a stale-statistics plan</h3>
+    <label><input type="checkbox" data-key="lesson-0016-step-4"> done</label>
+  </div>
+  <p>In a psql session in the lab’s container, create a table, run <code>ANALYZE</code> on it while it’s empty, insert 100,000 rows, and <code>EXPLAIN ANALYZE</code> a query on it. Find the line where the estimate and the actual rows disagree by orders of magnitude, then run <code>ANALYZE</code> and compare (<a href="https://www.postgresql.org/docs/current/planner-stats.html">planner statistics</a>).</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Prisma’s cursor pagination</strong> (<code>cursor: { id }</code>) looks the cursor row up: I-10. Tomorrow’s fix encodes the values in the cursor, or uses <code>$queryRaw</code> for the row comparison, with a test that deletes the cursor row.</li>
+  <li><strong>Every <code>docs/perf/</code> entry</strong> holds the query, the plan before, the plan after, the measured times and pages, and one sentence on why the fix works, in the vocabulary of section 2.</li>
+  <li><strong><code>$queryRaw</code> is allowed, with a reason.</strong> One of this week’s six plans is a query Prisma can’t express well; write down why (<a href="https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries">raw queries</a>), and use its tagged-template form so parameters stay parameters.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>For this afternoon’s queries 1–3 (problems list with a filter and a sort, submission history with a cursor, “solved by user”), write what you expect each <em>before</em> plan to show, using section 2’s shapes. You’ll check your predictions against the real plans. In section 6’s box.</p>
+</div>
+
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>6. Say it in your own words</h2>
+<p>Your predictions from section 4, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL: Using EXPLAIN</a></strong>, the manual’s chapter on reading plans, with the per-loop rule and what each number means. Then Markus Winand’s <a href="https://use-the-index-luke.com/no-offset">“No offset”</a> page, a short argument you can quote in your ADR.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why the planner picked a nested loop, how Prisma’s cursor works, how to encode a keyset cursor for an API, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0016</code></strong> message from section 6 and paste it in the terminal.</p>
+</div>

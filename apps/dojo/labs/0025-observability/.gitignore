@@ -1,0 +1,5 @@
+# The files you write in this lab, and the backups they make.
+observe.mjs
+backup.sh
+restore-check.sh
+backups/

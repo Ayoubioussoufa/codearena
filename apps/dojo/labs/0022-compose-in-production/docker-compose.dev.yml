@@ -1,0 +1,58 @@
+# Given: CodeArena's development Compose file, copied as it was on 3 Nov 2026.
+# Fine on a laptop. Every comment in the lesson about production is about this file.
+name: codearena
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codearena-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codearena
+      POSTGRES_PASSWORD: codearena
+      POSTGRES_DB: codearena
+    ports:
+      # Host 5433 → container 5432: a native PostgreSQL service already
+      # occupies 5432 on this machine (WSL systemd postgresql.service).
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codearena -d codearena"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: codearena-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional DB admin UI — start with: docker compose --profile tools up -d
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: codearena-pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@codearena.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

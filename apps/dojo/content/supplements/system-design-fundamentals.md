@@ -122,6 +122,11 @@ That's 100 million requests/day. Divide by 100k seconds → **~1,000 QPS average
 ```exercise
 envelope-estimate
 ```
+
+```check
+framework
+```
+
 ## Latency numbers every programmer should know
 
 Different kinds of storage and network hops are *wildly* different speeds — and knowing the rough
@@ -191,6 +196,11 @@ Two facts interviewers love, because they explain *why* redundancy works:
 > target you aim for to keep that promise.)
 
 ---
+
+```check
+latency
+```
+
 ## Caching
 
 A **cache** is a small, super-fast store that keeps a copy of expensive-to-get data *close by*, so you
@@ -264,6 +274,11 @@ named patterns, and knowing the trade-offs is a strong interview signal:
 ```exercise
 cache-strategy
 ```
+
+```check
+caching
+```
+
 ## Load balancing & stateless services
 
 A **load balancer** (LB) is the traffic cop that sits in front of your servers and spreads incoming
@@ -457,6 +472,11 @@ modern":
 ```exercise
 sql-or-nosql
 ```
+
+```check
+scaling
+```
+
 ## Consistency & the CAP theorem
 
 First, three definitions:
@@ -535,6 +555,11 @@ active machine dies *after* accepting a write but *before* replicating it, that 
 that window is a senior-level point.
 
 ---
+
+```check
+consistency
+```
+
 ## Asynchronous work & message queues
 
 Some work doesn't need to finish before you answer the user — sending a welcome email, making a
@@ -596,6 +621,11 @@ queue-backpressure
 ```exercise
 idempotency-key
 ```
+
+```check
+queues
+```
+
 ## Rate limiting
 
 **Rate limiting** = capping how many requests one client (or API key) may make in a window, to protect
@@ -693,6 +723,11 @@ flowchart TD
 ```
 
 ---
+
+```check
+apis
+```
+
 ## Worked design #1 — a URL shortener (the canonical opener)
 
 The most common *first* design question. Work it end-to-end with the five-step framework; aim to
@@ -966,6 +1001,11 @@ batch them), and exact rank for a user buried at position 4,000,000 (often an ap
 This is a real thing you built — say so, and walk your actual choices.
 
 ---
+
+```check
+designs
+```
+
 ## Daily self-drill — how to practise one design each morning
 
 Reading designs is not the same as *producing* them under pressure. Turn this guide into a daily rep:

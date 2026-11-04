@@ -87,6 +87,11 @@ Registration hangs off `scheduled`: a **ContestRegistration** records who's allo
 
 ---
 
+
+```check
+states
+```
+
 <a name="part-b"></a>
 # Part B — The read/write tension, and CQRS
 
@@ -210,6 +215,11 @@ the leaderboard didn't update," the three usual causes: (1) normal convergence l
 
 ---
 
+
+```check
+cqrs
+```
+
 <a name="part-e"></a>
 # Part E — Redis sorted sets
 
@@ -323,6 +333,11 @@ need.
 
 ---
 
+
+```check
+zsets
+```
+
 <a name="part-f"></a>
 # Part F — Real-time at scale
 
@@ -414,6 +429,11 @@ arrives after the end **counts** — you judge by *submission* time against the 
 deadline, not verdict time; defend that rule and apply it consistently.)
 
 ---
+
+
+```check
+realtime
+```
 
 <a name="worked"></a>
 # Part H — A complete leaderboard projector, end to end

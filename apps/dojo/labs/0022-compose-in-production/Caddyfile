@@ -1,0 +1,9 @@
+# Given: the reverse proxy's configuration (lesson 23 explains it).
+codearena.example.com {
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

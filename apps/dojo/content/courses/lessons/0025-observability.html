@@ -1,0 +1,128 @@
+<!--
+  Lesson 0025 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Once CodeArena runs on a server, you can’t attach a debugger or read the console. Everything you’ll ever know about production comes from what it writes down: logs, metrics and health checks. Then there’s the one thing that saves you when all of it is too late: a backup you know works because you’ve restored it. Today you build all four, and you test the backup by destroying the data.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon’s task is structured logs, a health endpoint, metrics, error tracking and a nightly backup you’ve restored once. In an interview, “how would you know it’s broken before users tell you?” separates someone who has run software from someone who has only written it.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Logs: events you can search</h2>
+<p>A log line is an event: one request, one failure. Write it as <strong>one JSON object per line</strong>, and “every 500 on <code>/submissions</code> in the last hour” becomes a query on fields instead of a fragile regex (wrapped here to fit the page; in the log it’s one line):</p>
+<pre>{"time":"2026-11-20T14:02:11.402Z","level":"error","msg":"request",
+ "method":"POST","path":"/submissions","status":500,"durationMs":31.2,
+ "requestId":"9f1c…","error":"connect ECONNREFUSED"}</pre>
+<ul>
+  <li><strong>A request id</strong> ties every line about one request together, across the proxy, the API and the worker. Accept one from upstream if it looks sane, otherwise make one, and send it back in a header so a user can quote it.</li>
+  <li><strong>Never log secrets.</strong> Tokens hide in query strings and the <code>Authorization</code> header; cookies hold sessions. Logs travel further than your database ever will, and OWASP lists access tokens and session identifiers among what must never be logged (<a href="https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html">Logging Cheat Sheet</a>).</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Health: alive, or ready?</h2>
+<p>Two different questions (<a href="https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/">Kubernetes: probes</a>):</p>
+<ul>
+  <li><strong>Liveness</strong>, <code>/health</code>: can this process still answer? If not, restart it.</li>
+  <li><strong>Readiness</strong>, <code>/ready</code>: can it do useful work right now, with its database and Redis answering? If not, stop sending it traffic, but don’t restart it: a restart won’t fix Postgres.</li>
+</ul>
+<p>Every check needs a <strong>timeout</strong>: a dependency that hangs is down, and a readiness check that hangs with it is worse than none.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Metrics: numbers over time</h2>
+<p>Logs answer “what happened to this request?”. Metrics answer “how is the system doing?”: counters and histograms that a server like <strong>Prometheus</strong> scrapes every few seconds from <code>/metrics</code>, in a plain text format (<a href="https://prometheus.io/docs/instrumenting/exposition_formats/">exposition formats</a>):</p>
+<pre class="wide"># TYPE http_requests_total counter
+http_requests_total{method="POST",route="/submissions",status="202"} 1027
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="POST",route="/submissions",le="0.1"} 990
+http_request_duration_seconds_bucket{method="POST",route="/submissions",le="+Inf"} 1027
+http_request_duration_seconds_sum{method="POST",route="/submissions"} 41.7
+http_request_duration_seconds_count{method="POST",route="/submissions"} 1027</pre>
+<ul>
+  <li><strong>Histogram buckets are cumulative:</strong> <code>le="0.1"</code> counts every request that took 0.1 s <em>or less</em> (<a href="https://prometheus.io/docs/practices/histograms/">histograms</a>). From them, Prometheus estimates percentiles like p95 latency.</li>
+  <li><strong>Watch your labels.</strong> Every distinct combination of label values is a separate series, kept in memory. Use the route template, never the raw path; never a user id (<a href="https://prometheus.io/docs/practices/naming/">naming and labels</a>). One scanner trying 10,000 random URLs shouldn’t create 10,000 series.</li>
+  <li><strong>What to measure first:</strong> Google’s SRE book names four golden signals: latency, traffic, errors and saturation (<a href="https://sre.google/sre-book/monitoring-distributed-systems/">monitoring distributed systems</a>). For CodeArena, add the queue: how many jobs are waiting, and how old the oldest is.</li>
+</ul>
+<p class="aside"><strong>Error tracking</strong> (Sentry, for instance) groups exceptions with their stack traces and tells you when a new one appears (<a href="https://docs.sentry.io/platforms/javascript/guides/nestjs/">Sentry for NestJS</a>). It complements logs: a log line says a 500 happened, the error tracker shows the line of code.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Backups: only a restore proves one</h2>
+<p><code>pg_dump --format=custom</code> writes an archive that <code>pg_restore</code> can read selectively (<a href="https://www.postgresql.org/docs/current/app-pgdump.html">pg_dump</a>). Run it nightly, keep a week, and copy it off the server: a backup on the same disk dies with the disk. Then the part almost everyone skips: <strong>restore it</strong>, into a scratch database, and count something you know. A dump can be empty, truncated or unrestorable, and the only way to find out is to try, before the day you need it.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:observe -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build it</h2>
+<div class="spec">
+  <p>Part 1’s contract is at the top of <code>observe.start.mjs</code>; part 2’s is in the lab’s <code>README.md</code>. The checker runs part 1 with plain Node, then starts Postgres, seeds 1,234 submissions, runs your backup and its rotation, drops the table, and restores.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Logs and request ids</h3>
+    <label><input type="checkbox" data-key="lesson-0025-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0025-observability
+cp observe.start.mjs observe.mjs
+bash check.sh</pre>
+  <p>Route matching (turn <code>/submissions/:id</code> into a regex), then one log line per request after the handler, even when it throws. Measure time with <code>process.hrtime.bigint()</code>.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Health and metrics</h3>
+    <label><input type="checkbox" data-key="lesson-0025-step-2"> done</label>
+  </div>
+  <p><code>/ready</code> runs the checks in parallel, each raced against a 500 ms timeout. For metrics, two <code>Map</code>s: counters keyed by method, route and status; histograms keyed by method and route, each with its bucket counts, sum and count. All 12 part-1 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Back up, then lose everything</h3>
+    <label><input type="checkbox" data-key="lesson-0025-step-3"> done</label>
+  </div>
+  <p><code>backup.sh</code> and <code>restore-check.sh</code>. Write the dump to a temporary name and rename it when complete, so a half-written file never looks like a backup. All 5 part-2 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: off-site and encrypted</h3>
+    <label><input type="checkbox" data-key="lesson-0025-step-4"> done</label>
+  </div>
+  <p>Encrypt each dump (for example with <code>age</code>, to a public key whose private half isn’t on the server) and upload it to object storage. Then restore from the downloaded, decrypted copy, on your laptop.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Logs:</strong> <code>nestjs-pino</code> in the API, the same JSON shape in the worker, with the submission id on every judging line.</li>
+  <li><strong>Health:</strong> <code>/health</code> for Docker’s health check and Compose’s <code>--wait</code>; <code>/ready</code> for the proxy and for you.</li>
+  <li><strong>Metrics and alerts:</strong> requests and latency per route, verdicts by type, queue depth, judge duration. Alert on symptoms users feel: errors and latency, a queue that keeps growing.</li>
+  <li><strong>Backups:</strong> a nightly cron on the VM running your script, a copy off the server, and the restore check on a schedule.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write what you’ll log on each request and each judging, which three metrics you’d alert on first and at what threshold, and your backup plan: when, where, kept how long, and how you’ll prove a restore works. In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your plan from section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://sre.google/sre-book/monitoring-distributed-systems/">Google SRE book: Monitoring Distributed Systems</a></strong>, the chapter that introduced the four golden signals, and the clearest argument for alerting on symptoms rather than causes. Then Prometheus’s <a href="https://prometheus.io/docs/practices/naming/">naming and labels</a> page.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how p95 comes out of buckets, what to alert on, how to set up Prometheus and Grafana on the VM, anything at all.</p>
+  <p>When both parts are green, copy your <strong><code>done 0025</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

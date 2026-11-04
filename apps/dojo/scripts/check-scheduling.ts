@@ -35,7 +35,8 @@ eq(isDue({ attempts: 0, correct: 0 }, T), false, "unseen item is never 'due'");
 eq(isDue({ attempts: 3, correct: 3, due: "2026-07-16" }, T), true, "past due → due");
 eq(isDue({ attempts: 3, correct: 3, due: "2026-07-17" }, T), true, "due today → due");
 eq(isDue({ attempts: 3, correct: 3, due: "2026-07-20" }, T), false, "future → not due");
-eq(isDue({ attempts: 1, correct: 0 }, T), true, "legacy seen item (no due date) → due");
+// Unscheduled (no due date, e.g. after resetReviews) is NOT due: see isDue in progress.ts.
+eq(isDue({ attempts: 1, correct: 0 }, T), false, "seen but unscheduled item (no due date) → not due");
 
 // dueList ordering: most overdue first, unseen excluded.
 const progress: Progress = {

@@ -1,0 +1,104 @@
+<!--
+  Lesson 0011 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">NestJS builds your objects for you: you write a constructor, and the service arrives with everything it needs. Today you build the machine that does that, in about 40 lines, so <code>@Injectable</code>, <code>providers</code>, <code>@Inject(CODE_RUNNER)</code> and “Nest can’t resolve dependencies” stop being magic words.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Tomorrow you write a whole new module: <code>POST /submissions</code>, a repository, a queue port. Every piece of it is wired by dependency injection. And “why does the worker inject a Symbol?” is an interview question you can now answer from first principles.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Who builds the objects?</h2>
+<p>Without DI, <code>JudgeService</code> would write <code>new DockerRunner(new Config())</code> itself. Then it’s welded to Docker: its tests need Docker, and swapping the runner means editing it. With <strong>dependency injection</strong>, it just asks for “a code runner” in its constructor, and something else, the <strong>container</strong>, decides which one and builds it (<a href="https://docs.nestjs.com/providers">Nest: providers</a>).</p>
+<p>The container needs three things for each dependency: a <strong>token</strong> (its name), a <strong>provider</strong> (how to build it: a class, a value or a factory) and a <strong>scope</strong> (how long it lives). Resolving a token is a depth-first walk of the dependency graph: build the dependencies first, then the consumer, remembering singletons. That walk is also where cycles show up, exactly like cycle detection in a graph DFS.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Tokens: why a Symbol</h2>
+<p>A class can name itself: <code>JudgeService</code> is both the type and the token. But the worker depends on the <code>CodeRunner</code> <em>interface</em>, and TypeScript erases interfaces when it compiles: at runtime, there’s nothing called <code>CodeRunner</code> to look up. So the port gets a runtime name, <code>CODE_RUNNER = Symbol("CodeRunner")</code>, and the constructor says <code>@Inject(CODE_RUNNER)</code>. The module binds it: <code>{ provide: CODE_RUNNER, useClass: FakeCodeRunner }</code> (<a href="https://docs.nestjs.com/fundamentals/custom-providers">custom providers</a>).</p>
+<p class="aside">How does Nest know a class’s dependencies without a <code>deps</code> list? With <code>emitDecoratorMetadata</code>, TypeScript writes the constructor’s parameter types into metadata that <code>reflect-metadata</code> reads at runtime. That’s why the worker imports <code>reflect-metadata</code> first. Your lab lists <code>deps</code> by hand instead: same idea, nothing hidden.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Lifetimes and borders</h2>
+<ul>
+  <li><strong>Singleton</strong> (Nest’s default): one instance for the whole app. Never keep request data in its fields: every request shares them (<a href="https://docs.nestjs.com/fundamentals/injection-scopes">injection scopes</a>).</li>
+  <li><strong>Transient</strong>: a new instance for each consumer that injects it. <strong>Request</strong>: one per HTTP request, and everything that depends on it becomes request-scoped too.</li>
+  <li><strong>Modules</strong> are borders: a provider is visible inside its module, and outside only if the module <code>exports</code> it (<a href="https://docs.nestjs.com/modules">modules</a>). That’s how the submissions module will use the queue without seeing BullMQ.</li>
+</ul>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:di -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>container.mjs</code></h2>
+<div class="spec">
+  <p>The rules are in <code>container.start.mjs</code>: <code>register(token, provider)</code> and <code>resolve(token)</code>, with <code>useClass</code> + <code>deps</code>, <code>useValue</code>, <code>useFactory</code> + <code>inject</code>, lazy creation, singleton and transient scopes, and two errors that tell you what to fix: a missing provider (naming who needed it) and a cycle (showing its path).</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Providers</h3>
+    <label><input type="checkbox" data-key="lesson-0011-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0011-di-from-scratch
+cp container.start.mjs container.mjs
+bash check.sh</pre>
+  <p>Store providers in a <code>Map</code>; resolve each dependency recursively, then build. Make “Providers” green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Lifetimes, and the swap</h3>
+    <label><input type="checkbox" data-key="lesson-0011-step-2"> done</label>
+  </div>
+  <p>Cache singletons in a second <code>Map</code>; skip the cache for transients. The swap case shows why there’s a port at all.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Errors that help</h3>
+    <label><input type="checkbox" data-key="lesson-0011-step-3"> done</label>
+  </div>
+  <p>Pass the path of tokens being resolved down the recursion: a token already on it is a cycle; a missing provider names the token and its requester. All 11 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: decorators</h3>
+    <label><input type="checkbox" data-key="lesson-0011-step-4"> done</label>
+  </div>
+  <p>In TypeScript with <code>experimentalDecorators</code>, write <code>@Injectable(deps)</code> that stores the dependency list on the class, so <code>register(Cls)</code> needs no provider object. You’ve just rebuilt half of Nest’s core.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Ports get Symbol tokens, adapters get bound in modules.</strong> The application layer never names Prisma, BullMQ or Docker.</li>
+  <li><strong>Tests swap adapters</strong> with <code>Test.createTestingModule(...).overrideProvider(TOKEN).useValue(fake)</code>.</li>
+  <li><strong>Read Nest’s errors</strong> as your container’s: “can’t resolve dependencies of X (?, Y)” is your missing-provider message, with the position of the missing one.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>List the providers the new <code>submissions</code> module needs, which ones are ports (Symbol tokens) and which adapters fill them, and what the module must import or export. In section 7’s box: it’s tomorrow’s wiring.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.nestjs.com/fundamentals/custom-providers">NestJS: Custom providers</a></strong>, the official page that explains tokens, <code>useClass</code>, <code>useValue</code> and <code>useFactory</code>, which you just built. Then <a href="https://docs.nestjs.com/fundamentals/injection-scopes">Injection scopes</a> and <a href="https://docs.nestjs.com/modules">Modules</a>.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why post-order, how Nest reads constructor types, when to use a factory, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0011</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

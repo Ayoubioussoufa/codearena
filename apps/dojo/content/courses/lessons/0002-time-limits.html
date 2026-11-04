@@ -1,0 +1,265 @@
+<!--
+  Lesson 0002 · body only. The page renders the title, meta, warm-up (at the
+  warmup marker), quiz (at the quiz marker), finish line and pager.
+-->
+<p class="lede">Lesson 1’s <code>run</code> has a fatal flaw: give it <code>while (1);</code> and it waits forever. CodeArena’s worker would freeze on the first infinite loop anyone submits. Today you give <code>run</code> a deadline, and find out why stopping a program is harder than it looks: it can ignore you, sleep instead of spinning, or leave its children behind.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Time Limit Exceeded is the verdict a judge hands out most, and the one that’s hardest to get right. It’s also behind <strong>I-17</strong>, the bug you met on Monday: killing <code>docker run</code> doesn’t stop the container. By the end of this lesson you’ll be able to explain exactly why, because it’s the same mistake you’re about to make, and fix, in C.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Two clocks</h2>
+
+<p>“How long did it run?” has two answers, and a judge needs both.</p>
+<ul>
+  <li><strong>Wall-clock time</strong> is what a clock on the wall would show between start and end. It keeps ticking whatever the program does: computing, sleeping, or waiting for input that never comes.</li>
+  <li><strong>CPU time</strong> counts only the moments the program actually runs on a core. A sleeping program gets almost none.</li>
+</ul>
+
+<p><strong>Try it</strong> (2 minutes):</p>
+<pre>time sleep 1
+time python3 -c "sum(range(30_000_000))"</pre>
+<p><code>real</code> is wall-clock time. <code>user</code> and <code>sys</code> are CPU time, spent in your code and in the kernel on your behalf. <code>sleep 1</code> takes a full second of <code>real</code> and almost zero CPU. The Python sum is the opposite: <code>real</code> ≈ <code>user</code>, because it computes the whole time.</p>
+
+<p class="aside">The IOI’s sandbox has both: <code>--time</code> limits CPU time and <code>--wall-time</code> limits wall-clock time, as two separate options (<a href="https://github.com/ioi/isolate/blob/master/isolate.1.txt">isolate’s manual</a>).</p>
+
+<p>So a CPU limit alone can’t stop <code>sleep(60)</code>, or a program blocked reading input you never send. <strong>The deadline that stops hangs is a wall-clock deadline.</strong> CPU time is still what you report and compare, and lesson 6 enforces it with cgroups. Today: the wall clock.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Signals: a tap on the shoulder, or the floor disappearing</h2>
+
+<p>To stop a process, you send it a <strong>signal</strong>: a small number that the kernel delivers on your behalf. The kernel marks it pending, and the next time the process passes through the kernel, the signal’s <em>disposition</em> runs. That’s one of three things:</p>
+<ul>
+  <li>the <strong>default action</strong>, which for most signals means terminating the process (sometimes with a core dump);</li>
+  <li>a <strong>handler</strong>, a function the program installed to run instead;</li>
+  <li><strong>nothing</strong>, if the program asked to ignore that signal.</li>
+</ul>
+<p>So most signals are a tap on the shoulder: the program decides what happens. Two are different. <strong>SIGKILL</strong> and SIGSTOP can never be caught, blocked or ignored. With SIGKILL, the program doesn’t get a say: the kernel just tears it down.</p>
+
+<p><strong>Try it</strong> (3 minutes). A Python process that ignores SIGTERM:</p>
+<pre>python3 -c 'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)' &amp;
+kill -TERM $!; sleep 0.5; ps -o pid,stat,args -p $!
+kill -KILL $!; sleep 0.5; ps -o pid,stat,args -p $!</pre>
+<p>After <code>-TERM</code>, it’s still listed. After <code>-KILL</code>, it’s gone. (<code>$!</code> is the PID of the last background job. And despite its name, <code>kill</code> sends <em>any</em> signal: the name is historical.)</p>
+
+<p class="aside"><code>docker stop</code> is polite: SIGTERM, then SIGKILL after a grace period of 10 seconds on Linux (<a href="https://docs.docker.com/reference/cli/docker/container/stop/">Docker docs</a>), so a database can flush its files. Right for services, wrong for a judge.</p>
+
+<p>For a judge, the rule follows: <strong>at the deadline, SIGKILL, with no grace period.</strong> A submission has nothing worth cleaning up, and a grace period is just more time for a hostile program to use.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Waiting, with a deadline</h2>
+
+<p>In lesson 1, <code>waitpid(pid, &amp;status, 0)</code> slept until the child ended. With a deadline, that’s the problem: if the child never ends, neither does <code>waitpid</code>. There are three classic ways out.</p>
+<ol>
+  <li><strong>Poll.</strong> <code>waitpid(pid, &amp;status, WNOHANG)</code> never sleeps: it returns the PID if the child has ended, and <code>0</code> if it’s still running. Ask, check the clock, nap for a millisecond, ask again. Simple, and easy to get right. <strong>Use this today.</strong></li>
+  <li><strong>An alarm.</strong> <code>alarm()</code> asks the kernel to send you SIGALRM later. If you install a handler with <code>sigaction</code> (without <code>SA_RESTART</code>), the blocked <code>waitpid</code> returns <code>-1</code> with <code>errno == EINTR</code> when the alarm fires. It’s the classic Unix way, and it’s fiddly.</li>
+  <li><strong>A pidfd.</strong> Since Linux 5.3, <code>pidfd_open(pid)</code> gives you a file descriptor for a process, which becomes readable when the process ends. <code>poll()</code> on it with a timeout gives you “wake me when it ends or when time’s up”, with no busy loop. It’s the modern answer, and today’s challenge.</li>
+</ol>
+
+<p><strong>Which clock?</strong> Measure with <code>clock_gettime(CLOCK_MONOTONIC, …)</code>, never with the time of day. The time-of-day clock (<code>CLOCK_REALTIME</code>, what <code>date</code> prints) can be <em>set</em>: by NTP, by an administrator, or by WSL resyncing with Windows. It can jump forwards, or even backwards. The monotonic clock only moves forward.</p>
+<p class="aside">This isn’t theory. While this lesson’s checker was being written, the wall clock on this very machine jumped back mid-run, and the checker measured a run that took <strong>−371 ms</strong>. The checker now uses a monotonic clock.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Killing everything it started</h2>
+
+<p>Your child isn’t always alone. <code>sh -c 'sleep 100; echo done'</code> is a shell, which forks <code>sleep</code> as <em>its</em> child. Kill the shell, and what happens to <code>sleep</code>?</p>
+
+<p><strong>Try it</strong> (2 minutes):</p>
+<pre>sh -c 'sleep 31.4; echo done' &amp;
+sleep 0.2; kill -KILL $!
+sleep 0.2; ps -o pid,ppid,args -C sleep
+pkill -f 'sleep 31.4'           <span class="c"># clean up</span></pre>
+<p><code>sleep 31.4</code> is still there, with a new parent. When a process dies, its children don’t die with it. They become <strong>orphans</strong>, adopted by init (PID 1) or by the nearest ancestor that registered as a <em>subreaper</em>, and they carry on. In a judge, every orphan is a process you forgot to stop, holding memory and CPU.</p>
+
+<h3>Process groups</h3>
+<p>Every process belongs to a <strong>process group</strong>, identified by a number, the PGID. A child starts in its parent’s group. A process can start a new group with itself as the leader by calling <code>setpgid(0, 0)</code>, and the new group’s ID is then its own PID. Every process it starts afterwards inherits that group.</p>
+<p>And <code>kill</code> understands groups: <strong>a negative number means “every process in this group”</strong>. <code>kill(-4121, SIGKILL)</code> kills the leader <em>and</em> everything it started. That’s how your shell’s <kbd>Ctrl</kbd>+<kbd>C</kbd> stops a whole pipeline at once.</p>
+
+<figure>
+  <svg viewBox="0 0 680 250" role="img" aria-label="run (PID 4120) starts sh (PID 4121), the leader of process group 4121, which also contains sleep (PID 4122). kill(4121) reaches only sh; kill(-4121) reaches the whole group. A second sleep (PID 4123) called setsid and sits outside the group, so it survives both.">
+    <defs>
+      <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" class="svg-fill-accent"/>
+      </marker>
+    </defs>
+    <rect class="svg-box" x="20" y="14" width="160" height="34" rx="5"/>
+    <text class="svg-code" x="100" y="36" text-anchor="middle">run · PID 4120</text>
+    <line class="svg-muted" x1="100" y1="48" x2="100" y2="112" stroke-width="1.5"/>
+    <rect class="svg-accent" x="30" y="84" width="330" height="150" rx="8" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <text class="svg-small" x="44" y="102" style="fill: var(--accent)">process group 4121</text>
+    <rect class="svg-box" x="50" y="112" width="220" height="34" rx="5"/>
+    <text class="svg-code" x="160" y="134" text-anchor="middle">sh · PID 4121 · the leader</text>
+    <line class="svg-muted" x1="160" y1="146" x2="160" y2="180" stroke-width="1.5"/>
+    <rect class="svg-box" x="80" y="180" width="160" height="34" rx="5"/>
+    <text class="svg-code" x="160" y="202" text-anchor="middle">sleep · PID 4122</text>
+    <line class="svg-muted" x1="270" y1="138" x2="440" y2="190" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <rect class="svg-box" x="440" y="180" width="180" height="34" rx="5"/>
+    <text class="svg-code" x="530" y="202" text-anchor="middle">sleep · PID 4123</text>
+    <text class="svg-small" x="530" y="232" text-anchor="middle">called setsid(): its own group, survives</text>
+    <text class="svg-code-accent" x="400" y="40">kill(-4121, SIGKILL)</text>
+    <text class="svg-small" x="400" y="56">the whole dashed box</text>
+    <path class="svg-accent" d="M420 64 L362 92" stroke-width="1.5" marker-end="url(#arrow2)"/>
+    <text class="svg-code" x="420" y="120">kill(4121, SIGKILL)</text>
+    <text class="svg-small" x="420" y="136">only sh: sleep 4122 is orphaned</text>
+    <path class="svg-muted" d="M418 126 L274 128" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  </svg>
+  <figcaption>A group is a label the kernel uses to deliver one signal to many processes. Anything that leaves the group is out of reach.</figcaption>
+</figure>
+
+<h3>The catch</h3>
+<p>Look at PID 4123. A process can leave its group: <code>setsid()</code> starts a new session and a new group, and <code>setpgid</code> can move a process too. A hostile submission can do that on purpose, and your <code>kill(-pgid)</code> misses it. Process groups were designed for shells and job control, not as a security wall. Your checker includes a program that escapes this way, and it <em>will</em> survive your kill. That’s expected: lesson 5 closes the hole with a PID namespace (kill its PID 1, and the kernel kills everything inside), and lesson 6 with <code>cgroup.kill</code>.</p>
+
+<p><strong>Before you build it, predict it.</strong> Each round draws new trees: groups or not, an escape or not, SIGTERM or SIGKILL. Getting these right in your head is what makes the lab quick.</p>
+<!-- drill:who-survives -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. I-17, explained</h2>
+
+<p>Now Monday’s bug makes sense. When you run <code>docker run …</code>, the process you started is only a <strong>client</strong>. It sends a request to the Docker daemon, and the daemon’s helpers (containerd, then a small <code>containerd-shim</code>) start the container’s process. That process is <em>not</em> a child of <code>docker run</code>: it lives in another branch of the process tree entirely.</p>
+<ul>
+  <li><strong>SIGKILL the client</strong>, and you’ve killed the messenger. The client can’t pass SIGKILL on (nobody can catch it), so the container never hears about it and keeps running. That’s the orphan story, one level up.</li>
+  <li><strong>SIGTERM the client</strong>, and it forwards the signal to the container’s first process (<code>docker run</code>’s <code>--sig-proxy</code> is on by default). But inside a container, that process is PID 1, and PID 1 only receives signals it has installed a handler for (<a href="https://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid_namespaces(7)</a>), so nothing happens. You’ll build one in lesson 5 and see it yourself.</li>
+</ul>
+<p>The fix follows the same rule as today: <strong>stop the work through whoever owns it.</strong> Give every container a unique name, and at the deadline ask the daemon to kill it by name (<code>docker kill &lt;name&gt;</code>). You’ll build exactly that in lesson 8.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Build: <code>run</code>, with a deadline</h2>
+
+<div class="spec">
+  <p><strong>Usage:</strong> <code>./run -t &lt;ms&gt; &lt;program&gt; [args...]</code></p>
+  <p>Runs the program with a wall-clock deadline of <em>ms</em> milliseconds, then prints exactly two lines on stdout:</p>
+  <ul>
+    <li>line 1: <code>exit N</code>, <code>signal S</code>, or <code>timeout</code> if the deadline stopped it;</li>
+    <li>line 2: <code>time_ms=T</code>, the wall-clock time from just before <code>fork</code> to the end.</li>
+  </ul>
+  <p>At the deadline, the program <strong>and everything it started</strong> must be killed and reaped. Wrong usage (no <code>-t</code>, a value that isn’t a positive number, no program) prints a usage line on stderr and exits with <code>2</code>.</p>
+</div>
+
+<p><strong>Your toolbox,</strong> on top of lesson 1’s:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Header</th><th>Remember</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://man7.org/linux/man-pages/man3/strtol.3.html"><code>long strtol(const char *s, char **end, int base)</code></a></td><td><code>&lt;stdlib.h&gt;</code></td><td>after the call, <code>*end</code> points at the first character it didn’t use: <code>'\0'</code> means the whole string was a number</td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man3/clock_gettime.3.html"><code>int clock_gettime(clockid_t c, struct timespec *t)</code></a></td><td><code>&lt;time.h&gt;</code></td><td>use <code>CLOCK_MONOTONIC</code>; <code>t.tv_sec</code> and <code>t.tv_nsec</code> (nanoseconds)</td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/nanosleep.2.html"><code>int nanosleep(const struct timespec *req, struct timespec *rem)</code></a></td><td><code>&lt;time.h&gt;</code></td><td>sleeps for <code>req</code>; 1 ms is <code>{0, 1000000}</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/wait.2.html"><code>waitpid(pid, &amp;status, WNOHANG)</code></a></td><td><code>&lt;sys/wait.h&gt;</code></td><td>returns <code>pid</code> if it ended, <code>0</code> if it’s still running, <code>-1</code> on error</td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/kill.2.html"><code>int kill(pid_t pid, int sig)</code></a></td><td><code>&lt;signal.h&gt;</code></td><td>a negative <code>pid</code> means “the whole process group <code>-pid</code>”</td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/setpgid.2.html"><code>int setpgid(pid_t pid, pid_t pgid)</code></a></td><td><code>&lt;unistd.h&gt;</code></td><td><code>setpgid(0, 0)</code>: “make me the leader of a new group”</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">With <code>-Wall -Wextra -Werror</code> and glibc, <code>clock_gettime</code> and <code>nanosleep</code> may need <code>#define _POSIX_C_SOURCE 200809L</code> as the very first line of the file, before any <code>#include</code>.</p>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>Start from your lesson 1 code</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0002-time-limits
+cp ../0001-run-a-program/run.c .
+bash check.sh build</pre>
+  <p>Read the four new test programs in <code>progs/</code> before going on. Each one attacks your runner differently. Can you say how, from the code alone?</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The new usage, and the clock</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-1"> done</label>
+  </div>
+  <p>Parse <code>-t &lt;ms&gt;</code> and reject anything that isn’t a positive number. Take the time just before <code>fork</code> and again after the child ends, and print <code>time_ms=</code> as a second line. Don’t add the deadline yet.</p>
+  <p>Run <code>bash check.sh</code>: the first group and “Called wrong” should be green. The deadline cases will hang for 5 seconds each, until the checker gives up. That’s the bug you’re about to fix.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The deadline</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-2"> done</label>
+  </div>
+  <p>Make “Stopped at the deadline” green: a spinning loop, a sleeper and a signal-ignorer must all print <code>timeout</code> at about the right time. Think before you type: what replaces the single blocking <code>waitpid</code>, and what must happen <em>after</em> you kill the child?</p>
+  <details>
+    <summary>Hint: the shape of the loop, in words</summary>
+    <p>Repeat: ask <code>waitpid</code> with <code>WNOHANG</code>. If the child has ended, leave the loop and report as in lesson 1. If not, check the clock: past the deadline, send SIGKILL, then call a <em>blocking</em> <code>waitpid</code> to reap it (otherwise it stays a zombie), and report <code>timeout</code>. Otherwise, sleep 1 ms and ask again.</p>
+  </details>
+  <details>
+    <summary>Why sleep 1 ms between checks?</summary>
+    <p>Without it, your loop asks the kernel millions of times a second, using a whole CPU core just to wait. Your judge would compete for the CPU with the very program it’s timing, and slow it down. One millisecond of sleep makes the waiting almost free, at the cost of up to 1 ms of lateness.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Leave nothing behind</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-3"> done</label>
+  </div>
+  <p>Make “Nothing left behind” green: when a shell started <code>sleep</code>, both must be dead after your timeout. Use a process group. Where must <code>setpgid</code> be called? (Lesson 1 told you where every sandbox gets built.)</p>
+  <details>
+    <summary>Hint: a race hides here</summary>
+    <p>After <code>fork</code>, you don’t know whether the parent or the child runs first. If the parent reaches the deadline and calls <code>kill(-pid, …)</code> before the child has called <code>setpgid(0, 0)</code>, the group doesn’t exist yet. The fix that shells use is to call it in <strong>both</strong> places: <code>setpgid(0, 0)</code> in the child before <code>exec</code>, and <code>setpgid(pid, pid)</code> in the parent right after <code>fork</code>. The parent’s call can fail if the child has already called <code>exec</code>. That’s fine: it means the child got there first.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <h3>All green, and one escape</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-4"> done</label>
+  </div>
+  <p>Run <code>bash check.sh</code> until all 13 cases pass. The last section isn’t graded: <code>escaper</code>’s grandchild survives your kill. Write one sentence saying why, using the words <em>session</em> and <em>process group</em>, in the box in section 9.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: wait without polling</h3>
+    <label><input type="checkbox" data-key="lesson-0002-step-5"> done</label>
+  </div>
+  <p>Replace the polling loop with a pidfd: <code>pidfd_open(pid, 0)</code> (from <code>&lt;sys/pidfd.h&gt;</code>, glibc 2.36 or later), then <code>poll()</code> on it with the time left as the timeout. It wakes exactly when the child ends or the deadline passes, and never in between. To see the difference, compare the CPU your runner itself uses while waiting on a sleeper:</p>
+  <pre>time ./build/run -t 3000 ./build/sleeper</pre>
+  <p>With polling, <code>user</code> + <code>sys</code> comes to tens of milliseconds (about 30 ms when this lesson was tested): three thousand wake-ups to ask “done yet?”. With a pidfd it drops to almost nothing. Read <a href="https://man7.org/linux/man-pages/man2/pidfd_open.2.html">pidfd_open(2)</a> first.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. What this means for a judge</h2>
+<ul>
+  <li><strong>Two limits.</strong> A wall-clock deadline stops hangs, and CPU time is the fair measure of speed. Your runner has the first; cgroups will give it the second (lesson 6).</li>
+  <li><strong>SIGKILL, no grace.</strong> Politeness is for services, not for strangers’ code.</li>
+  <li><strong>Kill the work, not the messenger.</strong> Whatever you kill must be what’s actually running, or the owner of it: the group, the PID namespace, the container through its daemon.</li>
+  <li><strong>Groups are not walls.</strong> They stop accidents, not attacks. The escape you just watched is why real judges use namespaces and cgroups.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Open <code>apps/worker/src/ports/code-runner.port.ts</code>. <code>RunLimits</code> has a <code>timeoutMs</code>. Is it wall-clock time or CPU time, as the type stands? And at the deadline, what exactly should the Docker adapter kill: the <code>docker</code> process it spawned, or something else? Answer in two sentences, in the box in section 9: they decide how you’ll build the adapter in lesson 8.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>8. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>9. Say it in your own words</h2>
+<p>Your answers to section 7 and to step 4, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://man7.org/linux/man-pages/man7/signal.7.html">signal(7)</a></strong>, the Linux manual’s overview of signals, maintained by Michael Kerrisk. Read “Signal dispositions” and the table under “Standard signals”: ten minutes, and you’ll know signals better than most engineers.</p>
+  <p>Then <a href="https://man7.org/linux/man-pages/man2/setpgid.2.html">setpgid(2)</a> for process groups and sessions, and <a href="https://man7.org/linux/man-pages/man2/pidfd_open.2.html">pidfd_open(2)</a> for the challenge.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why SIGKILL can’t be caught, how the kernel picks an orphan’s new parent, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0002</code></strong> message from section 9 and paste it in the terminal. For questions about signals and process groups that go beyond this lesson, <a href="https://unix.stackexchange.com/questions/tagged/signals">Unix &amp; Linux Stack Exchange</a> is where practitioners answer them.</p>
+</div>

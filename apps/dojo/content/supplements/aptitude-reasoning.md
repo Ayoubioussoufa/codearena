@@ -211,6 +211,11 @@ He gives 900 g of value and charges for 1000 g. Gain = extra/actual-given =
 **Answers:** (1) 640 × 9/8 = 720. (2) Need net +20: 60 − d − 60d/100 = 20 ⇒ 40 = d(1.6) ⇒
 d = 25%. (3) 690/0.92 = 750. (4) 50/950 = 5.26%.
 
+
+```check
+foundation
+```
+
 ## 5. Ratio, proportion and mixtures
 
 ### The concept
@@ -372,6 +377,11 @@ So A+B+C = 1/10 ⇒ **10 days**.
 days, 12 workers do 12 × 5 = 60 worker-days, leaving 180. Then 3 leave, so 9 workers remain:
 180 / 9 = 20 more days ⇒ **25 days** total. (3) 1/4 − 1/L = 1/4.8 ⇒ 1/L = 1/4 − 5/24 = 1/24 ⇒ 24 h.
 
+
+```check
+ratios
+```
+
 ## 8. Speed, distance, trains and boats
 
 ### The concept
@@ -467,6 +477,11 @@ Yearly SI = 1,440 − 1,320 = 120 (constant under SI!). So 2 years earlier: P = 
 years at compound interest — approximate rate? — 4. 10,000 at 12% compounded annually, 2 years?
 
 **Answers:** (1) 2,160. (2) 15,000 × 0.0064 = 96. (3) ≈ 72/8 = 9%. (4) 10,000 × 1.2544 = 12,544.
+
+
+```check
+motion
+```
 
 ## 10. Counting — permutations and combinations
 
@@ -568,6 +583,11 @@ Favourable = 5C1 × 3C1 = 15; total = 8C2 = 28 ⇒ **15/28**.
 P(face card)? — 4. Bag: 4 white, 6 black; two drawn without replacement. P(both black)?
 
 **Answers:** (1) 3C2/2³ = 3/8. (2) 25/36. (3) 12/52 = 3/13. (4) 6/10 × 5/9 = 1/3.
+
+
+```check
+counting
+```
 
 ## 12. Logical reasoning — a method per question type
 
@@ -686,6 +706,11 @@ flowchart LR
   resurface before the real test finds them.
 - **Gate** (from the [Interview Playbook](/guides/interview-playbook)): 80%+ on mixed sessions
   at ~1 min/question, and the formula sheet below written from memory without hesitation.
+
+
+```check
+logic
+```
 
 ## Formula sheet — one screen, memorize cold
 

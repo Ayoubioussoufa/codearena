@@ -1,0 +1,604 @@
+/*
+ * Courses: the lesson style (Tufte-flavoured: one readable column, notes in
+ * the margin on wide screens). Everything is scoped under .course so it never
+ * touches the rest of the dojo. Plain (unlayered) CSS, so it wins over
+ * Tailwind's preflight inside .course. Dark mode follows the dojo's .dark class.
+ */
+
+.course {
+  --bg: #fffff8;
+  --surface: #f6f4ea;
+  --ink: #1d1d1b;
+  --muted: #5f5d55;
+  --rule: #dcd8c8;
+  --accent: #a3342a;
+  --accent-soft: #f5e4df;
+  --link: #8a2b22;
+  --ok: #2f6b2f;
+  --ok-soft: #e3efdc;
+  --bad: #9b2c2c;
+  --bad-soft: #f6dddd;
+  --code-bg: #f1eee2;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, "SF Mono", Menlo, monospace;
+
+  flex: 1;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.dark .course {
+  --bg: #161614;
+  --surface: #1f1f1c;
+  --ink: #e9e6dc;
+  --muted: #a19d90;
+  --rule: #3a3933;
+  --accent: #e8836f;
+  --accent-soft: #3a231e;
+  --link: #e09a89;
+  --ok: #8fcf86;
+  --ok-soft: #1f3320;
+  --bad: #f09a9a;
+  --bad-soft: #3d2222;
+  --code-bg: #24241f;
+}
+
+.course-main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2.5rem 1rem 5rem;
+}
+.course-main.wide { max-width: 52rem; }
+
+
+/* ── type ── */
+.course a { color: var(--link); text-decoration: underline; text-underline-offset: 0.15em; }
+.course a:hover { text-decoration-thickness: 2px; }
+.course a.plain { text-decoration: none; color: inherit; }
+
+.course h1, .course h2, .course h3 { font-weight: 400; line-height: 1.2; color: var(--ink); }
+.course h1 { font-size: 2.3rem; margin: 0.2rem 0 0.6rem; }
+.course h2 {
+  clear: both;
+  font-size: 1.55rem;
+  margin: 3rem 0 0.8rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+.course h3 { font-size: 1.2rem; font-style: italic; margin: 2rem 0 0.5rem; }
+
+.course p, .course ul, .course ol { margin: 0 0 1rem; }
+.course ul { list-style: disc; padding-left: 1.4rem; }
+.course ol { list-style: decimal; padding-left: 1.6rem; }
+.course li { margin-bottom: 0.3rem; }
+.course ul.bare { list-style: none; padding-left: 0; }
+.course strong { font-weight: 600; }
+.course em { font-style: italic; }
+
+.course .kicker {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+.course .meta {
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 2rem;
+}
+.course .lede { font-size: 1.3rem; line-height: 1.5; }
+.course .muted { color: var(--muted); }
+.course .sans { font-family: var(--sans); }
+
+/* margin notes: an inset on narrow screens */
+.course .aside {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 2px solid var(--rule);
+  padding: 0.2rem 0 0.2rem 0.9rem;
+  margin: 0 0 1rem;
+}
+.course .aside strong { color: var(--ink); }
+
+/* Wide screens: notes move into the right margin. Must come after the base
+   .aside rule, which it overrides. */
+@media (min-width: 1180px) {
+  .course-main:not(.wide) { margin-left: max(2rem, calc(50vw - 34rem)); }
+  .course .aside {
+    float: right;
+    clear: right;
+    width: 15rem;
+    margin: 0.3rem -18rem 1rem 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+}
+
+/* ── code ── */
+.course code, .course pre, .course kbd { font-family: var(--mono); font-size: 0.86em; }
+.course :not(pre) > code {
+  background: var(--code-bg);
+  padding: 0.08em 0.3em;
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.course pre {
+  position: relative;
+  background: var(--code-bg);
+  color: var(--ink);
+  /* 0.8em ≈ 13.6px, GitHub's code size: ~72 columns in the text column, ~68 inside a step card */
+  font-size: 0.8em;
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.45;
+  margin: 0 0 1.2rem;
+}
+.course pre .c { color: var(--muted); }
+/* Output that can't be re-wrapped (metrics, real plans) spans the margin-note
+   column too, like a Tufte full-width figure. Top-level blocks only. */
+@media (min-width: 1180px) {
+  .course pre.wide { width: calc(100% + 17rem); clear: right; }
+}
+.course pre .copy {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.course pre:hover .copy, .course pre .copy:focus-visible { opacity: 1; }
+@media (hover: none) { .course pre .copy { opacity: 1; } }
+.course kbd {
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.3em;
+}
+
+/* ── tables ── */
+.course .table-wrap { overflow-x: auto; margin: 0 0 1.2rem; }
+.course table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+.course th, .course td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.course th {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.course td.blank { min-width: 7rem; border-bottom: 1px dashed var(--muted); }
+
+/* ── callouts ── */
+.course .callout {
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  padding: 0.9rem 1.1rem;
+  margin: 1.5rem 0;
+  border-radius: 0 6px 6px 0;
+}
+.course .callout > :last-child { margin-bottom: 0; }
+.course .label {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.3rem;
+}
+.course .callout.big { font-size: 1.2rem; }
+.course .callout.big .small { font-size: 1rem; }
+
+.course .spec {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin: 1.5rem 0;
+}
+.course .spec > :last-child { margin-bottom: 0; }
+
+/* ── build steps ── */
+.course .step {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1rem 1.2rem 0.4rem;
+  margin: 1.2rem 0;
+}
+.course .step.done { border-color: var(--ok); }
+.course .step-head { display: flex; gap: 0.7rem; align-items: baseline; margin-bottom: 0.6rem; }
+.course .step-head h3 { margin: 0; flex: 1; }
+.course .step-head label {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.course .step-head input { accent-color: var(--ok); width: 1rem; height: 1rem; vertical-align: -0.15rem; }
+.course .step-num {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 999px;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.course .step.done .step-num { background: var(--ok); }
+
+/* ── folded hints ── */
+.course details {
+  border: 1px dashed var(--rule);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  margin: 0 0 1rem;
+}
+.course details[open] { border-style: solid; }
+.course summary { cursor: pointer; font-family: var(--sans); font-size: 0.9rem; color: var(--link); }
+.course details[open] > summary { margin-bottom: 0.6rem; }
+.course details > :last-child { margin-bottom: 0.4rem; }
+
+/* ── figures ── */
+.course figure { margin: 1.5rem 0; }
+.course figure svg { width: 100%; height: auto; display: block; }
+.course figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 0.4rem; }
+.course .svg-ink { stroke: var(--ink); fill: none; }
+.course .svg-muted { stroke: var(--muted); fill: none; }
+.course .svg-accent { stroke: var(--accent); fill: none; }
+.course .svg-ok { stroke: var(--ok); fill: none; }
+.course .svg-dot { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+.course .svg-dot-accent { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }
+.course .svg-box { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+.course .svg-box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.course .svg-fill-accent { fill: var(--accent); }
+.course .svg-text { fill: var(--ink); font-family: var(--sans); font-size: 13px; }
+.course .svg-small { fill: var(--muted); font-family: var(--sans); font-size: 11.5px; }
+.course .svg-code { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+.course .svg-code-accent { fill: var(--accent); font-family: var(--mono); font-size: 12px; }
+
+.course .bits {
+  display: grid;
+  grid-template-columns: 8fr minmax(3.4rem, 1fr) 7fr;
+  gap: 3px;
+  margin: 0.8rem 0 0.4rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.course .bits div { background: var(--surface); border: 1px solid var(--rule); padding: 0.45rem 0.3rem; border-radius: 4px; }
+.course .bits .hi { background: var(--ok-soft); }
+.course .bits .lo { background: var(--accent-soft); }
+.course .bits small { display: block; color: var(--muted); font-size: 0.75rem; }
+
+/* ── quiz ── */
+.course .quiz { margin: 1.5rem 0; }
+.course .q { border: 1px solid var(--rule); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.course .q-from { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem; }
+.course .q-text { margin-bottom: 0.7rem; }
+.course .opts { display: grid; gap: 0.45rem; }
+.course .opt {
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+.course .opt:hover:not(:disabled) { border-color: var(--link); }
+.course .opt:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.course .opt:disabled { cursor: default; }
+.course .opt.right { background: var(--ok-soft); border-color: var(--ok); }
+.course .opt.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.course .why { margin: 0.8rem 0 0; font-size: 0.97rem; }
+.course .why .verdict { font-family: var(--sans); font-weight: 600; margin-right: 0.3rem; }
+.course .why .verdict.ok { color: var(--ok); }
+.course .why .verdict.bad { color: var(--bad); }
+.course .quiz-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* ── buttons ── */
+.course .btn {
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--link);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.course .btn:hover { border-color: var(--link); }
+.course .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.course .btn.primary:hover { filter: brightness(1.08); }
+.course .btn.done { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); font-weight: 600; }
+
+/* ── footer pieces ── */
+.course .source, .course .ask, .course .finish {
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin: 1.5rem 0;
+}
+.course .source { background: var(--surface); }
+.course .source .label { color: var(--muted); }
+.course .ask { border: 2px solid var(--accent); }
+.course .finish { border: 1px solid var(--rule); }
+.course .finish.is-done { border-color: var(--ok); background: var(--ok-soft); }
+.course .source > :last-child, .course .ask > :last-child, .course .finish > :last-child { margin-bottom: 0; }
+
+.course nav.crumbs {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+.course nav.crumbs a { color: var(--muted); }
+.course nav.pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+}
+.course nav.pager .next { text-align: right; grid-column: 2; }
+.course nav.pager small { display: block; color: var(--muted); }
+
+/* ── hub ── */
+.course .today {
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 1.1rem 1.3rem;
+  margin: 1.5rem 0 2rem;
+}
+.course .today h2 { border: 0; margin: 0.2rem 0 0.4rem; padding: 0; font-size: 1.45rem; }
+.course .today > :last-child { margin-bottom: 0; }
+.course .today .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+
+.course .meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+  margin: 0.4rem 0 0.2rem;
+}
+.course .meter > span { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+
+.course .lessons { list-style: none; padding: 0; margin: 0 0 1rem; border-top: 1px solid var(--rule); }
+.course .lessons li {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--rule);
+  margin: 0;
+}
+.course .lessons .num { font-family: var(--sans); font-size: 0.85rem; color: var(--muted); }
+.course .lessons .t { font-size: 1.05rem; }
+.course .lessons .s { grid-column: 2 / 4; font-size: 0.93rem; color: var(--muted); }
+.course .lessons .planned .t { color: var(--muted); }
+
+.course .badge {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.08rem 0.55rem;
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.course .badge.ready { border-color: var(--link); color: var(--link); }
+.course .badge.done { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.course .badge.now { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+.course .weeks { display: grid; gap: 1rem; margin: 1rem 0 2rem; }
+.course .week-card {
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  text-decoration: none;
+  color: inherit;
+}
+.course .week-card:hover { border-color: var(--link); }
+.course .week-card.current { border: 2px solid var(--accent); }
+.course .week-card h3 { margin: 0.1rem 0 0.3rem; font-style: normal; font-size: 1.2rem; }
+.course .week-card p { margin: 0; font-size: 0.97rem; }
+
+.course .days { display: grid; gap: 1rem; margin: 1rem 0 2rem; }
+.course .day { border: 1px solid var(--rule); border-radius: 8px; padding: 0.9rem 1.2rem; }
+.course .day.today-day { border: 2px solid var(--accent); }
+.course .day-head { display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.course .day-head h3 { margin: 0; font-style: normal; font-size: 1.1rem; }
+.course .day dl { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.35rem 0.8rem; margin: 0; font-size: 0.97rem; }
+.course .day dt { font-family: var(--sans); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding-top: 0.2rem; }
+.course .day dd { margin: 0; }
+@media (max-width: 520px) {
+  .course .day dl { grid-template-columns: 1fr; }
+  .course .day dt { padding-top: 0.5rem; }
+}
+
+.course .checklist { list-style: none; padding: 0; }
+.course .checklist li { display: flex; gap: 0.6rem; align-items: baseline; }
+.course .checklist input { accent-color: var(--ok); }
+
+.course .tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.8rem; margin: 1rem 0 2rem; }
+.course .track { border: 1px solid var(--rule); border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.95rem; }
+.course .track strong { display: block; font-size: 1.02rem; margin-bottom: 0.2rem; }
+
+/* ── reference pages ── */
+.course dl.terms dt { font-weight: 600; margin-top: 1rem; }
+.course dl.terms dd { margin: 0.2rem 0 0; }
+.course dl.terms .avoid { color: var(--muted); font-style: italic; font-size: 0.95rem; }
+.course .empty { color: var(--muted); font-style: italic; }
+
+@media print {
+  .course { background: #fff; color: #000; font-size: 11pt; }
+  .course-main { max-width: none; margin: 0; padding: 0; }
+  .course .aside { float: none; width: auto; margin: 0 0 1rem; }
+  .course nav.crumbs, .course nav.pager, .course .quiz-foot, .course .step-head label,
+  .course pre .copy, .course .finish { display: none; }
+  .course details { border: 0; padding: 0; }
+  .course details > summary { display: none; }
+  .course pre, .course .step, .course .q, .course table { break-inside: avoid; }
+  .course a { color: inherit; }
+}
+
+/* ── lesson map ── */
+.course nav.toc {
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.8rem 1.1rem 0.4rem;
+  margin: 0 0 2rem;
+}
+.course nav.toc ol { list-style: none; margin: 0.2rem 0 0.4rem; padding-left: 0; columns: 2 16rem; column-gap: 2rem; }
+.course nav.toc li { margin-bottom: 0.25rem; break-inside: avoid; }
+.course nav.toc a { color: var(--ink); text-decoration-color: var(--rule); }
+.course h2[id] { scroll-margin-top: 4.5rem; }
+
+/* ── in-lesson drills ── */
+.course .drill {
+  border: 2px dashed var(--link);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1.5rem 0 2rem;
+}
+.course .drill .label { color: var(--link); }
+.course .drill-title { font-size: 1.2rem; margin: 0 0 0.2rem; }
+.course .drill-blurb { font-size: 0.97rem; }
+.course .drill .q { margin: 0.8rem 0 0; }
+.course .drill-input { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.course .drill-input input {
+  flex: 1 1 12rem;
+  font-family: var(--mono);
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+}
+.course .drill-input input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+/* ── your own words ── */
+.course .words { display: grid; gap: 0.8rem; margin: 1rem 0 1.5rem; }
+.course .words-row { display: grid; grid-template-columns: 11rem 1fr; gap: 0.8rem; align-items: start; }
+.course .words-row.wide { grid-template-columns: 1fr; gap: 0.3rem; }
+.course .words-term { font-family: var(--sans); font-size: 0.9rem; font-weight: 600; padding-top: 0.45rem; }
+.course .words-row.wide .words-term { padding-top: 0; }
+.course .words textarea,
+.course .check-explain textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+  resize: vertical;
+}
+.course .words textarea:focus-visible,
+.course .check-explain textarea:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.course .words-message { white-space: pre-wrap; }
+@media (max-width: 560px) {
+  .course .words-row { grid-template-columns: 1fr; gap: 0.3rem; }
+  .course .words-term { padding-top: 0; }
+}
+@media print {
+  .course .drill, .course nav.toc { display: none; }
+}
+
+/* ── Today in CodeArena ── */
+.course .task {
+  border: 2px solid var(--ok);
+  border-radius: 10px;
+  padding: 1rem 1.2rem 0.6rem;
+  margin: 1.5rem 0;
+}
+.course .task .label { color: var(--ok); }
+.course .task-title { font-size: 1.25rem; margin: 0 0 0.4rem; }
+.course .task-before { font-size: 0.9rem; }
+.course .task-h {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0.9rem 0 0.3rem;
+}
+.course .task details { border-style: solid; }
+.course ul.checklist-plain { list-style: "☐  "; }
+
+/* ── guide checks: lesson pieces embedded in a dojo guide ── */
+.course.course-embed { flex: none; font-size: 1.0625rem; margin: 2.2rem 0; }
+.course.check {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 1rem 1.2rem 0.5rem;
+}
+.course .check-label {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.4rem;
+}
+.course .check .quiz { margin: 0.4rem 0 1rem; }
+.course .check-explain { display: grid; gap: 0.45rem; margin: 0 0 0.8rem; }
+.course .check-foot { font-family: var(--sans); font-size: 0.82rem; color: var(--muted); margin: 0 0 0.6rem; }
+.course.review h2 { margin: 0.2rem 0 0.6rem; border: 0; padding: 0; }

@@ -1,0 +1,118 @@
+<!--
+  Lesson 0026 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You’ve built a sandbox, a queue that survives crashes, queries a hundred times faster, a pipeline that rolls itself back. None of it counts in an interview until you can tell it, clearly, in about ninety seconds, and answer the question that follows. Today you write the six stories you’ll tell, and test them against the rubric an interviewer carries in their head.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Big-tech and consulting interviews (BCG X included) have a behavioural part: “tell me about a time when…”. Strong engineers fail it by rambling, by saying “we” for ten minutes, or by never reaching a result. It’s a skill, so it’s trainable, and you’ve already lived the material.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. STAR, and where the time goes</h2>
+<p><strong>STAR</strong> is the shape interviewers listen for. Amazon’s interview guide describes it directly: the situation, what you were trying to accomplish, “what did you specifically do”, and how it turned out (<a href="https://www.amazon.jobs/en/landing_pages/in-person-interview">Amazon: the interview loop</a>). In 90 seconds:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Part</th><th>Time</th><th>What it answers</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Situation</strong></td><td>~10 s</td><td>Where, when, what was wrong. One or two sentences.</td></tr>
+    <tr><td><strong>Task</strong></td><td>~10 s</td><td>Your goal, and your role in it.</td></tr>
+    <tr><td><strong>Action</strong></td><td>~45 s</td><td>What <em>you</em> did, step by step, and why each step. The evidence of how you work.</td></tr>
+    <tr><td><strong>Result</strong></td><td>~15 s</td><td>What changed, with a number.</td></tr>
+    <tr><td><strong>Learned</strong></td><td>~10 s</td><td>What you’d do differently, or now always do.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Four habits that make a story land</h2>
+<ul>
+  <li><strong>“I”, not “we”.</strong> They’re hiring you. Credit the team, then say exactly what you did. “We migrated the database” leaves them guessing whether you led it or watched.</li>
+  <li><strong>Numbers.</strong> “Much faster” is an opinion; “from 2,750 pages read to 23” is a fact they can write down. CodeArena is full of them: your lab outputs, your <code>docs/perf/</code> plans, your attack suite.</li>
+  <li><strong>Decisions, with their trade-offs.</strong> The follow-up is almost always “why that, and not X?”. Your ADRs are the answers: a story you understand bends under questions; a memorised one breaks.</li>
+  <li><strong>Spoken English.</strong> Short sentences, one idea each. Cut filler (“basically”, “kind of”, “a lot of stuff”): it fills the air and empties the meaning.</li>
+</ul>
+<p class="aside">The Tech Interview Handbook has a good, free guide with sample answers and the most common questions (<a href="https://www.techinterviewhandbook.org/behavioral-interview/">behavioural interviews</a>). Most questions map onto a handful of stories: a hard technical problem, a conflict, a failure, a decision with a trade-off, learning something fast.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Your six</h2>
+<ol>
+  <li><strong>The sandbox:</strong> running strangers’ code safely; the walls, and the attack tests that prove each one.</li>
+  <li><strong>The faster query:</strong> one of your six plans, before and after, and how you found the cause.</li>
+  <li><strong>The idempotent queue:</strong> at-least-once delivery, and how a duplicate judges once.</li>
+  <li><strong>A production bug:</strong> one your real users found on 21 November, from report to test to fix.</li>
+  <li><strong>A disagreement:</strong> a code review, a 42 group project, a design choice you argued for or against.</li>
+  <li><strong>A failure:</strong> something that went wrong because of you, and what you changed afterwards.</li>
+</ol>
+
+<p><strong>Before you write, train the ear:</strong></p>
+<!-- drill:star -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Write them, then say them</h2>
+<div class="spec">
+  <p><code>stories.start.md</code> has a worked example (not yours) and six empty stories. The checker reads each one the way an interviewer listens: the five parts in order, 115 to 225 words (45 to 90 seconds), the Action at least 40%, “I” more than “we”, a number in the Result, no filler. It prints each story’s spoken length.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Stories 1 to 3</h3>
+    <label><input type="checkbox" data-key="lesson-0026-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0026-star-stories
+cp stories.start.md stories.md
+bash check.sh</pre>
+  <p>Read the example, then write the three technical stories first: your notes, ADRs and lab outputs hold the facts. Make them pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Stories 4 to 6</h3>
+    <label><input type="checkbox" data-key="lesson-0026-step-2"> done</label>
+  </div>
+  <p>The production bug after your users have used the site, the disagreement and the failure. These are harder to write honestly: the failure must be a real one, with a real lesson.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Out loud, timed</h3>
+    <label><input type="checkbox" data-key="lesson-0026-step-3"> done</label>
+  </div>
+  <p>Read each story aloud with a timer, then without the page. Record one on your phone and listen back. Where you hesitate is where the story isn’t clear yet: fix the text, not your delivery.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: the follow-ups</h3>
+    <label><input type="checkbox" data-key="lesson-0026-step-4"> done</label>
+  </div>
+  <p>Under each story, write the three questions an interviewer would most likely ask next (“why not Kafka?”, “how did you test that?”, “what would you do with ten times the traffic?”), and a two-sentence answer to each. Paste one story in the terminal and I’ll play the interviewer.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Your turn, in CodeArena</h2>
+<div class="callout">
+  <span class="label">For the README</span>
+  <p>Tomorrow’s task puts “the three stories in one line each” in CodeArena’s README. Write those lines now, one per story, each with its number. In section 7’s box.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your one-liners from section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.amazon.jobs/en/landing_pages/in-person-interview">Amazon: the in-person interview</a></strong>, a hiring company explaining in its own words what it listens for in behavioural answers. Then the <a href="https://www.techinterviewhandbook.org/behavioral-interview/">Tech Interview Handbook’s behavioural guide</a> for worked examples.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Paste a story in the terminal: I’ll ask the follow-up questions, point out where it’s vague, and correct the English.</p>
+  <p>When all six pass, copy your <strong><code>done 0026</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

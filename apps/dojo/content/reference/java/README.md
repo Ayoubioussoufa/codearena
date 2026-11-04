@@ -67,3 +67,8 @@ if you're arriving from the [JS/TS reference](/guides/js).
   accidental O(n²) that causes most TLEs.
 - 🔴 **mutates** · 🟢 **returns new**
 - ⚠️ **trap** — behaviour that compiles fine and gives wrong answers.
+
+```check
+traps
+```
+

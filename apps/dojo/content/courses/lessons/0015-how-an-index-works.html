@@ -1,0 +1,118 @@
+<!--
+  Lesson 0015 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Postgres doesn’t “look up” a row. It reads pages from disk, 8 kB at a time, and the only question that matters for speed is <em>how many</em>. Today you watch a query read 2,750 pages to return 20 rows, then build the index that gets it down to 23, and learn exactly why column order decides whether an index helps at all.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon you seed a million submissions and write six before/after query plans. That’s also the evidence behind I-16, the index your schema has that can’t serve its own query. After today, you’ll see it without running anything.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Pages and the heap</h2>
+<p>A Postgres table is a file of fixed-size <strong>pages</strong> (8 kB by default), each holding as many rows as fit (<a href="https://www.postgresql.org/docs/current/storage-page-layout.html">page layout</a>). The rows sit in no useful order: new ones go wherever there’s room. That unordered file is called the <strong>heap</strong>.</p>
+<p>So without help, “find user 4242’s submissions” has one strategy: read every page and test every row. That’s a <strong>sequential scan</strong>. On the lab’s 300,000 submissions it reads about 2,750 pages, whether 10 rows match or 100,000. The unit of cost is the page, and <code>EXPLAIN (ANALYZE, BUFFERS)</code> counts them for you: that’s the “buffers” number your checker prints.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. A B-tree: a sorted copy with a table of contents</h2>
+<p>An index is a <strong>second copy</strong> of some columns, kept sorted, where each entry points at its row in the heap. Postgres’s default kind is a <strong>B-tree</strong>: the sorted entries live in leaf pages, and a few levels of branch pages above them act as a table of contents.</p>
+<pre>                 [ root: … 3000 | 6000 … ]
+                /            |             \
+   [ branch … ]       [ branch: 4000 | 4200 | 4400 ]       [ branch … ]
+                                    |
+        leaf: (4242 → page 812) (4242 → page 1907) (4243 → page 33) …</pre>
+<p>Finding user 4242 means reading the root, one branch, and the leaf: three pages, not 2,750. Because each page holds hundreds of entries, the tree stays shallow: Markus Winand notes that real indexes with millions of entries have a depth of four or five (<a href="https://use-the-index-luke.com/sql/anatomy/the-tree">Use The Index, Luke: the tree</a>). Then each matching row costs one more page from the heap, which is why a query matching 10 rows is cheap and one matching 100,000 isn’t.</p>
+<p class="aside">If every column a query needs is <em>in</em> the index, Postgres can skip the heap entirely: an <strong>index-only scan</strong>. It still needs to know the rows are visible, which it learns from the visibility map that <code>VACUUM</code> keeps (<a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html">index-only scans</a>). That’s why the checker vacuums before measuring.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Column order is everything</h2>
+<p>A two-column index is sorted like a phone book: by the first column, then by the second <em>within</em> each value of the first. That one fact gives you every rule:</p>
+<ul>
+  <li><strong>The leftmost prefix.</strong> <code>(user_id, family)</code> can find a user, or a user and a family. It can’t find a family alone: those entries are scattered across every user, so there’s nowhere to start (<a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">multicolumn indexes</a>). That’s I-16.</li>
+  <li><strong>Equality first, then the sort or the range.</strong> <code>(user_id, created_at DESC)</code>: the equality lands on one contiguous slice, and inside it the rows are already in date order. <code>ORDER BY created_at DESC LIMIT 20</code> reads 20 entries and stops: no sort at all (<a href="https://www.postgresql.org/docs/current/indexes-ordering.html">indexes and ORDER BY</a>).</li>
+  <li><strong>Backwards is free.</strong> A B-tree can be walked in either direction, so the same index serves <code>ASC</code> too.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. The planner decides, from statistics</h2>
+<p>Having an index doesn’t mean Postgres uses it. The <strong>planner</strong> estimates what each strategy would cost, from statistics that <code>ANALYZE</code> collects, and picks the cheapest (<a href="https://www.postgresql.org/docs/current/using-explain.html">using EXPLAIN</a>). The key estimate is <strong>selectivity</strong>, the fraction of rows that match:</p>
+<ul>
+  <li><strong>A few rows:</strong> an <strong>Index Scan</strong>, one heap page per row.</li>
+  <li><strong>Hundreds to thousands, scattered:</strong> a <strong>Bitmap Heap Scan</strong>. It collects the matching page numbers from the index first, then reads each page once, in file order, instead of jumping back and forth (<a href="https://www.postgresql.org/docs/current/indexes-bitmap-scans.html">combining indexes</a>). It can also combine two indexes with a <code>BitmapAnd</code>.</li>
+  <li><strong>A large share of the table:</strong> a <strong>Seq Scan</strong>, because reading everything in order beats fetching most of it piece by piece.</li>
+</ul>
+<p>That’s why, in the lab, your 8,000-submission user gets an ordered index walk, and the 10-submission user gets a bitmap scan plus a tiny sort. Both are right. A plan belongs to a query and its data, not to an index.</p>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:indexes -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build <code>indexes.sql</code></h2>
+<div class="spec">
+  <p>The four queries and the rules are in the lab’s <code>README.md</code>. The checker seeds 300,000 skewed submissions in a throwaway Postgres, shows each query’s plan before, runs your file, and checks each plan after: no Seq Scan, at most 60 pages read, no sort for the heavy user, and <strong>at most three</strong> new indexes on <code>submissions</code>. Three is tight on purpose.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Read the plans before</h3>
+    <label><input type="checkbox" data-key="lesson-0015-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0015-how-an-index-works
+cat README.md
+<span class="c"># an empty file: watch every query read the whole table</span>
+touch indexes.sql &amp;&amp; bash check.sh</pre>
+  <p>Note each query’s plan and buffer count. Predict, for each one, which index would fix it, before you write any.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Three indexes, four queries</h3>
+    <label><input type="checkbox" data-key="lesson-0015-step-2"> done</label>
+  </div>
+  <p>Write <code>CREATE INDEX name ON table (columns);</code> lines until all 6 cases pass. One index must serve two queries. When a query still fails, read its plan in the checker’s output: it tells you which rule you broke.</p>
+  <details>
+    <summary>Hint: which two queries share an index?</summary>
+    <p>Query 3 filters on <code>user_id</code> and <code>problem_id</code>. You already need an index that starts with <code>user_id</code>, and another that starts with <code>problem_id</code>. Postgres can combine two bitmap scans.</p>
+  </details>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a partial index</h3>
+    <label><input type="checkbox" data-key="lesson-0015-step-3"> done</label>
+  </div>
+  <p>Query 2 only ever counts <code>ACCEPTED</code> rows. Replace its index with <code>CREATE INDEX … ON submissions (problem_id) WHERE status = 'ACCEPTED'</code> (<a href="https://www.postgresql.org/docs/current/indexes-partial.html">partial indexes</a>). Compare the two indexes’ sizes in the checker’s cost line, and explain the difference. This is query 5 of this week’s six.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Every index answers a named query.</strong> Your schema already does this with comments (<code>// profile history, cursor-paginated</code>). Keep the habit: an index nobody can name a query for is pure write cost.</li>
+  <li><strong>Seed before you measure.</strong> On 50 rows, everything is a Seq Scan and every plan is fast. That’s why today’s task starts with a million-row seed, skewed like real traffic.</li>
+  <li><strong>Run <code>ANALYZE</code> after seeding.</strong> The planner works from statistics; stale statistics make plans that lie.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Open <code>apps/api/prisma/schema.prisma</code>. For each <code>@@index</code>, write the query it serves and whether the leftmost-prefix rule lets it. Then write I-16’s proof plan: the exact <code>EXPLAIN</code> you’ll run this afternoon, what you expect it to show, and the index that fixes it. In section 8’s box.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your answer to section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://use-the-index-luke.com/sql/where-clause/the-equals-operator/concatenated-keys">Use The Index, Luke: concatenated keys</a></strong>, by Markus Winand, the clearest explanation anywhere of why column order matters, with pictures of the tree. The whole site is free and worth a chapter a week. Then the Postgres manual’s <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">multicolumn indexes</a> page.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why a bitmap scan beats an index scan, what the visibility map is, why the planner ignored your index, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0015</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

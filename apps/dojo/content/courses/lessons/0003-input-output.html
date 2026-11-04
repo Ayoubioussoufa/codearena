@@ -1,0 +1,231 @@
+<!--
+  Lesson 0003 · body only. The page renders the title, meta, warm-up (at the
+  warmup marker), quiz (at the quiz marker), finish line and pager.
+-->
+<p class="lede">A judge doesn’t just run a program. It hands it a test’s input and keeps what it prints, to compare with the expected answer: that’s the stdin/stdout judging from ADR-006. Today <code>run</code> learns to do it, and you meet the two traps every judge falls into once: output that never stops, and a wiring mistake that freezes a correct program until the deadline calls it too slow.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Both traps are invisible in testing and show up in production. Small outputs fit in the kernel’s buffers, so the deadlock never happens on your laptop’s examples. Then someone submits a solution that prints 300 KB, it’s correct, and your judge says Time Limit Exceeded. Today you learn why, and build the design real judges use to make it impossible.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. File descriptors</h2>
+
+<p>When a process opens a file, the kernel gives it back a small integer: a <strong>file descriptor</strong>, an index into that process’s table of open files. By convention, three are already open when a program starts: <strong>0</strong> is stdin, <strong>1</strong> is stdout, <strong>2</strong> is stderr.</p>
+<p>Here’s the key: <code>read(0, …)</code> means “read from whatever fd 0 points to”. That could be a terminal, a file, or a pipe. The program doesn’t know which, and doesn’t care. And the table is <strong>inherited</strong>: a child gets a copy of its parent’s descriptors at <code>fork</code>, and keeps them through <code>exec</code>. That’s why <code>echo hi</code> printed straight into your lesson 1 checker.</p>
+
+<p><strong>Try it</strong> (2 minutes). Watch fd 0 change:</p>
+<pre>ls -l /proc/self/fd
+ls -l /proc/self/fd &lt; /etc/hostname
+echo hi | ls -l /proc/self/fd</pre>
+<p>First, 0 points to your terminal (<code>/dev/pts/…</code>). Then to <code>/etc/hostname</code>. Then to <code>pipe:[…]</code>. Same program, three different stdins, chosen by the shell before <code>ls</code> even started. (The extra fd 3 is the directory <code>ls</code> opened to list it.)</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Redirection happens in the gap</h2>
+
+<p>You did this in minishell. To make a child’s stdin a file, do it in the child, <em>between <code>fork</code> and <code>exec</code></em>:</p>
+<ol>
+  <li><code>open</code> the file, which gives you some fd, say 3;</li>
+  <li><code>dup2(3, 0)</code> makes fd 0 point to the same open file as fd 3 (closing whatever 0 pointed to before);</li>
+  <li><code>close(3)</code>, because the program doesn’t need two handles on the same file;</li>
+  <li><code>exec</code>: the new program reads “its stdin” and gets the file.</li>
+</ol>
+<p>The same three moves on fd 1 send stdout to a file. That’s all <code>&lt;</code> and <code>&gt;</code> ever were.</p>
+
+<p class="aside"><strong><code>/dev/null</code></strong> is a file that’s always empty to read (end of file right away) and swallows anything written to it.</p>
+
+<p>Two rules for a judge. First, <strong>never let a submission inherit your stdin.</strong> If the worker was started from a terminal, a program calling <code>input()</code> would sit waiting for a keyboard until the deadline. With no test input, give it <code>/dev/null</code>. Second, <strong>open the files in the parent, before <code>fork</code></strong>, so a bad path becomes a clear error from your runner instead of a mysterious exit 127 from the child.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Pipes, and the deadlock</h2>
+
+<p>A <strong>pipe</strong> is a buffer inside the kernel with two file descriptors: one end to write into, one to read from. When you type <code>a | b</code>, the shell creates a pipe, points <code>a</code>’s stdout at the write end and <code>b</code>’s stdin at the read end, and both run at the same time.</p>
+<p>Three rules (from <a href="https://man7.org/linux/man-pages/man7/pipe.7.html">pipe(7)</a>) explain everything that can go wrong:</p>
+<ul>
+  <li><strong>Reading an empty pipe blocks</strong> while any write end is open, anywhere. It returns 0 (end of file) only once <em>every</em> write end is closed, including copies inherited by children.</li>
+  <li><strong>Writing to a full pipe blocks</strong> until the reader makes room. On Linux, a pipe holds 65,536 bytes by default.</li>
+  <li><strong>Writing with no reader left</strong> sends the writer SIGPIPE.</li>
+</ul>
+
+<p><strong>Try it</strong> (3 minutes). First, measure the buffer:</p>
+<pre>python3 - &lt;&lt;'EOF'
+import os
+r, w = os.pipe()
+os.set_blocking(w, False)
+n = 0
+try:
+    while True:
+        n += os.write(w, b"x" * 1024)
+except BlockingIOError:
+    print(n, "bytes fit in the pipe before a write would block")
+EOF</pre>
+<p>Then watch a writer get stuck. The reader waits 3 seconds before reading:</p>
+<pre>python3 -c "import sys; sys.stdout.write('x' * 1000); sys.stderr.write('done writing\n')" | (sleep 3; wc -c)
+python3 -c "import sys; sys.stdout.write('x' * 100000); sys.stderr.write('done writing\n')" | (sleep 3; wc -c)</pre>
+<p>With 1,000 bytes, “done writing” appears at once: everything fit in the pipe. With 100,000, it appears only after 3 seconds. The writer was frozen at the 65,537th byte until <code>wc</code> started reading.</p>
+
+<h3>The deadlock</h3>
+<p>Now picture the obvious way to capture a child’s output: point its stdout at a pipe, <code>waitpid</code> until it ends, then read the pipe. With a small output, that works. With 300 KB, the child fills the pipe and blocks in <code>write</code>, waiting for you to read. But you’re blocked in <code>waitpid</code>, waiting for it to end. Each waits for the other, forever, until the deadline kills a correct program and reports a TLE. Feeding a large input through a pipe before reading the output fails the same way.</p>
+
+<p class="aside">This is a famous bug. Python’s documentation warns that <code>Popen.wait()</code> “will deadlock when using <code>stdout=PIPE</code>” and points to <code>communicate()</code>, which reads while it waits (<a href="https://docs.python.org/3/library/subprocess.html#subprocess.Popen.wait">subprocess docs</a>).</p>
+
+<p>There are two ways out. Either <strong>read while it runs</strong> (watch the pipe with <code>poll()</code> and empty it as data arrives, with the deadline as the timeout), or <strong>don’t use pipes</strong>: point stdin and stdout at files, which never fill up and never block. Real judges use files: the IOI’s isolate has <code>--stdin</code> and <code>--stdout</code> options that redirect them to files, and <code>--fsize</code> to cap what it writes (<a href="https://github.com/ioi/isolate/blob/master/isolate.1.txt">isolate’s manual</a>). That’s what you build today. Reading while it runs is today’s challenge, and in lesson 4 Node does it for you, with its event loop.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Capping the output, with the kernel</h2>
+
+<p>Files fix the deadlock but open a new hole: <code>yes</code> prints “y” forever, and at hundreds of megabytes a second it would fill your disk before the deadline. You need a cap, and the kernel has one built in.</p>
+<p><code>setrlimit(RLIMIT_FSIZE, …)</code> sets the largest size any file may reach <em>through this process</em>. The kernel lets a file grow up to the limit, and the first write that tries to go past it gets <strong>SIGXFSZ</strong> (signal 25), whose default action kills the process. Like every resource limit, it’s inherited across <code>fork</code> and <code>exec</code>, so you set it in the gap and it binds the program and everything it starts.</p>
+
+<p><strong>Try it</strong> (2 minutes). The shell’s <code>ulimit -f</code> sets the same limit, in blocks of 1,024 bytes:</p>
+<pre>( ulimit -f 10; yes &gt; /tmp/yes.txt ); echo "exit=$?"; ls -l /tmp/yes.txt
+( ulimit -f 10; python3 -c "import sys; sys.stdout.write('x' * 20000)" &gt; /tmp/py.txt ); echo "exit=$?"</pre>
+<p><code>yes</code> dies with 153, which is 128 + 25: SIGXFSZ. Its file holds exactly 10,240 bytes. Python is different: it prints <code>OSError: File too large</code> and exits with 120.</p>
+
+<h3>Why Python didn’t die</h3>
+<p>Python ignores SIGXFSZ at startup, on purpose. When a program ignores it, the kernel refuses the write with the error <code>EFBIG</code> instead, and Python turns that into an exception. This one surfaces when Python flushes its buffer at shutdown, hence 120. So <strong>how the program died tells you nothing reliable.</strong> The limit held either way, and the file’s size is the fact to trust.</p>
+
+<p>One last detail. With the limit set to exactly the cap, an honest program that prints exactly the cap and a flood that tries to print more both leave a file of the same size. So set the limit to <strong>cap + 1</strong>: an honest program never goes past the cap, and anything that tried to write more leaves cap + 1 bytes behind. <strong>Size greater than the cap means output-limit</strong>, whatever the exit status.</p>
+
+<p><strong>Before you build it, predict it.</strong> Output sizes against a 64 KiB pipe, three ways to capture, and the cap + 1 arithmetic, with new numbers every round.</p>
+<!-- drill:pipe-or-deadlock -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build: <code>run</code>, with input and output</h2>
+
+<div class="spec">
+  <p><strong>Usage:</strong> <code>./run -t &lt;ms&gt; [-i &lt;input&gt;] -o &lt;output&gt; [-m &lt;max bytes&gt;] &lt;program&gt; [args...]</code></p>
+  <ul>
+    <li>The program’s stdin is the <code>-i</code> file, or <code>/dev/null</code> without <code>-i</code>.</li>
+    <li>Its stdout goes to the <code>-o</code> file. It may write at most <code>-m</code> bytes (default 8 MiB, 8,388,608).</li>
+    <li>The deadline and the process group work as in lesson 2.</li>
+  </ul>
+  <p>Then <code>run</code> prints exactly three lines:</p>
+  <ul>
+    <li>line 1: <code>output-limit</code> if the output file is bigger than <code>-m</code>, else <code>timeout</code>, else <code>exit N</code> or <code>signal S</code>;</li>
+    <li>line 2: <code>time_ms=T</code>;</li>
+    <li>line 3: <code>output_bytes=B</code>, the output file’s size.</li>
+  </ul>
+  <p>A missing <code>-t</code>, <code>-o</code> or program, a bad number, or an input file that can’t be opened prints a usage line on stderr and exits with <code>2</code>.</p>
+</div>
+
+<p><strong>Your toolbox,</strong> on top of lessons 1 and 2:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Header</th><th>Remember</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://man7.org/linux/man-pages/man3/getopt.3.html"><code>int getopt(int argc, char *argv[], const char *spec)</code></a></td><td><code>&lt;unistd.h&gt;</code></td><td>spec <code>"+t:i:o:m:"</code>: the colon means “takes a value” (in <code>optarg</code>); after the loop, the program starts at <code>argv[optind]</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/open.2.html"><code>int open(const char *path, int flags, mode_t mode)</code></a></td><td><code>&lt;fcntl.h&gt;</code></td><td>read: <code>O_RDONLY</code> · write: <code>O_WRONLY | O_CREAT | O_TRUNC</code> with mode <code>0644</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/dup.2.html"><code>int dup2(int old, int new)</code></a></td><td><code>&lt;unistd.h&gt;</code></td><td>makes <code>new</code> point where <code>old</code> points; then <code>close(old)</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/setrlimit.2.html"><code>int setrlimit(int resource, const struct rlimit *r)</code></a></td><td><code>&lt;sys/resource.h&gt;</code></td><td><code>RLIMIT_FSIZE</code>, in bytes; set both <code>rlim_cur</code> and <code>rlim_max</code></td></tr>
+    <tr><td><a href="https://man7.org/linux/man-pages/man2/stat.2.html"><code>int fstat(int fd, struct stat *st)</code></a></td><td><code>&lt;sys/stat.h&gt;</code></td><td><code>st.st_size</code> is the file’s size in bytes</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">Why the <code>+</code> in <code>"+t:i:o:m:"</code>? By default, GNU <code>getopt</code> scans the <em>whole</em> command line, so in <code>./run -t 500 -o out sh -c 'exit 5'</code> it would try to read <code>-c</code> as one of <em>your</em> options. <code>+</code> tells it to stop at the first word that isn’t an option: the program’s name.</p>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>Start from your lesson 2 code</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0003-input-output
+cp ../0002-time-limits/run.c .
+bash check.sh build</pre>
+  <p>Read the cases in <code>check.sh</code>, under “Feeding input” onwards. For each one, predict what your current <code>run</code> would do wrong.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Options, and files opened in the parent</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-1"> done</label>
+  </div>
+  <p>Replace your hand-made <code>-t</code> parsing with <code>getopt</code>, add <code>-i</code>, <code>-o</code> and <code>-m</code> with their defaults, and open both files before <code>fork</code>. Make “Called wrong” green.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Redirect in the gap</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-2"> done</label>
+  </div>
+  <p>In the child, before <code>exec</code>, point fd 0 at the input and fd 1 at the output. After the child ends, add the <code>output_bytes</code> line. Make “Feeding input” and “Big outputs” green.</p>
+  <details>
+    <summary>The <code>cat</code> case with no <code>-i</code> fails with a timeout?</summary>
+    <p>Then the child is still reading <em>your</em> stdin. The checker gives your runner a stdin that stays open and never sends anything, like a terminal nobody types into. Without <code>-i</code>, the child’s stdin must be <code>/dev/null</code>.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>The cap</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-3"> done</label>
+  </div>
+  <p>Set the file-size limit in the child, and decide line 1 from the file’s size first. Make “The output limit” green: <code>yes</code> must stop fast, exactly-the-cap must pass, and one byte over must be caught even though Python doesn’t die of the signal.</p>
+  <details>
+    <summary>Hint: in what order to decide</summary>
+    <p>After the child has ended (or been killed), <code>fstat</code> your own output fd. If <code>st_size</code> is greater than the cap, it’s <code>output-limit</code>, full stop. Only otherwise ask whether it timed out, and only then how it ended. A flood that also ran past the deadline is still an output-limit: that happened first.</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <h3>All green</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-4"> done</label>
+  </div>
+  <p>Run <code>bash check.sh</code> until all 14 cases pass, including lesson 2’s deadline case: nothing you added may break it.</p>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: through a pipe, without the deadlock</h3>
+    <label><input type="checkbox" data-key="lesson-0003-step-5"> done</label>
+  </div>
+  <p>Capture stdout through a pipe instead of pointing it at the file. Your runner reads the pipe and writes into the <code>-o</code> file itself, so the checker doesn’t change. First, build the naive version on purpose: <code>waitpid</code>, then read. Watch the 300 KB case freeze until the deadline: the deadlock, with your own hands.</p>
+  <p>Then fix it with <a href="https://man7.org/linux/man-pages/man2/poll.2.html"><code>poll()</code></a>: wait on the read end with the time left as the timeout, read whatever is there, stop at cap + 1 bytes (kill the group: that’s your output-limit), and finish when <code>read</code> returns 0. Two traps: close the parent’s copy of the write end right after <code>fork</code> (or you never see end of file), and reap the child after the end of file.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for a judge</h2>
+<ul>
+  <li><strong>Files are the safe default.</strong> Input and output through files can’t deadlock, the kernel enforces the cap, and nothing piles up in the judge’s memory.</li>
+  <li><strong>Pipes need a reader that never stops.</strong> When you can’t use files (and CodeArena’s worker talks to <code>docker run -i</code> through pipes), you must read while the program runs, and cap it yourself. That’s lesson 4.</li>
+  <li><strong>Trust facts, not stories.</strong> The file’s size is a fact. An exit code is the program’s own story, and lesson 1 already showed it can lie.</li>
+  <li><strong>stderr needs the same care.</strong> A crash can print megabytes of stack trace, so it needs a cap too, and it must never be shown to another user.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Open <code>docs/adr/006-leetcode-codeforces-hybrid.md</code>: tests are judged through stdin and stdout. When the worker runs a submission in Docker, the input can reach it through a pipe (<code>docker run -i</code>) or through a file mounted into the container. Give one advantage of each, using today’s lesson. Two sentences, in the box in section 8: they’re a design decision for lesson 8.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>8. Say it in your own words</h2>
+<p>Your answer to section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://man7.org/linux/man-pages/man7/pipe.7.html">pipe(7)</a></strong>, the Linux manual’s page on pipes. Read “I/O on pipes and FIFOs” and “Pipe capacity”: five minutes, and every rule in section 3 is there in the kernel’s own words.</p>
+  <p>Then <a href="https://man7.org/linux/man-pages/man2/setrlimit.2.html">setrlimit(2)</a> on <code>RLIMIT_FSIZE</code>, and look back at <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf">OSTEP chapter 5</a>: its <code>p4.c</code> example is redirection, the same move you made today.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why <code>dup2</code> closes the target first, how <code>poll</code> knows a pipe has data, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0003</code></strong> message from section 8 and paste it in the terminal. If you did the challenge, add how the naive version failed. For deeper questions about pipes and file descriptors, <a href="https://unix.stackexchange.com/questions/tagged/pipe">Unix &amp; Linux Stack Exchange</a> has years of expert answers.</p>
+</div>

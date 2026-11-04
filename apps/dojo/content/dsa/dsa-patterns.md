@@ -512,6 +512,11 @@ than any template here.
 ---
 
 
+
+```check
+recognize
+```
+
 ## Arrays & Hashing
 
 ### 🔍 Recognise it
@@ -874,6 +879,11 @@ flowchart LR
 to a rule); recomputing the summary from scratch instead of nudging it as you add/remove; and the
 "minimum window" flavor — grow until *good enough*, then shrink to *smallest still-good*.
 
+
+```check
+arrays
+```
+
 ## Linked List
 
 ### 🔍 Recognise it
@@ -1216,6 +1226,11 @@ function windowMax(a, k) {
 Subarray Minimums needs strict on one side, non-strict on the other, or equal values get double-counted);
 store *indices* whenever age/position matters; and remember popped elements can carry info out with them.
 
+
+```check
+linear
+```
+
 ## Binary Search
 
 ### 🔍 Recognise it
@@ -1414,6 +1429,11 @@ range. That pairing is load-bearing — `l < r` with `r = m` terminates, `l <= r
   capacity 20 works, 21 works too. Then `ok` is your check and `[lo, hi]` is the answer range.
 - **An `ok` that isn't monotonic.** Binary search is only valid if the predicate never flips back.
   Say out loud why yours can't — that sentence is the proof of correctness interviewers want.
+
+
+```check
+search
+```
 
 ## Recursion & Backtracking
 
@@ -1714,6 +1734,11 @@ function countingSort(a, maxV) {
 but say so rather than relying on it silently); and copying vs mutating — `.sort()` sorts **in
 place** and returns the same array, which surprises callers who still needed the original order.
 
+
+
+```check
+backtracking
+```
 
 ## Trees
 
@@ -2061,6 +2086,11 @@ duplicates); using `Array.shift()` on a huge queue (it's O(n) each time — use 
 frontiers); and remembering a node with one child isn't a leaf when the goal is "shortest depth to a
 leaf".
 
+
+```check
+traversal
+```
+
 ## Tries
 
 ### 🔍 Recognise it
@@ -2297,6 +2327,11 @@ class MedianFinder {
 from "the root is whoever leaves next"); reaching for a heap where a plain sort is fine at small n (say
 the trade-off out loud in interviews); and remembering heap-order only relates parent↔child, never
 siblings.
+
+
+```check
+structures
+```
 
 ## Graphs
 
@@ -2557,6 +2592,11 @@ function kruskal(n, edges) {                       // edges = [[u, v, w], …]
 shortest path; multi-source BFS (seed the queue with all sources) for "simultaneous spread"; and the
 extra "in-progress vs done" colouring needed to detect cycles in a *directed* graph.
 
+
+```check
+graphs
+```
+
 ## Intervals
 
 ### 🔍 Recognise it
@@ -2746,6 +2786,11 @@ for (let s = mask; s; s = (s - 1) & mask)   // every non-empty SUBMASK of mask
 *unsigned* shift, `1 << 31` comes out negative, and results touching bit 31 are safer built
 arithmetically (`res * 2 + bit`). Elements appearing in *triples* defeat plain XOR — that needs a mod-3
 bit-counting trick.
+
+
+```check
+greedy
+```
 
 ## Dynamic Programming
 
@@ -2963,6 +3008,11 @@ function countNoRepeatedDigit(n) {                 // how many of 1..n have all-
 brute-force recursion first, add memoization (top-down), *then* invert it to a bottom-up table. Mind the
 base cases, and 1-D (Coin Change over an amount) vs 2-D (Longest Common Subsequence over two strings)
 state; collapse the memory when only the last few states matter.
+
+
+```check
+dp
+```
 
 ## Math & Geometry
 
@@ -3494,6 +3544,11 @@ cases read as senior.
 
 ---
 
+
+
+```check
+rest
+```
 
 ## How to get faster
 

@@ -3,23 +3,40 @@
  */
 import { Fragment } from "react";
 
-/** Renders `backtick spans` in exercise text as inline code. */
+/**
+ * Renders `backtick spans` in exercise text as inline code, and
+ * [text](https://…) as a link (course explanations cite their sources).
+ */
 export function RichText({ text }: { text: string }) {
-  const parts = text.split(/`([^`]+)`/g);
+  const parts = text.split(/(`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|\/)[^)\s]+\))/g);
   return (
     <>
-      {parts.map((part, i) =>
-        i % 2 === 1 ? (
-          <code
-            key={i}
-            className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-          >
-            {part}
-          </code>
-        ) : (
-          <Fragment key={i}>{part}</Fragment>
-        ),
-      )}
+      {parts.map((part, i) => {
+        if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
+          return (
+            <code
+              key={i}
+              className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+            >
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
+        if (link) {
+          return (
+            <a
+              key={i}
+              href={link[2]}
+              className="text-cyan-700 underline underline-offset-2 dark:text-cyan-300"
+              {...(link[2]?.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}
+            >
+              {link[1]}
+            </a>
+          );
+        }
+        return <Fragment key={i}>{part}</Fragment>;
+      })}
     </>
   );
 }

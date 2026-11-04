@@ -85,6 +85,11 @@ Note the worker is *trusted* but the sandbox is *not* — and even the worker tr
 clock the sandbox can't touch, memory caps the kernel imposes) and validates everything that comes
 back. "Trust the boundary, not the thing inside it."
 
+
+```check
+trust
+```
+
 ---
 
 <a name="part-b"></a>
@@ -205,6 +210,11 @@ against the memory cap. **The most-forgotten flag is `--network none`** — with
 shares Docker's default network and can reach your Postgres/Redis by container name (**SSRF**);
 a compute sandbox needs zero network, so give it zero.
 
+
+```check
+primitives
+```
+
 ---
 
 <a name="part-c"></a>
@@ -282,6 +292,11 @@ The judging runs in a dedicated worker app, not inside your API server. Reasons,
    shouldn't. Different trust and different Dockerfile.
 
 They communicate through a **queue** — which is Part D.
+
+
+```check
+docker
+```
 
 ---
 
@@ -444,6 +459,11 @@ at-least-once
   retries/backoff/DLQ/concurrency with a tiny API. Right-sized. (Migrate later only when a *specific*
   requirement — massive fan-out, event replay — appears.)
 
+
+```check
+queues
+```
+
 ---
 
 <a name="part-e"></a>
@@ -505,6 +525,11 @@ pub/sub** so a verdict emitted on server A reaches a subscriber connected to ser
   latest matters), **queue with a cap** (buffer a little, then drop oldest), or **disconnect** the
   laggard. The wrong choice is "unbounded buffer", which is how one bad phone on hotel wifi can
   degrade your server.
+
+
+```check
+realtime
+```
 
 ---
 
@@ -679,6 +704,11 @@ C.2, not a bare interpreter. This skeleton is the *control flow*; the container 
 TIMEOUT), one that prints in an infinite loop (see OUTPUT_LIMIT), one that exits 1 (see
 RUNTIME_ERROR). Then note what it *can't* stop (a fork bomb, a network call) and connect each gap to
 the exact Docker flag that closes it.
+
+
+```check
+failure
+```
 
 ## Mastery checklist — you're ready to build Phase 2 when you can…
 

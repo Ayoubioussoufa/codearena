@@ -13,6 +13,98 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * The course look, for the whole dojo. Every page is written with slate
+ * (neutrals) and cyan (accent) utilities, so remapping those two scales here
+ * restyles everything at once: warm paper and ink instead of cool grey, a
+ * brick accent instead of cyan. Light mode reads the low numbers, dark mode
+ * the high ones, so each scale runs from paper (50) to ink (950).
+ */
+@theme {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  --color-white: #fffff8;
+  --color-slate-50: #f7f5ec;
+  --color-slate-100: #efece0;
+  --color-slate-200: #dcd8c8;
+  --color-slate-300: #c4bfad;
+  --color-slate-400: #9d988a;
+  --color-slate-500: #706c60;
+  --color-slate-600: #57544b;
+  --color-slate-700: #403e38;
+  --color-slate-800: #33322d;
+  --color-slate-900: #1f1f1c;
+  --color-slate-950: #161614;
+
+  --color-cyan-50: #fbf0ed;
+  --color-cyan-100: #f5ded8;
+  --color-cyan-200: #ecc0b5;
+  --color-cyan-300: #e09a89;
+  --color-cyan-400: #d4735f;
+  --color-cyan-500: #c0533f;
+  --color-cyan-600: #a3342a;
+  --color-cyan-700: #8a2b22;
+  --color-cyan-800: #6e231c;
+  --color-cyan-900: #521a15;
+  --color-cyan-950: #3a1310;
+}
+
+/* Serif reading text everywhere; interface pieces (navigation, buttons,
+   the small uppercase kickers) in a sans, as in the lessons. In the base
+   layer, so any explicit font utility (font-mono on a button) still wins. */
+@layer base {
+  body {
+    font-size: 1.0625rem;
+  }
+  .uppercase,
+  nav,
+  button,
+  input,
+  select,
+  label {
+    font-family: var(--font-ui);
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.005em;
+  }
+}
+
+/* Guides: lesson typography for rendered markdown. */
+.prose {
+  font-size: 1.1rem;
+  line-height: 1.65;
+}
+.prose :where(h1, h2, h3, h4):not(:where(.not-prose *)) {
+  font-weight: 400;
+}
+.prose :where(h2):not(:where(.not-prose *)) {
+  border-top: 1px solid var(--color-slate-200);
+  padding-top: 1rem;
+}
+.dark .prose :where(h2):not(:where(.not-prose *)) {
+  border-top-color: var(--color-slate-800);
+}
+.prose :where(a):not(:where(.not-prose *)) {
+  color: var(--color-cyan-700);
+  text-underline-offset: 0.15em;
+}
+.dark .prose :where(a):not(:where(.not-prose *)) {
+  color: var(--color-cyan-300);
+}
+.prose :where(blockquote):not(:where(.not-prose *)) {
+  border-left: 3px solid var(--color-cyan-600);
+  background: var(--color-slate-50);
+  font-style: normal;
+  padding: 0.6rem 1rem;
+  border-radius: 0 6px 6px 0;
+}
+.dark .prose :where(blockquote):not(:where(.not-prose *)) {
+  background: var(--color-slate-900);
+}
+
 :root {
   color-scheme: light;
 }
@@ -47,7 +139,7 @@
 }
 .dark .hljs-surface,
 .dark .prose pre {
-  background-color: #0d1424;
+  background-color: #24241f;
   color: var(--color-slate-200);
 }
 
@@ -148,4 +240,12 @@
 }
 .dark .hljs-deletion {
   color: #ffa198;
+}
+
+/* Horizontal rules in guides: the warm rule colour, not the plugin's default. */
+.prose :where(hr):not(:where(.not-prose *)) {
+  border-color: var(--color-slate-200);
+}
+.dark .prose :where(hr):not(:where(.not-prose *)) {
+  border-color: var(--color-slate-800);
 }

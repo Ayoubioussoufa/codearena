@@ -11,6 +11,8 @@ import rehypeHighlight from "rehype-highlight";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { GuideExercise } from "./GuideExercise";
 import { getGuideExercise } from "@/lib/guide-exercises";
+import { GuideCheckBlock } from "./courses/GuideCheckBlock";
+import { getGuideCheck } from "@/lib/guide-checks";
 
 function textOf(node: ReactNode): string {
   if (typeof node === "string") return node;
@@ -32,7 +34,7 @@ export function MarkdownView({
   guideSlug,
 }: {
   markdown: string;
-  /** Enables ```exercise fences, which are looked up per guide. */
+  /** Enables ```exercise and ```check fences, which are looked up per guide. */
   guideSlug?: string;
 }) {
   return (
@@ -53,6 +55,18 @@ export function MarkdownView({
               };
               if (className?.includes("language-mermaid")) {
                 return <MermaidDiagram code={textOf(children).trim()} />;
+              }
+              // ```check fences hold a check id: multiple choice + one written
+              // question, defined in src/lib/guide-checks.
+              if (className?.includes("language-check") && guideSlug) {
+                const id = textOf(children).trim();
+                const check = getGuideCheck(guideSlug, id);
+                if (check) return <GuideCheckBlock slug={guideSlug} check={check} />;
+                return (
+                  <pre className="not-prose rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                    Unknown check: {guideSlug}:{id}
+                  </pre>
+                );
               }
               // ```exercise fences hold an exercise id; the definition lives in
               // src/lib/guide-exercises so its checks can be real code and the

@@ -1,0 +1,124 @@
+<!--
+  Lesson 0018 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">“What’s my rank among 50,000 users?” is a terrible question for a SQL table and a trivial one for a Redis sorted set. Today you learn why, build a leaderboard that is fair on ties and correct under duplicate deliveries, and meet a new idea that runs through all of system design: data you can throw away because you can rebuild it.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon’s task is the live leaderboard: the worker updates it on every Accepted, idempotently, and two endpoints read it. It’s also worked design #9 in your system-design guide. After today, the design and the code are the same thing.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Why not just Postgres?</h2>
+<p><code>SELECT … ORDER BY points DESC LIMIT 10</code> is fine with an index. The hard question is the other one: <em>my</em> rank. That’s “how many users have more points than me?”, a count over a large slice of the table, on every profile view. It gets slower as the board grows, and the board changes on every Accepted.</p>
+<p>A Redis <strong>sorted set</strong> keeps members ordered by a score at all times. It’s a <strong>skip list</strong> (a sorted linked list with “express lanes” above it, so a search skips most of the elements) plus a hash table from member to score. Adding, updating and ranking are all <strong>O(log N)</strong>; reading one score is O(1) (<a href="https://redis.io/docs/latest/develop/data-types/sorted-sets/">Redis: sorted sets</a>).</p>
+<pre>ZINCRBY lb:board 100 ada             <span class="c"># ada +100, O(log N)</span>
+ZRANGE  lb:board 0 9 REV WITHSCORES  <span class="c"># the top 10, best first</span>
+ZREVRANK lb:board ada                <span class="c"># 0 for the best: add 1 for a rank</span>
+ZSCORE  lb:board ada                 <span class="c"># O(1)</span></pre>
+<p class="aside"><code>ZREVRANGE</code>, which you’ll see in older tutorials, is deprecated since Redis 6.2: use <code>ZRANGE … REV</code> (<a href="https://redis.io/docs/latest/commands/zrevrange/">ZREVRANGE</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Fair ties: put time inside the score</h2>
+<p>When two members have the same score, Redis orders them <strong>by member name</strong>. Stable, and unfair: on equal points, “zack” beats “amy” forever. The usual rule is that whoever got there first ranks higher, but a score is one number. So you build a <strong>composite score</strong> that sorts by points first and time second:</p>
+<pre>score = points × T + (T − 1 − reachedAt)  <span class="c"># T larger than any reachedAt</span>
+points = floor(score / T)                 <span class="c"># and back</span></pre>
+<p>More points always wins, because one point is worth T. On equal points, an earlier <code>reachedAt</code> gives a larger score. Two limits to respect: a score is a 64-bit float, exact for integers up to 2<sup>53</sup> (about 9 × 10<sup>15</sup>), so choose T and the maximum points so that <code>points × T</code> stays below it. And “reached at” means the time of the user’s <em>latest</em> counted solve, since deliveries can arrive out of order.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Correct under duplicates: one atomic script</h2>
+<p>Lesson 13 promised at-least-once delivery, so the same Accepted can arrive twice. The leaderboard must count each (user, problem) once. The check is a set: <code>SADD lb:solved ada:p1</code> answers 1 the first time and 0 after. But “check, then add points” as two commands has a crash window: die between them, and the retry sees the solve recorded and skips the points, which are then lost for good.</p>
+<p>Redis runs a <strong>Lua script</strong> atomically: nothing else executes in the middle (<a href="https://redis.io/docs/latest/develop/programmability/eval-intro/">scripting with Lua</a>). So the whole update is one <code>EVAL</code>:</p>
+<pre>if redis.call('SADD', KEYS[1], user .. ':' .. problem) == 0 then
+  return 0
+end
+local points = redis.call('HINCRBY', KEYS[2], user, add)
+<span class="c">-- …remember the latest time, compute the composite score…</span>
+redis.call('ZADD', KEYS[4], score, user)
+return 1</pre>
+<p class="aside">One Lua trap: <code>tostring(n)</code> and the <code>..</code> operator turn a number into a string with only 14 significant digits (on Redis 7.4, <code>tostring(123456789012345)</code> gives <code>1.2345678901234e+14</code>). Numbers passed straight to <code>redis.call</code> keep their precision; when you need a number inside a string, use <code>string.format('%.0f', n)</code>.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Derived data, and the order of writes</h2>
+<ul>
+  <li><strong>Postgres is the source of truth; Redis is a view.</strong> The solves live in Postgres. The board is <strong>derived data</strong>: computed from them, fast to read, and safe to lose, as long as you can <strong>rebuild</strong> it.</li>
+  <li><strong>Write Redis after the commit.</strong> They don’t share a transaction. Before the commit, a rollback leaves points nobody earned. After it, the worst case is a missed update, which the idempotent retry or a rebuild repairs.</li>
+  <li><strong>Rebuild aside, then swap.</strong> Build the new board under temporary keys, then <code>RENAME</code> them into place inside <code>MULTI</code>/<code>EXEC</code>, so readers never see a half-built board.</li>
+</ul>
+
+<p><strong>Before you build it, predict it:</strong></p>
+<!-- drill:leaderboard -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Build <code>leaderboard.mjs</code></h2>
+<div class="spec">
+  <p>The contract and the rules are in <code>leaderboard.start.mjs</code>: <code>recordSolve</code>, <code>top</code>, <code>rankOf</code> and <code>rebuild</code>. The checker runs them against a real Redis: concurrent duplicates from two connections, ties both ways round, 10,000 users (it measures the bytes each <code>rankOf</code> makes Redis send), and a rebuild compared with the live board.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Points, then the atomic update</h3>
+    <label><input type="checkbox" data-key="lesson-0018-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0018-leaderboard
+cp leaderboard.start.mjs leaderboard.mjs
+bash check.sh</pre>
+  <p>Start with plain points and <code>ZINCRBY</code>: make “Scores” green except the concurrent case. Then move the update into one <code>EVAL</code> (<code>redis.cmd("EVAL", script, 2, key1, key2, arg1, …)</code>) and watch it go green.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Fair ties, cheap ranks</h3>
+    <label><input type="checkbox" data-key="lesson-0018-step-2"> done</label>
+  </div>
+  <p>Switch to the composite score. <code>top</code> and <code>rankOf</code> must return real points, decoded from it. <code>rankOf</code> must ask Redis for one rank and one score, not the whole set.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Rebuild</h3>
+    <label><input type="checkbox" data-key="lesson-0018-step-3"> done</label>
+  </div>
+  <p>Compute totals and times from the solves (each pair once), write them under temporary keys, then swap them in with <code>MULTI</code>, <code>RENAME</code>, <code>EXEC</code>. Remember the dedupe set: it’s part of the view too. All 11 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: the users around me</h3>
+    <label><input type="checkbox" data-key="lesson-0018-step-4"> done</label>
+  </div>
+  <p>Add <code>around(userId, k)</code>: the k users above and below, with ranks, in two commands. Then answer: what does it cost with 1 million users?</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Write your rules down first:</strong> what a solve is worth (one per problem? weighted by difficulty?), and the tie-break. Then the test “ties break the way you decided” has something to check.</li>
+  <li><strong>The update runs in the worker, after the verdict commits,</strong> as one script keyed by (user, problem), so a redelivered job can’t count twice. Put it behind a <code>LeaderboardPort</code>, like the queue.</li>
+  <li><strong>Add a rebuild command</strong> (a script or an admin endpoint) that recomputes the board from Postgres. It’s your answer to “what if Redis dies?” in the interview.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write your score rule, your tie-break, your T and your maximum points (check them against 2<sup>53</sup>), and where in the worker the update runs relative to the commit. In section 8’s box: it’s the decision you record before this afternoon’s build.</p>
+</div>
+
+<h2>7. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>8. Say it in your own words</h2>
+<p>Your answer to section 6, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://redis.io/docs/latest/develop/data-types/sorted-sets/">Redis: sorted sets</a></strong>, the official guide, with the leaderboard example and the implementation note about the skip list. Then <a href="https://redis.io/docs/latest/develop/programmability/eval-intro/">Scripting with Lua</a> for what “atomic” means for a script, and what a script must not do.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how a skip list finds a rank, why Lua and not MULTI, how to choose T, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0018</code></strong> message from section 8 and paste it in the terminal.</p>
+</div>

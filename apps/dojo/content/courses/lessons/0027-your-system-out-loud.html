@@ -1,0 +1,106 @@
+<!--
+  Lesson 0027 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">The last lesson puts everything together. An interviewer says: “Design an online judge.” You’ve built one, so this is the best system-design question you’ll ever get, if you can say it in order and under time. Today you write the notes for that conversation: requirements, numbers worked out on the spot, the design, the judge in depth, what breaks at a hundred times the traffic, and what you chose instead of what.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This afternoon you record yourself giving this talk, watch it back, and fix the three weakest moments. Every lesson in this course is a paragraph of it: the sandbox (1 to 10), the queue and its claim (13, 14), the queries (15 to 17), the leaderboard (18), the page (19, 20), the server and pipeline (21 to 25).</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. The shape of the hour</h2>
+<ol>
+  <li><strong>Requirements</strong> (a few minutes). What it does (submit, judge, rank) and how well: a verdict in under 10 seconds for most submissions, the availability you promise, and the hard constraint: untrusted code never escapes. Ask; don’t assume.</li>
+  <li><strong>Estimates</strong>. A few numbers that size the design (below).</li>
+  <li><strong>API and data model</strong>. The handful of endpoints and tables everything else hangs on.</li>
+  <li><strong>The design</strong>. Boxes and arrows, drawn while you talk, following one submission end to end.</li>
+  <li><strong>One part in depth</strong>. For you, the judge: it’s where you know more than the interviewer expects.</li>
+  <li><strong>Scale and trade-offs</strong>. What breaks first, what you’d change, and what each choice costs.</li>
+</ol>
+<p class="aside">Your <a href="/guides/system-design-fundamentals">system-design guide</a> has the vocabulary; worked design #9 is your leaderboard. This lesson is about delivering it.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Back of the envelope, out loud</h2>
+<p>You need four kinds of number, and they’re all multiplication:</p>
+<ul>
+  <li><strong>Rates.</strong> 20,000 users × 10 submissions = 200,000 a day. A day has 86,400 seconds, call it 100,000 in your head: about 2 per second on average.</li>
+  <li><strong>Peaks.</strong> Traffic isn’t flat. With a peak at 10× the average: about 23 per second.</li>
+  <li><strong>Concurrency, with Little’s law.</strong> The number of things in a system equals the rate they arrive times how long each stays (<a href="https://en.wikipedia.org/wiki/Little%27s_law">Little’s law</a>). 23 submissions a second, each holding a runner for 6 seconds: about 140 runners busy at once. That one line sizes your worker fleet, and it’s the number most candidates never compute.</li>
+  <li><strong>Storage.</strong> 200,000 × 5 KB = 1 GB a day, about 365 GB a year. Not big data: one Postgres holds it. Saying so is as valuable as any diagram.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. At 100×: name the bottleneck, then the change</h2>
+<p>Don’t list technologies; follow the load. For CodeArena, in order:</p>
+<ul>
+  <li><strong>Runner capacity</strong> breaks first: 140 slots at peak won’t fit next to the API. Runners move to their own hosts, scaled on the queue’s depth, which also shrinks the blast radius of an escape.</li>
+  <li><strong>Database connections</strong>: many API and worker processes each holding a pool exhaust Postgres. A pooler (PgBouncer), then read replicas for history pages.</li>
+  <li><strong>Hot reads</strong>: the leaderboard at a thousand views a second comes from Redis, with a short cache in front.</li>
+  <li><strong>Isolation strength</strong>: at scale, stronger sandboxes (gVisor, Firecracker microVMs) become worth their cost.</li>
+</ul>
+<p>Then the trade-offs, each as “X instead of Y, because Z”: BullMQ instead of Kafka, polling rather than WebSockets, one VM instead of Kubernetes, today. And when each would flip.</p>
+
+<p><strong>Before you write it, warm up the arithmetic:</strong></p>
+<!-- drill:estimate -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Write the outline, then give the talk</h2>
+<div class="spec">
+  <p>The scenario and the eight required sections are in the lab’s <code>README.md</code>. The checker recomputes your five capacity numbers (±15%), and checks each section for what an interviewer listens for: numbers in the requirements, real endpoints and tables, a diagram, the judge’s walls, four bottleneck → change lines, three “instead of … because” trade-offs, and a time budget of 15 minutes at most.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The outline</h3>
+    <label><input type="checkbox" data-key="lesson-0027-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0027-your-system-out-loud
+cat README.md
+bash check.sh                <span class="c"># once you have a first outline.md</span></pre>
+  <p>Write it as speaking notes: short lines, not prose. Work out the numbers by hand first, then check them. All 14 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Out loud, recorded</h3>
+    <label><input type="checkbox" data-key="lesson-0027-step-2"> done</label>
+  </div>
+  <p>On a blank page or whiteboard, give the whole talk to your phone’s camera, keeping to your time budget. Watch it back once, and write down the three weakest moments: a number you fumbled, a box you couldn’t justify, a silence.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: the interviewer’s curveball</h3>
+    <label><input type="checkbox" data-key="lesson-0027-step-3"> done</label>
+  </div>
+  <p>Ask me in the terminal to play the interviewer. I’ll pick a curveball (“contests with 5,000 people submitting in the same minute”, “add C++ with a compile step”, “a region goes down”), and you redesign out loud, in writing.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Your turn, in CodeArena</h2>
+<div class="callout">
+  <span class="label">After the recording</span>
+  <p>Write your three weakest moments, and for each, the fix: in the talk, in the outline, or in the product itself. In section 7’s box. Tomorrow’s task is to fix the weakest one.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your three moments from section 5, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="/guides/system-design-fundamentals">Your system-design guide</a></strong>, now read as a checklist against your outline: every section in it should have a line in yours, or a reason it doesn’t apply. Then the <a href="https://sre.google/sre-book/monitoring-distributed-systems/">SRE book’s monitoring chapter</a> again, for the “how would you know it’s broken?” follow-up.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me to be the interviewer, to check a number, or to push on a design choice. That’s what the last week is for.</p>
+  <p>When the checker is green and the recording exists, copy your <strong><code>done 0027</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

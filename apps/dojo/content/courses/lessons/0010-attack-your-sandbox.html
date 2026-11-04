@@ -1,0 +1,134 @@
+<!--
+  Lesson 0010 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">You’ve built a sandbox. Now you try to break it, on purpose, with the six attacks a stranger will try on day one. Then a harder question: if one of your walls quietly went missing next month, would your tests notice? Today you find out, with a technique most junior engineers have never heard of.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>The adversarial suite is the single most convincing file in CodeArena. “Here are six attacks on my judge, each contained, each test proving <em>which</em> wall held, and each one fails if that wall is removed” is a sentence an interviewer remembers. The last part is the one almost nobody can say.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Test the wall, not the verdict</h2>
+
+<p>A naive sandbox test checks the verdict: “the fork bomb gets a verdict and doesn’t crash the judge”. But a fork bomb’s parent ends normally whether it created 60 processes or 500, so that test passes with or without <code>--pids-limit</code>. It tests nothing about containment.</p>
+<p>A <strong>containment test</strong> makes the attack <em>report what it could do</em>, and asserts on that:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Attack</th><th>The program prints…</th><th>Contained when…</th><th>The wall</th></tr></thead>
+  <tbody>
+    <tr><td>fork bomb</td><td>how many children it created</td><td>fewer than 64</td><td><code>pids.max</code></td></tr>
+    <tr><td>infinite loop</td><td>nothing</td><td>outcome <code>timeout</code>, no container left</td><td>your deadline + <code>docker kill</code></td></tr>
+    <tr><td>512 MB allocation</td><td>“allocated” if it got it</td><td>outcome <code>memory-limit</code>, never “allocated”</td><td><code>memory.max</code></td></tr>
+    <tr><td>network</td><td>its interfaces</td><td>only <code>lo</code></td><td>network namespace</td></tr>
+    <tr><td>write and run a program</td><td>the root mount’s mode, and whether a script in <code>/tmp</code> ran</td><td><code>ro blocked</code></td><td><code>--read-only</code>, <code>noexec</code></td></tr>
+    <tr><td>identity</td><td>its uid, <code>CapBnd</code>, <code>/etc/passwd</code>’s first line</td><td>65534, all zeros, Alpine’s <code>/bin/sh</code> root</td><td><code>--user</code>, <code>--cap-drop</code>, mount namespace</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="aside">Why <code>/etc/passwd</code>? Reading it is harmless: every image has one. The question is whose. Alpine’s root line ends in <code>/bin/sh</code>; your Ubuntu host’s ends in <code>/bin/bash</code>. Seeing the host’s would mean your mount namespace leaked.</p>
+<p>And after every attack, check the <strong>host</strong> too: no container left, Docker still answering. A wall that holds but leaves debris isn’t containment.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Would your tests notice? Mutation testing</h2>
+
+<p>Code coverage tells you a line ran during the tests; it doesn’t tell you a test would fail if that line were wrong. <strong>Mutation testing</strong> answers that question directly: change the code on purpose (each changed version is a <strong>mutant</strong>), run the suite, and count the mutants that no test catches. A surviving mutant is a protection your tests can’t see.</p>
+<p>For a sandbox, the mutants are obvious: remove one protection at a time. This lab’s checker ships six weakened runners (no network isolation, writable root, no memory limit, no pids limit, capabilities kept, running as root), and runs your suite against each. Every one must make at least one of your attacks fail. Writing to <code>/etc</code> as <code>nobody</code>, for example, fails <em>even on a writable root</em>, so an attack built on it lets the read-only mutant survive. The lab will show you that, unless you’ve thought of it.</p>
+<p class="aside">Tools do this for regular code: <a href="https://stryker-mutator.io/">Stryker</a> mutates JavaScript and TypeScript (flips a <code>&lt;</code>, removes a call) and reports surviving mutants. Today you do it by hand, on infrastructure, which is rarer.</p>
+
+<p><strong>Before you write them, train the eye:</strong></p>
+<!-- drill:mutants -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Build <code>attacks.mjs</code></h2>
+
+<div class="spec">
+  <p>Six attacks, each <code>{ name, source, timeoutMs?, expect }</code>: a Python program for <code>python:3.12-alpine</code>, and <code>expect(facts)</code>, which returns the list of problems it found (empty means contained). The checker runs them against your lesson 8 runner (all must be contained, no containers left), then against six weakened runners (each must be caught by at least one attack).</p>
+</div>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">0</span>
+    <h3>Set up</h3>
+    <label><input type="checkbox" data-key="lesson-0010-step-0"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0010-attack-your-sandbox
+cp ../0008-docker-hardened/runner.mjs .
+cp ../0008-docker-hardened/docker-runner.mjs .
+cp attacks.start.mjs attacks.mjs
+<span class="c"># the six mutants: read how each one weakens the run</span>
+less weak-runner.mjs</pre>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The obvious four</h3>
+    <label><input type="checkbox" data-key="lesson-0010-step-1"> done</label>
+  </div>
+  <p>Fork bomb, infinite loop, memory, network, each printing what it could do, each <code>expect</code> asserting on that. Run <code>bash check.sh</code>: they should be contained by your runner, and catch four of the six mutants.</p>
+  <details>
+    <summary>Hint: a fork bomb that reports</summary>
+    <p>Loop up to 500 times: <code>os.fork()</code>; in the child, sleep a few seconds then <code>os._exit(0)</code>; in the parent, count. Catch <code>OSError</code> (the pids limit says no) and stop. Print the count. When the parent exits, PID 1 of the container is gone, and the kernel kills the sleeping children (lesson 5).</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The two subtle ones</h3>
+    <label><input type="checkbox" data-key="lesson-0010-step-2"> done</label>
+  </div>
+  <p>Write the filesystem attack and the identity attack so they catch the read-only, capabilities and root mutants. All 14 cases should pass.</p>
+  <details>
+    <summary>Hint: proving read-only</summary>
+    <p>Two observations that change with the flag: the root’s mount options (find the line in <code>/proc/mounts</code> whose mount point is <code>/</code>; its options start with <code>ro</code> or <code>rw</code>), and whether a script you write into <code>/tmp</code> and <code>chmod</code> can run (with <code>noexec</code>, running it raises <code>PermissionError</code>).</p>
+  </details>
+</section>
+
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: two more attacks</h3>
+    <label><input type="checkbox" data-key="lesson-0010-step-3"> done</label>
+  </div>
+  <p>Add an attack that tries a forbidden system call (say, <code>os.unshare</code> in Python 3.12: Docker’s seccomp profile refuses it), and one that floods stderr. Each needs a mutant to justify it: what would you remove to make it fail?</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. What this means for a judge</h2>
+<ul>
+  <li><strong>Every protection gets a test that would notice it missing.</strong> That’s the standard: a protection without such a test will quietly disappear in a refactor.</li>
+  <li><strong>Check the host, not just the verdict.</strong> No leftovers, the daemon still answering, nothing written outside the run’s folder.</li>
+  <li><strong>Name the mechanism.</strong> Comment each attack with the wall that stops it (<code>--pids-limit</code>, not “the sandbox”): the file becomes documentation an interviewer can read.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Today’s afternoon build is <code>apps/worker/test/adversarial/</code>. Before writing it, list the host checks every attack test will run afterwards (at least three), and which of today’s six mutants each attack would catch. In section 6’s box.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+
+<!-- quiz -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>6. Say it in your own words</h2>
+<p>Your answer to section 4, then a definition for each term.</p>
+<p>One sentence each, from memory, without scrolling up. The boxes save as you type. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://stryker-mutator.io/docs/">Stryker’s documentation</a></strong>, “What is mutation testing?”: a short, clear explanation of mutants, survivors and the mutation score, from the team behind the main JavaScript and TypeScript tool. Then run it on your CodeArena judge loop one day: it will find assertions you thought were stronger than they are.</p>
+  <p>For the attacks themselves, the <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html">OWASP Docker Security Cheat Sheet</a> lists the same rules from the defender’s side.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why a mutant survives, how to observe a wall from inside, what else a stranger might try, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0010</code></strong> message from section 6 and paste it in the terminal. Then build today’s CodeArena suite, below. That file is a portfolio piece on its own.</p>
+</div>

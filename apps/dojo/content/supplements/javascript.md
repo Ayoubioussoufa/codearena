@@ -99,6 +99,11 @@ for (let i = 0; i < 3; i++) {
 binding *per iteration* — each closure captures its own. (More on closures in §5.)
 
 ---
+
+```check
+values
+```
+
 ## 3. Coercion, equality, and truthiness
 
 The eight falsy values — memorise them, everything else is truthy:
@@ -145,6 +150,11 @@ reached for `||` when they needed `??`.
 ```exercise
 coercion-predict
 ```
+
+```check
+coercion
+```
+
 ## 4. Functions, arrows, and the two returns
 
 Three ways to make a function; the differences matter:
@@ -252,6 +262,11 @@ no `this` at all, like `forEach` in strict code, give `undefined`, and then you 
 ```exercise
 this-binding
 ```
+
+```check
+functions
+```
+
 ## 7. Destructuring, spread, and rest
 
 Pull fields out by name (objects) or position (arrays), with defaults:
@@ -321,6 +336,11 @@ a `.sort()` you thought was pure.
 ```exercise
 array-toolbox
 ```
+
+```check
+data
+```
+
 ## 9. Async — the event loop, promises, and `async/await`
 
 JavaScript is single-threaded: it runs one thing at a time and never blocks on I/O. Slow work (network, timers)
@@ -395,6 +415,11 @@ Named exports are imported by their exact name in `{ }`; the default is imported
 Modules are singletons (evaluated once, cached) and run in strict mode automatically.
 
 ---
+
+```check
+async
+```
+
 ## Mastery checklist — you can…
 
 - [ ] explain why `{} === {}` is false, and copy an object without aliasing it

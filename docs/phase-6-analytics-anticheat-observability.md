@@ -83,6 +83,11 @@ is *supposed* to lag; investigate whether the refresh ran, not whether the query
 
 ---
 
+
+```check
+analytics
+```
+
 <a name="part-b"></a>
 # Part B — Plagiarism detection: Winnowing
 
@@ -208,6 +213,11 @@ under ~50 lines is statistically noisy. So:
   coursework — not proof, and never grounds for an automatic ban.)
 
 ---
+
+
+```check
+winnowing
+```
 
 <a name="part-c"></a>
 # Part C — Observability: the three pillars
@@ -385,6 +395,11 @@ depend on the standard, not a vendor (Phase 0's Dependency Inversion, at the too
 
 ---
 
+
+```check
+observability
+```
+
 <a name="part-e"></a>
 # Part E — Metrics: Prometheus, RED & USE
 
@@ -465,6 +480,11 @@ false alarms and **alert fatigue** — the state where so many alerts fire that 
 including the real one.)
 
 ---
+
+
+```check
+metrics
+```
 
 <a name="worked"></a>
 # Part F — A complete Winnowing fingerprinter, end to end

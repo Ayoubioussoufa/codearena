@@ -192,6 +192,11 @@ In a diff, `-` lines were removed, `+` added; a header `@@ -a,b +c,d @@` marks t
 
 ---
 
+
+```check
+model
+```
+
 # Part 4 — Merge vs rebase
 
 Both bring branch A's work into branch B. They differ in **the shape of the history they leave**.
@@ -460,6 +465,11 @@ recover-reset-hard
 ```
 
 ---
+
+
+```check
+history
+```
 
 # Part 7 — Stashing
 
@@ -917,6 +927,11 @@ lost-work-triage
 
 
 ---
+
+
+```check
+remotes
+```
 
 ## Mastery checklist — you can…
 

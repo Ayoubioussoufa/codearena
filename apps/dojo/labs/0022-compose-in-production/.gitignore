@@ -1,0 +1,4 @@
+# The files you write in this lab, and any real env file.
+docker-compose.prod.yml
+.env.prod.example
+.env.prod

@@ -16,13 +16,20 @@ async function bootstrap() {
   const judge = app.get(JudgeService);
 
   // Today this is a smoke test. Wednesday it becomes a queue consumer.
-  const result = await judge.run("console.log(2 + 3)", "TYPESCRIPT", {
+  const limits = {
     timeoutMs: 2000,
     memoryMb: 256,
     pids: 64,
-  });
+    maxOutputBytes: 1024 * 1024,
+  };
+  const result = await judge.run(
+    "console.log(2 + 3)",
+    "TYPESCRIPT",
+    limits,
+    "",
+  );
 
-  logger.log(`verdict=${result.verdict} runtimeMs=${result.runtimeMs}ms`);
+  logger.log(`outcome=${result.outcome} timeMs=${result.timeMs}ms`);
 
   await app.close();
 }

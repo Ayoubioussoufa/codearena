@@ -16,14 +16,22 @@ import { RunResult } from "../domain/run-result.entity";
  */
 @Injectable()
 export class FakeCodeRunner implements CodeRunner {
+  private facts: RunResult = {
+    outcome: "EXIT",
+    exitCode: 0,
+    stdout: "",
+    stderr: "",
+    timeMs: 1,
+  };
+
+  /** Scripts the facts that the next run() calls return. */
+  willReturn(facts: RunResult): void {
+    this.facts = facts;
+  }
+
   run(): Promise<RunResult> {
     // Not `async`: this does no asynchronous work, and saying otherwise would
     // be a lie the linter is right to catch. The real adapter awaits Docker.
-    return Promise.resolve({
-      verdict: "ACCEPTED",
-      runtimeMs: 1,
-      stdout: "",
-      stderr: "",
-    });
+    return Promise.resolve(this.facts);
   }
 }

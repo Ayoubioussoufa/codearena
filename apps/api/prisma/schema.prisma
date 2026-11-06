@@ -37,6 +37,7 @@ enum Language {
   PYTHON
   CPP
   JAVA
+  JAVASCRIPT
 }
 
 enum Verdict {

@@ -30,6 +30,7 @@ function guideFile(slug: string): string | undefined {
   const candidates = [
     path.join(DOJO, "content/supplements", `${slug}.md`),
     path.join(DOJO, "content/dsa", `${slug}.md`),
+    path.join(DOJO, "content/missed", `${slug}.md`),
     path.join(DOJO, "../../docs", `${slug}.md`),
     path.join(DOJO, "content/reference", slug, "README.md"),
     path.join(DOJO, "content/reference", lang ?? "", `${rest.join("-")}.md`),

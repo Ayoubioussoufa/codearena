@@ -1,5 +1,5 @@
 /**
- * Guides index: Dojo supplements + the repo's docs/ phase guides.
+ * Guides index: missed weeks, Dojo supplements + the repo's docs/ phase guides.
  */
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Guides" };
 
 export default function GuidesPage() {
   const guides = getAllGuides();
+  const missed = guides.filter((g) => g.source === "missed");
   const supplements = guides.filter((g) => g.source === "supplement");
   const dsa = guides.filter((g) => g.source === "dsa");
   const phases = guides.filter((g) => g.source === "phase");
@@ -27,6 +28,7 @@ export default function GuidesPage() {
         </p>
       </header>
 
+      <Section title="Missed knowledge (rebuild these yourself)" guides={missed} />
       <Section title="Concepts & supplements (frontend + system design)" guides={supplements} />
       <Section title="DSA & interviews" guides={dsa} />
       <Section title="Language method references" guides={reference} />
@@ -62,7 +64,7 @@ function Section({
                   {guide.title}
                 </h3>
                 <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  {guide.source === "phase" ? "phase" : guide.source === "dsa" ? "dsa" : guide.source === "reference" ? "ref" : "dojo"}
+                  {guide.source === "phase" ? "phase" : guide.source === "dsa" ? "dsa" : guide.source === "reference" ? "ref" : guide.source === "missed" ? "missed" : "dojo"}
                 </span>
               </div>
               <p className="mt-2 flex-1 text-sm leading-6 text-slate-500 dark:text-slate-400">

@@ -24,7 +24,7 @@ async function bootstrap() {
   };
   const result = await judge.run(
     "console.log(2 + 3)",
-    "TYPESCRIPT",
+    "JAVASCRIPT",
     limits,
     "",
   );

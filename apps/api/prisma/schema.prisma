@@ -82,6 +82,8 @@ model Problem {
   totalSubmissions Int        @default(0)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+  timeLimitMs      Int        @default(2000)
+  memoryLimitMb    Int        @default(256)
 
   examples    ProblemExample[]
   testCases   TestCase[]

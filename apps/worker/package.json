@@ -5,9 +5,10 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "lint": "eslint",
     "test": "jest",
+    "test:adversarial": "jest --config test/adversarial/jest.config.json",
     "test:integration": "jest --testRegex '\\.integration-spec\\.ts$' --testTimeout 30000 --runInBand"
   },
   "dependencies": {

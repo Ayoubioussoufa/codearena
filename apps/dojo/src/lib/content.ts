@@ -10,13 +10,15 @@ import { REPO_ROOT } from "./repo";
 const REPO_DOCS = path.join(REPO_ROOT, "docs");
 const SUPPLEMENTS = path.join(REPO_ROOT, "apps/dojo/content/supplements");
 const DSA_DIR = path.join(REPO_ROOT, "apps/dojo/content/dsa");
+/** Weeks that were built in a rush, explained part by part so they can be rebuilt. */
+const MISSED = path.join(REPO_ROOT, "apps/dojo/content/missed");
 /** Language method references: content/reference/<lang>/<topic>.md → slug "<lang>-<topic>". */
 const REFERENCE = path.join(REPO_ROOT, "apps/dojo/content/reference");
 
 export interface GuideMeta {
   slug: string;
   title: string;
-  source: "phase" | "supplement" | "dsa" | "reference";
+  source: "phase" | "supplement" | "dsa" | "reference" | "missed";
   minutes: number;
   intro: string;
   /**
@@ -138,6 +140,7 @@ export function getAllGuides(): GuideMeta[] {
   const phase = listDir(REPO_DOCS).map((f) => metaFor(f, REPO_DOCS, "phase"));
   const supp = listDir(SUPPLEMENTS).map((f) => metaFor(f, SUPPLEMENTS, "supplement"));
   const dsa = listDir(DSA_DIR).map((f) => metaFor(f, DSA_DIR, "dsa"));
+  const missed = listDir(MISSED).map((f) => metaFor(f, MISSED, "missed"));
   const reference = listReference().map(([slug, file]) => {
     const lang = path.basename(path.dirname(file));
     return {
@@ -146,7 +149,7 @@ export function getAllGuides(): GuideMeta[] {
       ...(slug === lang ? {} : { parent: lang }),
     };
   });
-  return [...supp, ...dsa, ...reference, ...phase];
+  return [...missed, ...supp, ...dsa, ...reference, ...phase];
 }
 
 function extractToc(md: string): TocEntry[] {
@@ -173,6 +176,7 @@ export function getGuide(slug: string): Guide | null {
   for (const [dir, source] of [
     [SUPPLEMENTS, "supplement"],
     [DSA_DIR, "dsa"],
+    [MISSED, "missed"],
     [REPO_DOCS, "phase"],
   ] as const) {
     const file = path.join(dir, `${safe}.md`);

@@ -32,6 +32,7 @@ import { aptitudeChecks } from "./aptitude-reasoning";
 import { moroccoChecks } from "./morocco-internship-playbook";
 import { jsReferenceChecks } from "./js";
 import { javaReferenceChecks } from "./java";
+import { missedWeek2Checks } from "./missed-week-2-the-judge";
 
 const BY_GUIDE: Record<string, GuideCheckSet> = {
   nestjs: nestjsChecks,
@@ -62,6 +63,7 @@ const BY_GUIDE: Record<string, GuideCheckSet> = {
   "morocco-internship-playbook": moroccoChecks,
   js: jsReferenceChecks,
   java: javaReferenceChecks,
+  "missed-week-2-the-judge": missedWeek2Checks,
 };
 
 export function guideCheckSet(slug: string): GuideCheckSet | undefined {

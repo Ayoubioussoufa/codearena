@@ -17,4 +17,5 @@ export type RunResult =
   | (RunOutput & { outcome: "EXIT"; exitCode: number })
   | (RunOutput & { outcome: "SIGNAL"; signal: string })
   | (RunOutput & { outcome: "TIMEOUT" })
-  | (RunOutput & { outcome: "OUTPUT_LIMIT" });
+  | (RunOutput & { outcome: "OUTPUT_LIMIT" })
+  | (RunOutput & { outcome: "MEMORY_LIMIT" });

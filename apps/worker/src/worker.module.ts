@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { JudgeService } from "./application/judge.service";
 import { CODE_RUNNER } from "./ports/code-runner.port";
-import { FakeCodeRunner } from "./adapters/fake-code.runner";
+import { DockerCodeRunner } from "./adapters/docker-code.runner";
 
 @Module({
   imports: [
@@ -10,6 +10,9 @@ import { FakeCodeRunner } from "./adapters/fake-code.runner";
       isGlobal: true,
     }),
   ],
-  providers: [JudgeService, { provide: CODE_RUNNER, useClass: FakeCodeRunner }],
+  providers: [
+    JudgeService,
+    { provide: CODE_RUNNER, useClass: DockerCodeRunner },
+  ],
 })
 export class WorkerModule {}

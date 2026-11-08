@@ -82,6 +82,31 @@ jobs:
       # Postgres, so parallel workers would race on the same rows.
       - run: pnpm --filter api test:e2e
 
+  worker-sandbox:
+    name: Worker sandbox (Docker)
+    # The runner's tests start real containers, so they need a Docker daemon.
+    # GitHub's Ubuntu runners have one; the build job's unit tests don't need it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Pull first, so the download time never counts against a test's limit.
+      # The tag is read from the runner, so CI can't drift from what it runs.
+      - name: Pull the sandbox image
+        run: >-
+          docker pull "$(grep -oP 'const IMAGE = "\K[^"]+'
+          apps/worker/src/adapters/docker-code.runner.ts)"
+      - run: pnpm --filter worker run test:integration
+      # Six hostile programs. Each must be contained by its named wall.
+      - run: pnpm --filter worker run test:adversarial
+      - name: No container left behind (I-17)
+        run: test -z "$(docker ps -aq --filter name=codearena-run-)"
+
   dojo-content:
     name: Dojo content checks
     runs-on: ubuntu-latest

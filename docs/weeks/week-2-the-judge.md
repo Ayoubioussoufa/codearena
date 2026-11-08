@@ -2,6 +2,11 @@
 
 ### Mon 2 → Sun 8 Nov 2026 · revise, build, system design, then DSA
 
+> **Status: missed.** The sandbox, the judge loop and the attacks were built in a rush on 8 Nov,
+> mostly not by you. Each part is explained in the dojo, ready to rebuild:
+> **Guides → Missed knowledge → Week 2, the judge** (`/guides/missed-week-2-the-judge`). The queue,
+> the idempotency test, the failure modes and the ADRs are still owed.
+
 **The build:** code goes into a hardened container, through a queue, and comes back as a stored
 verdict. **The DSA:** a new concept every 2 days, so each one gets a full course, all three days of
 problems, and the boss. **System design:** one section a day, explained out loud.

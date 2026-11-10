@@ -57,6 +57,7 @@ function clientMessage(exception: HttpException): string | string[] {
       msg.every((m): m is string => typeof m === 'string')
     )
       return msg;
+    if (typeof msg === 'string') return msg;
   }
   return exception.message;
 }

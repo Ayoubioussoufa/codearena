@@ -3,8 +3,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthGuard } from './auth/guards/auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.schema';
 import { PrismaModule } from './prisma/prisma.module';
@@ -27,9 +25,8 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UsersModule,
   ],
-  controllers: [AppController, HealthController],
+  controllers: [HealthController],
   providers: [
-    AppService,
     // ORDER IS EXECUTION ORDER.
     // Throttle first: reject the 6th login WITHOUT spending 45ms in Argon2.
     { provide: APP_GUARD, useClass: ThrottlerGuard },

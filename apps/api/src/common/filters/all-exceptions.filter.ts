@@ -24,8 +24,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // 4xx: tell the client what they did wrong — they can fix it.
     // 5xx: a generic message. Details go to the log, never to the client.
-    console.log(exception instanceof HttpException && exception.getResponse());
-
     const message = isHttp ? clientMessage(exception) : 'Internal server error';
 
     if (!isHttp) {
@@ -53,8 +51,12 @@ function clientMessage(exception: HttpException): string | string[] {
   const body = exception.getResponse();
   if (typeof body === 'string') return body;
   if (typeof body === 'object' && 'message' in body) {
-    const msg = (body as Record<string, unknown>).message;
-    if (typeof msg === 'string' || Array.isArray(msg)) return msg;
+    const msg = body.message;
+    if (
+      Array.isArray(msg) &&
+      msg.every((m): m is string => typeof m === 'string')
+    )
+      return msg;
   }
   return exception.message;
 }

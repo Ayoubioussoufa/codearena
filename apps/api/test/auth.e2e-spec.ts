@@ -106,7 +106,7 @@ describe('Auth (e2e)', () => {
       expect(JSON.stringify(body(res))).not.toContain('$argon2');
     });
 
-    it('names the invalid fields instead of "Bad Request Exception', async () => {
+    it('names the invalid fields instead of "Bad Request Exception"', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/register')
         .send({ email: 'x@y.com', username: 'dd', password: 'short' });

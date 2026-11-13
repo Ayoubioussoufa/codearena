@@ -80,14 +80,16 @@ describe("DockerCodeRunner", () => {
   });
 
   it("stops a program that prints forever", async () => {
+    // Synchronous writes: console.log queues output in memory when the pipe is
+    // slow, and a slow host would hit the memory limit before the output cap.
     const facts = await runner.run(
-      `while (true) console.log("x".repeat(1000))`,
+      `const fs = require("fs"); while (true) fs.writeSync(1, "x".repeat(1000));`,
       "JAVASCRIPT",
       limits,
       "",
     );
 
-    expect(facts.outcome).toBe("OUTPUT_LIMIT");
+    expect(facts).toMatchObject({ outcome: "OUTPUT_LIMIT" });
     expect(facts.stdout.length).toBeLessThanOrEqual(limits.maxOutputBytes);
   });
 

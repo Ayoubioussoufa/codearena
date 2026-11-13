@@ -24,6 +24,11 @@ const leftovers = () =>
 describe("DockerCodeRunner", () => {
   const runner = new DockerCodeRunner();
 
+  // The first container on a cold host (a fresh CI runner) can take over a
+  // second to start, and Docker's own clock would then call it a timeout.
+  // One unmeasured run warms the image and the daemon.
+  beforeAll(() => runner.run("", "JAVASCRIPT", limits, ""), 30_000);
+
   afterEach(() => {
     expect(leftovers()).toBe("");
   });
@@ -87,7 +92,9 @@ describe("DockerCodeRunner", () => {
   });
 
   it("reports the OOM killer as a memory limit", async () => {
-    const code = `const kept = []; while (true) kept.push(new Array(1e6).fill(1.5));`;
+    // Off-heap buffers: V8's --max-old-space-size doesn't count them, so Node
+    // can't abort first, and only the cgroup's OOM killer can stop the program.
+    const code = `const kept = []; while (true) kept.push(Buffer.alloc(16 * 1024 * 1024, 1));`;
 
     const facts = await runner.run(code, "JAVASCRIPT", limits, "");
 

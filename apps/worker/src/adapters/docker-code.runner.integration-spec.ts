@@ -98,7 +98,8 @@ describe("DockerCodeRunner", () => {
 
     const facts = await runner.run(code, "JAVASCRIPT", limits, "");
 
-    expect(facts.outcome).toBe("MEMORY_LIMIT");
+    // On the whole object, so a failure shows the signal and stderr too.
+    expect(facts).toMatchObject({ outcome: "MEMORY_LIMIT" });
   });
 
   it("reports the time without the container's start-up", async () => {

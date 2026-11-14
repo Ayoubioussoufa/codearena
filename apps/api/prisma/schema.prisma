@@ -47,6 +47,8 @@ enum Verdict {
   TIME_LIMIT
   RUNTIME_ERROR
   COMPILE_ERROR
+  MEMORY_LIMIT
+  OUTPUT_LIMIT
 }
 
 model User {

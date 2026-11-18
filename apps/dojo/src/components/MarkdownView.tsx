@@ -1,7 +1,8 @@
 /**
  * Guide markdown renderer: GFM + heading anchors, mermaid fences rendered as
- * diagrams, relative .md links rewritten to /guides routes, tables wrapped in
- * scroll containers. Runs in server components.
+ * diagrams, ````walkthrough fences rendered as closed toggles, relative .md
+ * links rewritten to /guides routes, tables wrapped in scroll containers.
+ * Runs in server components.
  */
 import { isValidElement, type ReactNode } from "react";
 import Markdown from "react-markdown";
@@ -35,7 +36,7 @@ export function MarkdownView({
 }: {
   markdown: string;
   /** Enables ```exercise and ```check fences, which are looked up per guide. */
-  guideSlug?: string;
+  guideSlug?: string | undefined;
 }) {
   return (
     <div className="prose prose-slate max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-pre:overflow-x-auto">
@@ -43,7 +44,7 @@ export function MarkdownView({
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[
           rehypeSlug,
-          [rehypeHighlight, { detect: false, plainText: ["mermaid", "text", "txt"] }],
+          [rehypeHighlight, { detect: false, plainText: ["mermaid", "text", "txt", "walkthrough"] }],
         ]}
         components={{
           pre: (props) => {
@@ -66,6 +67,34 @@ export function MarkdownView({
                   <pre className="not-prose rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
                     Unknown check: {guideSlug}:{id}
                   </pre>
+                );
+              }
+              // ````walkthrough fences hold markdown (four backticks, so code
+              // blocks fit inside). Closed by default: the full answer for a
+              // step, opened only when you're stuck. An optional first line
+              // `title: …` names it.
+              if (className?.includes("language-walkthrough")) {
+                const raw = textOf(children).replace(/\n$/, "");
+                const [first = "", ...rest] = raw.split("\n");
+                const titled = first.startsWith("title:");
+                const title = titled ? first.slice("title:".length).trim() : "";
+                const body = titled ? rest.join("\n") : raw;
+                return (
+                  <details className="walkthrough not-prose group my-5 rounded-xl border border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/20">
+                    <summary className="flex cursor-pointer select-none list-none items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100/70 dark:text-amber-200 dark:hover:bg-amber-900/30 [&::-webkit-details-marker]:hidden">
+                      <span className="rounded-md bg-amber-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white dark:bg-amber-600">
+                        <span className="group-open:hidden">Show walkthrough</span>
+                        <span className="hidden group-open:inline">Hide walkthrough</span>
+                      </span>
+                      <span>{title || "The full answer, step by step"}</span>
+                      <span className="ml-auto text-xs font-normal text-amber-700/80 dark:text-amber-300/70">
+                        try first, open when stuck
+                      </span>
+                    </summary>
+                    <div className="border-t border-amber-200 px-4 pb-2 pt-1 dark:border-amber-800/60">
+                      <MarkdownView markdown={body} guideSlug={guideSlug} />
+                    </div>
+                  </details>
                 );
               }
               // ```exercise fences hold an exercise id; the definition lives in

@@ -15,6 +15,8 @@ generator client {
   // Compatibility with Jest (CommonJS environment)
   // No .js extension conflicts during testing
   runtime             = "nodejs"
+  // Partial indexes (block E): `where:` on @@index.
+  previewFeatures     = ["partialIndexes"]
 }
 
 // The worker's own client, generated from this same schema. One schema means
@@ -153,8 +155,15 @@ model Submission {
   claimedBy String?
   claimedAt DateTime?
 
-  @@index([userId, createdAt(sort: Desc)]) // profile history, cursor-paginated
-  @@index([problemId, verdict]) // acceptance-rate stats
+  // History, keyset-paginated on (createdAt, id): `id` in the index removes
+  // the sort on ties (docs/perf/02).
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([problemId, verdict]) // acceptance rates (docs/perf/05)
+  // Only accepted rows, about 30 %: "solved" badges and the top-users query
+  // (docs/perf/03, 04).
+  @@index([userId, problemId], map: "Submission_solved_idx", where: raw("verdict = 'ACCEPTED'"))
+  // The latest accepted solutions of a problem (docs/perf/05).
+  @@index([problemId, createdAt(sort: Desc)], map: "Submission_accepted_recent_idx", where: raw("verdict = 'ACCEPTED'"))
 }
 
 model RefreshToken {
@@ -167,5 +176,8 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime  @default(now())
 
-  @@index([userId, family]) // rotation lookup
+  // userId first: deleting a user cascades here (ON DELETE CASCADE).
+  @@index([userId, family])
+  // revokeFamily: WHERE family = … (I-16, docs/perf/06).
+  @@index([family])
 }

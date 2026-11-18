@@ -19,3 +19,15 @@ export interface Problem {
   totalSubmissions: number;
   tags: string[];
 }
+
+/** What the list page shows: no statement, no examples, no starter code (I-15). */
+export type ProblemSummary = Pick<
+  Problem,
+  | 'id'
+  | 'slug'
+  | 'title'
+  | 'difficulty'
+  | 'acceptanceRate'
+  | 'totalSubmissions'
+  | 'tags'
+>;

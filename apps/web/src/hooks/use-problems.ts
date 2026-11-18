@@ -10,13 +10,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/http';
 import { queryKeys } from '@/lib/query/keys';
-import type { Problem } from '@/lib/types';
+import type { Problem, ProblemSummary } from '@/lib/types';
 
-type ProblemsPage = { items: Problem[]; nextCursor: number | null };
+type ProblemsPage = { items: ProblemSummary[]; nextCursor: number | null };
 
 /** Walks every cursor page. The API caps `limit` at 100. */
-async function fetchAllProblems(): Promise<Problem[]> {
-  const all: Problem[] = [];
+async function fetchAllProblems(): Promise<ProblemSummary[]> {
+  const all: ProblemSummary[] = [];
   let cursor: number | null = null;
 
   do {

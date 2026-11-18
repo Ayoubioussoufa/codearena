@@ -21,3 +21,7 @@ Each file records one decision: what we chose, what we rejected, and why.
 | [004](004-token-storage-cookie-vs-memory.md) | Refresh token in an httpOnly cookie, access token in memory | Accepted |
 | [005](005-per-ip-rate-limiting.md) | Rate-limit the credential endpoints per IP | Accepted |
 | [006](006-leetcode-codeforces-hybrid.md) | A LeetCode–Codeforces hybrid, judged through stdin/stdout | Proposed |
+| [009](009-six-queries-six-plans.md) | Index for the queries we measured, and paginate with keysets | Proposed |
+| [010](010-worker-database-access.md) | The worker reads and writes Postgres with its own Prisma client | Proposed |
+
+007 and 008 are reserved for the two records still owed from week 2: the trust boundary, and BullMQ rather than Kafka.

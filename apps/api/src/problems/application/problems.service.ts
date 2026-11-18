@@ -14,9 +14,15 @@ export class ProblemsService {
   ) {}
 
   async list(params: FindManyParams) {
-    const items = await this.repo.findMany(params);
+    // Ask for one more than the page: if it comes back, a next page exists.
+    // A full last page no longer costs the client an empty request (I-11).
+    const rows = await this.repo.findMany({
+      ...params,
+      limit: params.limit + 1,
+    });
+    const items = rows.slice(0, params.limit);
     const nextCursor =
-      items.length === params.limit ? items[items.length - 1]!.id : null;
+      rows.length > params.limit ? items[items.length - 1]!.id : null;
     return { items, nextCursor };
   }
 

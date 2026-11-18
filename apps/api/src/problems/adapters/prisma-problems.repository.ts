@@ -3,21 +3,19 @@ import {
   FindManyParams,
   ProblemsRepository,
 } from '../ports/problems.repository';
-import { Problem } from '../domain/problem.entity';
+import { Problem, ProblemSummary } from '../domain/problem.entity';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class PrismaProblemsRepository implements ProblemsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findMany(params: FindManyParams): Promise<Problem[]> {
+  async findMany(params: FindManyParams): Promise<ProblemSummary[]> {
     const rows = await this.prisma.problem.findMany({
-      take: params.limit,
-      ...(params.cursor !== undefined && {
-        cursor: { id: params.cursor },
-        skip: 1,
-      }),
       where: {
+        // Keyset: "ids after this one". Prisma's `cursor` looks the cursor's
+        // row up first, so a deleted row ended the list early (I-10).
+        ...(params.cursor !== undefined && { id: { gt: params.cursor } }),
         ...(params.difficulty && { difficulty: params.difficulty }),
         ...(params.tag && { tags: { some: { name: params.tag } } }),
         ...(params.q && {
@@ -25,28 +23,19 @@ export class PrismaProblemsRepository implements ProblemsRepository {
         }),
       },
       orderBy: { id: 'asc' },
-      include: {
-        tags: true,
-        examples: { orderBy: { order: 'asc' } },
+      take: params.limit,
+      // Only what the list page shows (I-15).
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        difficulty: true,
+        acceptanceRate: true,
+        totalSubmissions: true,
+        tags: { select: { name: true } },
       },
     });
-    return rows.map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      difficulty: r.difficulty,
-      description: r.description,
-      constraints: r.constraints,
-      examples: r.examples.map((e) => ({
-        input: e.input,
-        output: e.output,
-        explanation: e.explanation ?? undefined,
-      })),
-      starterCode: r.starterCode as Record<string, string>,
-      acceptanceRate: r.acceptanceRate,
-      totalSubmissions: r.totalSubmissions,
-      tags: r.tags.map((t) => t.name),
-    }));
+    return rows.map((r) => ({ ...r, tags: r.tags.map((t) => t.name) }));
   }
 
   async findBySlug(slug: string): Promise<Problem | null> {

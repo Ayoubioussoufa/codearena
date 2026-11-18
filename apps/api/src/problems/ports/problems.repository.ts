@@ -1,4 +1,4 @@
-import { Problem, Difficulty } from '../domain/problem.entity';
+import { Problem, ProblemSummary, Difficulty } from '../domain/problem.entity';
 
 export interface FindManyParams {
   cursor?: number;
@@ -9,7 +9,8 @@ export interface FindManyParams {
 }
 
 export interface ProblemsRepository {
-  findMany(params: FindManyParams): Promise<Problem[]>;
+  /** Ids above `cursor`, in id order, at most `limit` of them. */
+  findMany(params: FindManyParams): Promise<ProblemSummary[]>;
   findBySlug(slug: string): Promise<Problem | null>;
 }
 

@@ -41,4 +41,35 @@ describe('ProblemsService', () => {
     const result = await service.list({ limit: 20 });
     expect(result.nextCursor).toBeNull();
   });
+
+  describe('pages (I-11)', () => {
+    // Five problems, ids 1..5. The fake honours cursor and limit like the
+    // real adapter: ids above the cursor, in order, at most `limit`.
+    const ids = [1, 2, 3, 4, 5];
+    const pagedRepo: ProblemsRepository = {
+      findMany: ({ cursor, limit }) =>
+        Promise.resolve(
+          ids
+            .filter((id) => cursor === undefined || id > cursor)
+            .slice(0, limit)
+            .map((id) => ({ ...sample, id })),
+        ),
+      findBySlug: () => Promise.resolve(null),
+    };
+    const paged = new ProblemsService(pagedRepo);
+
+    it('returns a cursor when another page exists', async () => {
+      const page = await paged.list({ limit: 2 });
+
+      expect(page.items.map((p) => p.id)).toEqual([1, 2]);
+      expect(page.nextCursor).toBe(2);
+    });
+
+    it('returns no cursor after a full last page, so the client stops', async () => {
+      const page = await paged.list({ limit: 5 });
+
+      expect(page.items).toHaveLength(5);
+      expect(page.nextCursor).toBeNull();
+    });
+  });
 });

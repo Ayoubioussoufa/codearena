@@ -41,6 +41,18 @@ export interface Problem {
   starterCode: Record<Language, string>;
 }
 
+/** One row of GET /problems: the list endpoint omits the statement (I-15). */
+export type ProblemSummary = Pick<
+  Problem,
+  | "id"
+  | "slug"
+  | "title"
+  | "difficulty"
+  | "tags"
+  | "acceptanceRate"
+  | "totalSubmissions"
+>;
+
 export interface TestResult {
   name: string;
   passed: boolean;

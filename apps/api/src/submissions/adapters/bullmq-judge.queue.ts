@@ -24,6 +24,10 @@ export class BullmqJudgeQueue implements JudgeQueue {
       { submissionId },
       {
         jobId: submissionId,
+        // Our failures (Docker or the database down) get two more tries,
+        // 2 s then 4 s later. Without `attempts`, a failed job is never retried.
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
         // Keep some history to look at, but don't let Redis fill up.
         removeOnComplete: 1000,
         removeOnFail: 5000,

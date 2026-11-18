@@ -8,7 +8,9 @@ export type Verdict =
   | 'RUNTIME_ERROR'
   | 'COMPILE_ERROR'
   | 'MEMORY_LIMIT'
-  | 'OUTPUT_LIMIT';
+  | 'OUTPUT_LIMIT'
+  | 'JUDGING'
+  | 'SYSTEM_ERROR';
 
 export interface Submission {
   id: string;

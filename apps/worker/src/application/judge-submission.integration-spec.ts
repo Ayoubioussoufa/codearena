@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CODE_RUNNER } from "../ports/code-runner.port";
 import { SUBMISSION_STORE } from "../ports/submission-store.port";
 import { validateEnv } from "../config/env.schema";
+import { LEADERBOARD } from "../ports/leaderboard.port";
 
 /**
  * The idempotency test. The guarantee lives in the database, so this runs
@@ -44,6 +45,11 @@ describe("Judging a submission delivered twice", () => {
         JudgeSubmissionService,
         { provide: CODE_RUNNER, useValue: runner },
         { provide: SUBMISSION_STORE, useClass: PrismaSubmissionStore },
+        // This test is about the claim; the leaderboard has its own.
+        {
+          provide: LEADERBOARD,
+          useValue: { recordSolve: () => Promise.resolve(true) },
+        },
       ],
     }).compile();
     await moduleRef.init();

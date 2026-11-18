@@ -6,6 +6,19 @@ import type {
   SubmissionStore,
 } from "../ports/submission-store.port";
 import type { Judgement } from "../domain/verdict.entity";
+import type { Leaderboard } from "../ports/leaderboard.port";
+
+/** Records every solve, or fails like a Redis that's down. */
+class FakeLeaderboard implements Leaderboard {
+  readonly solves: string[] = [];
+  down = false;
+
+  recordSolve(userId: string, problemId: number): Promise<boolean> {
+    if (this.down) return Promise.reject(new Error("Redis is down"));
+    this.solves.push(`${userId}:${problemId}`);
+    return Promise.resolve(true);
+  }
+}
 
 /**
  * One submission in memory. The claim is a plain field: this fake proves the
@@ -56,6 +69,8 @@ class FakeStore implements SubmissionStore {
 
 const task: JudgeTask = {
   submissionId: "sub-1",
+  userId: "ada",
+  problemId: 7,
   code: "console.log(1)",
   language: "JAVASCRIPT",
   tests: [{ input: "", expected: "1" }],
@@ -73,15 +88,17 @@ const printed = (stdout: string) => ({
 
 describe("JudgeSubmissionService", () => {
   let runner: FakeCodeRunner;
+  let leaderboard: FakeLeaderboard;
 
   beforeEach(() => {
     runner = new FakeCodeRunner();
+    leaderboard = new FakeLeaderboard();
   });
 
   // The REAL JudgeService, on a fake runner: we test the whole use case,
   // and only fake what touches the outside world.
   const serviceWith = (store: FakeStore) =>
-    new JudgeSubmissionService(store, new JudgeService(runner));
+    new JudgeSubmissionService(store, leaderboard, new JudgeService(runner));
 
   it("stores ACCEPTED for a right answer", async () => {
     const store = new FakeStore(task);
@@ -131,6 +148,32 @@ describe("JudgeSubmissionService", () => {
     await expect(serviceWith(store).handle("gone")).resolves.toBeUndefined();
 
     expect(runner.inputs).toEqual([]);
+  });
+
+  it("records the solve on the leaderboard after an ACCEPTED", async () => {
+    runner.willReturn(printed("1\n"));
+
+    await serviceWith(new FakeStore(task)).handle("sub-1");
+
+    expect(leaderboard.solves).toEqual(["ada:7"]);
+  });
+
+  it("records nothing for a wrong answer", async () => {
+    runner.willReturn(printed("2\n"));
+
+    await serviceWith(new FakeStore(task)).handle("sub-1");
+
+    expect(leaderboard.solves).toEqual([]);
+  });
+
+  it("still succeeds when Redis is down: the verdict is stored, the board is rebuilt later", async () => {
+    const store = new FakeStore(task);
+    runner.willReturn(printed("1\n"));
+    leaderboard.down = true;
+
+    await expect(serviceWith(store).handle("sub-1")).resolves.toBeUndefined();
+
+    expect(store.saved).toMatchObject([{ verdict: "ACCEPTED" }]);
   });
 
   it("marks SYSTEM_ERROR when it gives up", async () => {

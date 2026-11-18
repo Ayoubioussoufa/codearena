@@ -40,6 +40,8 @@ export class PrismaSubmissionStore implements SubmissionStore {
     const row = await this.prisma.submission.findUnique({
       where: { id: submissionId },
       select: {
+        userId: true,
+        problemId: true,
         code: true,
         language: true,
         problem: {
@@ -57,6 +59,8 @@ export class PrismaSubmissionStore implements SubmissionStore {
     if (!row) return null;
     return {
       submissionId,
+      userId: row.userId,
+      problemId: row.problemId,
       code: row.code,
       language: row.language,
       tests: row.problem.testCases,

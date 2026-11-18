@@ -12,6 +12,7 @@ import { ProblemsModule } from './problems/problems.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SubmissionsModule } from './submissions/submissions.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { SubmissionsModule } from './submissions/submissions.module';
     AuthModule,
     UsersModule,
     SubmissionsModule,
+    LeaderboardModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -3,7 +3,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthGuard } from './auth/guards/auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { validateEnv } from './config/env.schema';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health/health.controller';
@@ -21,6 +22,16 @@ import { SubmissionsModule } from './submissions/submissions.module';
     // ttl is in MILLISECONDS. A loose app-wide ceiling; /auth/* is tightened
     // per-route with @Throttle, and /problems opts out with @SkipThrottle.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    // One Redis connection for every queue in the app, from the validated env.
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.getOrThrow<string>('REDIS_HOST'),
+          port: config.getOrThrow<number>('REDIS_PORT'),
+        },
+      }),
+    }),
     PrismaModule,
     ProblemsModule,
     AuthModule,

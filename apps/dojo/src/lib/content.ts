@@ -155,10 +155,17 @@ export function getAllGuides(): GuideMeta[] {
 function extractToc(md: string): TocEntry[] {
   const slugger = new GithubSlugger();
   const entries: TocEntry[] = [];
-  let inFence = false;
+  // The fence that opened the current block, e.g. "```" or "````". Only a fence
+  // at least that long closes it, so a ````walkthrough can hold ``` code blocks.
+  let fence: string | null = null;
   for (const line of md.split("\n")) {
-    if (line.trimStart().startsWith("```")) inFence = !inFence;
-    if (inFence) continue;
+    const marker = line.trimStart().match(/^`{3,}/)?.[0];
+    if (marker) {
+      if (fence === null) fence = marker;
+      else if (marker.length >= fence.length && line.trim() === marker) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
     const m = line.match(/^(#{2,3})\s+(.+?)\s*$/);
     if (!m) continue;
     const text = (m[2] as string).replace(/[*`]/g, "");

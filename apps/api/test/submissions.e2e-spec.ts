@@ -153,6 +153,12 @@ describe('Submissions (e2e)', () => {
     );
   });
 
+  it('answers 413, not 500, for a body over the parser limit', async () => {
+    await submit(aliceToken, { ...valid(), code: 'x'.repeat(200_000) }).expect(
+      413,
+    );
+  });
+
   it('answers 404 for a problem that does not exist, and queues nothing', async () => {
     const before = queued.length;
     await submit(aliceToken, { ...valid(), problemId: 999_999 }).expect(404);

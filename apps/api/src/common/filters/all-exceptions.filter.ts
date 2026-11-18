@@ -18,15 +18,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const isHttp = exception instanceof HttpException;
+    const parserStatus = bodyParserStatus(exception);
     const status = isHttp
       ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+      : (parserStatus ?? HttpStatus.INTERNAL_SERVER_ERROR);
 
     // 4xx: tell the client what they did wrong — they can fix it.
     // 5xx: a generic message. Details go to the log, never to the client.
-    const message = isHttp ? clientMessage(exception) : 'Internal server error';
+    const message = isHttp
+      ? clientMessage(exception)
+      : parserStatus !== null && exception instanceof Error
+        ? exception.message
+        : 'Internal server error';
 
-    if (!isHttp) {
+    if (!isHttp && parserStatus === null) {
       this.logger.error(
         `Unhandled ${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
@@ -60,4 +65,23 @@ function clientMessage(exception: HttpException): string | string[] {
     if (typeof msg === 'string') return msg;
   }
   return exception.message;
+}
+
+/**
+ * Express's body parser rejects some requests before Nest sees them: a body
+ * over the size limit gets a PayloadTooLargeError, which is not an
+ * HttpException but carries `status: 413`. Without this, the client gets a
+ * 500 for its own mistake.
+ */
+function bodyParserStatus(exception: unknown): number | null {
+  if (
+    exception instanceof Error &&
+    'status' in exception &&
+    typeof exception.status === 'number' &&
+    exception.status >= 400 &&
+    exception.status < 500
+  ) {
+    return exception.status;
+  }
+  return null;
 }

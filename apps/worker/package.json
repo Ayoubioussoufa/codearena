@@ -56,6 +56,9 @@
         }
       ]
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "node_modules/(?!.*@nestjs[+/](config|bullmq|bull-shared))"
+    ]
   }
 }

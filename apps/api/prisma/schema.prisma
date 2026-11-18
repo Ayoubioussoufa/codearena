@@ -59,6 +59,8 @@ enum Verdict {
   COMPILE_ERROR
   MEMORY_LIMIT
   OUTPUT_LIMIT
+  JUDGING // a worker holds the claim (claimedBy, claimedAt)
+  SYSTEM_ERROR // our failure, after the last retry: the user should resubmit
 }
 
 model User {
@@ -146,6 +148,10 @@ model Submission {
   code      String
   runtimeMs Int?
   createdAt DateTime @default(now())
+  // The claim: which worker is judging it, and since when. A claim older
+  // than the lease belongs to a dead worker and can be taken over.
+  claimedBy String?
+  claimedAt DateTime?
 
   @@index([userId, createdAt(sort: Desc)]) // profile history, cursor-paginated
   @@index([problemId, verdict]) // acceptance-rate stats

@@ -1,61 +1,47 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SubmissionsRepository } from '../ports/submissions.repository';
-import { Submission } from '../domain/submissions.entity';
+import type {
+  NewSubmission,
+  SubmissionsRepository,
+} from '../ports/submissions.repository';
+import type { Submission } from '../domain/submissions.entity';
+import type { Submission as SubmissionRow } from '../../../generated/prisma/client';
+
+/** The adapter's one job: a Prisma row in, a domain Submission out. */
+function toDomain(row: SubmissionRow): Submission {
+  return {
+    id: row.id,
+    problemId: row.problemId,
+    userId: row.userId,
+    language: row.language,
+    verdict: row.verdict,
+    code: row.code,
+    runtimeMs: row.runtimeMs,
+    createdAt: row.createdAt,
+  };
+}
 
 @Injectable()
 export class PrismaSubmissionsRepository implements SubmissionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(submissions: Submission): Promise<Submission> {
-    const rows = await this.prisma.submission.create({
-      data: {
-        problemId: submissions.problemId,
-        userId: submissions.userId,
-        language: submissions.language,
-        code: submissions.code,
-        runtimeMs: submissions.runtimeMs,
-        createdAt: submissions.createdAt,
-      },
+  async problemExists(problemId: number): Promise<boolean> {
+    // A yes or a no: fetch the id only, not the whole problem.
+    const problem = await this.prisma.problem.findUnique({
+      where: { id: problemId },
+      select: { id: true },
     });
-
-    return {
-      id: rows.id,
-      problemId: rows.problemId,
-      userId: rows.userId,
-      language: rows.language,
-      verdict: rows.verdict,
-      code: rows.code,
-      runtimeMs: rows.runtimeMs !== null ? rows.runtimeMs : null,
-      createdAt: rows.createdAt,
-    };
+    return problem !== null;
   }
 
-  async problemExists(problemId: number): Promise<boolean> {
-    const count = await this.prisma.problem.count({
-      where: { id: problemId },
-    });
-    return count > 0;
+  async create(data: NewSubmission): Promise<Submission> {
+    // verdict, runtimeMs and createdAt come from the schema's defaults.
+    const row = await this.prisma.submission.create({ data });
+    return toDomain(row);
   }
 
   async findById(id: string): Promise<Submission | null> {
-    const submission = await this.prisma.submission.findUnique({
-      where: { id },
-    });
-
-    if (!submission) {
-      return null;
-    }
-
-    return {
-      id: submission.id,
-      problemId: submission.problemId,
-      userId: submission.userId,
-      language: submission.language,
-      verdict: submission.verdict,
-      code: submission.code,
-      runtimeMs: submission.runtimeMs !== null ? submission.runtimeMs : null,
-      createdAt: submission.createdAt,
-    };
+    const row = await this.prisma.submission.findUnique({ where: { id } });
+    return row ? toDomain(row) : null;
   }
 }

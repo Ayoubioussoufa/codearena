@@ -256,7 +256,7 @@ export const WEEKS: Week[] = [
         systemDesign: [sd("Worked design #9: the leaderboard", "worked-design-9--a-leaderboard-your-codearena-story")],
         dsa: "Block 08 · Day 3, then CP checkpoint 3",
       }),
-      day("Sun 15 Nov", "2026-11-15", [], { note: "A full day off. The middle of a sprint is where people crash." }),
+      day("Sun 15 Nov", "2026-11-15", [], { build: "Week 3 in two days, day 2: a million rows, six plans, the leaderboard", note: "Replanned on 14 Nov: the week runs on Sat and Sun, from the guide \"Week 3 in two days\". Take Monday evening off instead." }),
     ],
   },
   {

@@ -12,9 +12,14 @@
     "test:integration": "jest --testRegex '\\.integration-spec\\.ts$' --testTimeout 30000 --runInBand"
   },
   "dependencies": {
+    "@nestjs/bullmq": "^12.0.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^11.0.1",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.8.0",
+    "bullmq": "^6.7.7",
+    "ioredis": "^6.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.5.2"

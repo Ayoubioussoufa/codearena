@@ -17,6 +17,16 @@ generator client {
   runtime             = "nodejs"
 }
 
+// The worker's own client, generated from this same schema. One schema means
+// a renamed column breaks the worker's build, not its first job in production.
+generator worker {
+  provider            = "prisma-client"
+  output              = "../../worker/src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
+  runtime             = "nodejs"
+}
+
 datasource db {
   provider = "postgresql"
 }

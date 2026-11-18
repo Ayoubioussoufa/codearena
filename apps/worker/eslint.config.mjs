@@ -8,7 +8,7 @@ export default tseslint.config(
   {
     // dist/ is build output, and it is not in tsconfig's `include`, so the
     // type-aware rules cannot parse it.
-    ignores: ['eslint.config.mjs', 'dist/**'],
+    ignores: ['eslint.config.mjs', 'dist/**', 'src/generated/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

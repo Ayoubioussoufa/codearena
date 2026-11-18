@@ -16,7 +16,7 @@
     ]
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!.*@nestjs[+/](jwt|config))"
+    "node_modules/(?!.*@nestjs[+/](jwt|config|bullmq|bull-shared))"
   ],
   "testTimeout": 30000
 }

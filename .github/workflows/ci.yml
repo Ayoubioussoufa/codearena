@@ -62,8 +62,19 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+      # The app opens Redis connections at start-up (BullMQ, the
+      # leaderboard). Without a server, ioredis keeps reconnecting and Jest
+      # never exits after the last test.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgresql://codearena:codearena@localhost:5432/codearena?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
       JWT_SECRET: ci-only-secret-at-least-32-characters-long
       JWT_ACCESS_TTL: '900'
       NODE_ENV: test
@@ -86,7 +97,30 @@ jobs:
     name: Worker sandbox (Docker)
     # The runner's tests start real containers, so they need a Docker daemon.
     # GitHub's Ubuntu runners have one; the build job's unit tests don't need it.
+    # The idempotency test needs real Postgres, and the leaderboard test real
+    # Redis: the guarantees they prove live in those servers.
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: codearena
+          POSTGRES_PASSWORD: codearena
+          POSTGRES_DB: codearena
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://codearena:codearena@localhost:5432/codearena?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -95,6 +129,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Both Prisma clients (the API's and the worker's) from one schema,
+      # then the tables the integration tests write to.
+      - run: pnpm --filter api exec prisma generate
+      - run: pnpm --filter api exec prisma migrate deploy
       # Pull first, so the download time never counts against a test's limit.
       # The tag is read from the runner, so CI can't drift from what it runs.
       - name: Pull the sandbox image

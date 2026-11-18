@@ -4,6 +4,8 @@ import type { Judgement, TestCase } from "../domain/verdict.entity";
 /** Everything the worker needs to judge one submission, read from the database. */
 export type JudgeTask = {
   submissionId: string;
+  userId: string;
+  problemId: number;
   code: string;
   language: Language;
   /** In order: the judge stops at the first failure. */

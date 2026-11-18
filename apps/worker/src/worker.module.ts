@@ -11,6 +11,9 @@ import { DockerCodeRunner } from "./adapters/docker-code.runner";
 import { PrismaSubmissionStore } from "./adapters/prisma-submission.store";
 import { JudgeProcessor } from "./queue/judge.processor";
 import { JUDGE_QUEUE_NAME } from "./queue/judge-job";
+import { RedisService } from "./redis/redis.service";
+import { LEADERBOARD } from "./ports/leaderboard.port";
+import { RedisLeaderboard } from "./adapters/redis-leaderboard";
 
 @Module({
   imports: [
@@ -28,12 +31,18 @@ import { JUDGE_QUEUE_NAME } from "./queue/judge-job";
   ],
   providers: [
     PrismaService,
+    RedisService,
     JudgeService,
     JudgeSubmissionService,
     // Listed here, or Nest never finds it and no job is ever processed.
     JudgeProcessor,
     { provide: CODE_RUNNER, useClass: DockerCodeRunner },
     { provide: SUBMISSION_STORE, useClass: PrismaSubmissionStore },
+    {
+      provide: LEADERBOARD,
+      inject: [RedisService],
+      useFactory: (redis: RedisService) => new RedisLeaderboard(redis),
+    },
   ],
 })
 export class WorkerModule {}

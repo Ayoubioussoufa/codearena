@@ -7,6 +7,7 @@ import {
   type SubmissionStore,
 } from "../ports/submission-store.port";
 import type { RunLimits } from "../ports/code-runner.port";
+import { LEADERBOARD, type Leaderboard } from "../ports/leaderboard.port";
 
 /** The sandbox's fixed walls. Time and memory come from the problem. */
 const PIDS = 64;
@@ -32,6 +33,7 @@ export class JudgeSubmissionService {
 
   constructor(
     @Inject(SUBMISSION_STORE) private readonly store: SubmissionStore,
+    @Inject(LEADERBOARD) private readonly leaderboard: Leaderboard,
     private readonly judge: JudgeService,
   ) {}
 
@@ -63,18 +65,40 @@ export class JudgeSubmissionService {
         limits,
       );
 
-      if (await this.store.saveVerdict(submissionId, claimant, judgement)) {
-        this.logger.log(`Submission ${submissionId}: ${judgement.verdict}`);
-      } else {
+      if (!(await this.store.saveVerdict(submissionId, claimant, judgement))) {
         this.logger.warn(
           `Submission ${submissionId}: lost the claim, verdict dropped`,
         );
+        return;
+      }
+      this.logger.log(`Submission ${submissionId}: ${judgement.verdict}`);
+
+      if (judgement.verdict === "ACCEPTED") {
+        await this.recordSolve(task.userId, task.problemId);
       }
     } catch (error) {
       // Our failure. Give the claim back so the retry can take it now,
       // instead of waiting for the lease to expire.
       await this.store.release(submissionId, claimant);
       throw error;
+    }
+  }
+
+  /**
+   * After the verdict is committed, never before: a rollback would leave a
+   * point nobody earned. If Redis is down, the job still succeeds: the
+   * verdict is the truth, and the board is derived data, rebuilt from
+   * Postgres. Throwing wouldn't help anyway: the retry finds the submission
+   * already judged, so the claim stops it before it reaches this line.
+   */
+  private async recordSolve(userId: string, problemId: number): Promise<void> {
+    try {
+      await this.leaderboard.recordSolve(userId, problemId, new Date());
+    } catch (error) {
+      this.logger.error(
+        `Leaderboard not updated for ${userId}/${problemId}: rebuild it`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

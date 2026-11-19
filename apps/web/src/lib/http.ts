@@ -10,8 +10,9 @@
  * If the refresh also fails, the session is genuinely over.
  */
 import { getAccessToken, setAccessToken } from './access-token';
+import { API_URL } from './api-url';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
+const BASE = API_URL;
 
 export class HttpError extends Error {
   constructor(

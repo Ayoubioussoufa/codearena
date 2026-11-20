@@ -1,16 +1,11 @@
 /**
- * src/components/auth/AuthForm.tsx — shared login/register form
- * TODOs: 3 × (practice - auth form handling)  ← ALL DONE (built for you)
- *   #1 controlled inputs                       ✅
- *   #2 client-side validation + per-field errors ✅
- *   #3 submit → fake API, loading state, API error, redirect ✅
- * The markup, styling, and the <FieldError>/<FormBanner> helpers below are
- * complete — your work is purely the state and event logic.
+ * Shared login / register form: controlled inputs, client-side validation
+ * with per-field errors, and submission through useLogin / useRegister
+ * (TanStack mutations).
  *
- * Now wired to the REAL API through useLogin/useRegister (TanStack mutations).
- * The refresh token never appears here — it arrives as an httpOnly cookie the
- * browser stores and sends on its own; only the access token comes back in the
- * body, and it goes into memory. See docs/adr/004-*.md
+ * The refresh token never appears here: it arrives as an httpOnly cookie the
+ * browser stores and sends on its own. Only the access token comes back in
+ * the body, and it is kept in memory. See docs/adr/004-*.md.
  */
 'use client';
 
@@ -23,7 +18,7 @@ interface AuthFormProps {
   mode: 'login' | 'register';
 }
 
-/** Optional helper shape for TODO #2 — use it or roll your own. */
+/** Validation errors, one message per field. */
 export type FieldErrors = Partial<
   Record<'username' | 'email' | 'password' | 'confirmPassword', string>
 >;

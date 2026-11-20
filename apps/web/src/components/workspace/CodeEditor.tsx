@@ -1,10 +1,8 @@
 /**
- * src/components/workspace/CodeEditor.tsx — mono textarea editor (presentational)
- * TODOs: none — fully implemented scaffold. Purely props-driven: no state here.
+ * Monospace textarea editor (presentational, no state).
  *
- * Controlled when `value`/`onChange` are passed; falls back to an uncontrolled
- * textarea seeded with `defaultValue` otherwise (that fallback is what makes
- * the page typable before the workspace TODOs are done).
+ * Controlled when `value`/`onChange` are passed; otherwise an uncontrolled
+ * textarea seeded with `defaultValue`.
  */
 "use client";
 

@@ -1,7 +1,6 @@
 /**
- * src/components/workspace/ProblemWorkspace.tsx — two-pane workspace shell
- * TODOs: none — fully implemented scaffold.
- * (Server-safe composition: this just arranges the client pieces.)
+ * Two-pane workspace layout. Server-safe: it only arranges the client
+ * components.
  */
 import type { Problem } from "@/lib/types";
 import { WorkspaceProvider } from "./WorkspaceContext";

@@ -1,6 +1,5 @@
 /**
- * src/components/Navbar.tsx — sticky responsive nav with active links + mobile menu
- * TODOs: none — fully implemented scaffold.
+ * Sticky, responsive navbar with active links and a mobile menu.
  */
 "use client";
 

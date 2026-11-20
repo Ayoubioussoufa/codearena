@@ -1,8 +1,5 @@
 /**
- * src/components/settings/DeleteAccount.tsx — danger zone: delete flow
- * TODOs: 1 × (practice - modal confirmation flow)
- * The danger card and the <DangerDialog> presentational modal are complete —
- * the state machine around them is yours.
+ * Danger zone: account deletion behind a confirmation dialog.
  */
 "use client";
 

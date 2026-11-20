@@ -1,6 +1,5 @@
 /**
- * src/components/profile/SolvedBars.tsx — solved-per-difficulty progress bars
- * TODOs: none — fully implemented scaffold.
+ * Solved-per-difficulty progress bars.
  */
 import type { UserProfile } from "@/lib/types";
 

@@ -1,9 +1,8 @@
 /**
- * src/components/settings/PasswordForm.tsx — change password
- * TODOs: none — complete REFERENCE implementation (React 19 useActionState;
- * same idiom as ProfileForm). React resets the uncontrolled fields after a
- * successful action, which conveniently clears the password inputs.
- * Try current password "wrongpass" to see the API-error path.
+ * Change-password form, using React 19 form actions (useActionState) like
+ * ProfileForm. React resets the uncontrolled fields after a successful
+ * action, which clears the password inputs. The mock API rejects the
+ * current password "wrongpass", to exercise the error path.
  */
 "use client";
 

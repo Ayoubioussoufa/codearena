@@ -1,8 +1,6 @@
 /**
- * src/components/Avatar.tsx — avatar with initials fallback
- * TODOs: none — fully implemented scaffold.
- * Used in the navbar, profile header and settings; the settings avatar
- * uploader passes its preview through `src`.
+ * Avatar with an initials fallback. Used in the navbar, the profile header
+ * and settings; the avatar uploader passes its preview through `src`.
  */
 
 const SIZES = {

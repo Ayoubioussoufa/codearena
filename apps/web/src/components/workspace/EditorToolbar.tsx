@@ -1,6 +1,5 @@
 /**
- * src/components/workspace/EditorToolbar.tsx — language select + run/reset (presentational)
- * TODOs: none — fully implemented scaffold. Purely props-driven: no state here.
+ * Language select and run / reset buttons (presentational).
  */
 "use client";
 

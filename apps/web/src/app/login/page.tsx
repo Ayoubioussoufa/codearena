@@ -1,6 +1,5 @@
 /**
- * src/app/login/page.tsx — Sign in route
- * TODOs: none here — the practice gaps live in components/auth/AuthForm.tsx.
+ * Sign-in page.
  */
 import type { Metadata } from "next";
 import { AuthForm } from "@/components/auth/AuthForm";

@@ -1,6 +1,5 @@
 /**
- * src/app/register/page.tsx — Create account route
- * TODOs: none here — the practice gaps live in components/auth/AuthForm.tsx.
+ * Registration page.
  */
 import type { Metadata } from "next";
 import { AuthForm } from "@/components/auth/AuthForm";

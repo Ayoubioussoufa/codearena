@@ -1,9 +1,6 @@
 /**
- * src/components/profile/ActivityHeatmap.tsx — GitHub-style activity graph
- * TODOs: 1 × (practice - calendar data → UI grid)  ← DONE (built for you)
- * The card shell, legend and intensity colour classes are complete; the grid
- * itself is yours. No hooks or interactivity needed — this is pure
- * data-transformation + Tailwind grid work (it can stay a server component).
+ * GitHub-style activity graph. Pure data transformation and a Tailwind
+ * grid, with no hooks, so it stays a server component.
  */
 import type { ActivityDay } from "@/lib/types";
 
@@ -38,8 +35,8 @@ export function ActivityHeatmap({ activity }: { activity: ActivityDay[] }) {
 
   // ── Build the calendar the grid renders (the DATA doesn't drive layout) ──
   // Stay in UTC throughout: the data keys are UTC ISO days, and UTC has no
-  // daylight-saving, so every "+1 day" is exactly 24h — that's what dodges the
-  // weekday off-by-one the TODO warns about.
+  // daylight-saving, so every "+1 day" is exactly 24h, which avoids a
+  // weekday off-by-one.
   const now = new Date();
   const today = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),

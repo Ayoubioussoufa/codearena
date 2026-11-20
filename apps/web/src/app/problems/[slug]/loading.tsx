@@ -1,6 +1,5 @@
 /**
- * src/app/problems/[slug]/loading.tsx — workspace skeleton while getProblem() resolves
- * TODOs: none — fully implemented scaffold (extra polish).
+ * Workspace skeleton, shown while getProblem() resolves.
  */
 export default function ProblemLoading() {
   return (

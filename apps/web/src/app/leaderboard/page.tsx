@@ -1,11 +1,8 @@
 /**
- * src/app/leaderboard/page.tsx — Leaderboard route (server component)
- * TODOs: none here — the practice gaps live in
- * components/leaderboard/LeaderboardTable.tsx.
+ * Leaderboard page (server component).
  *
- * Data is fetched on the server and handed to the client table, so the client
- * component can focus purely on DERIVED state (its skill target) — fetching
- * with hooks is the problems page's job, not this one's.
+ * The data is fetched on the server and handed to LeaderboardTable, a client
+ * component that only derives ranks and sort order from it.
  */
 import type { Metadata } from "next";
 import { getLeaderboard } from "@/lib/api";

@@ -1,7 +1,5 @@
 /**
- * src/components/DifficultyBadge.tsx — Easy/Medium/Hard pill
- * TODOs: none — fully implemented scaffold.
- * Reusable: you'll want this in your own problems-list page too.
+ * Easy / Medium / Hard pill.
  */
 import type { Difficulty } from "@/lib/types";
 

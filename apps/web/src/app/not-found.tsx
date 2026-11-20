@@ -1,6 +1,5 @@
 /**
- * src/app/not-found.tsx — custom 404
- * TODOs: none — fully implemented scaffold (extra page for polish).
+ * Custom 404 page.
  */
 import Link from "next/link";
 

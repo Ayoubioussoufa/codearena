@@ -1,11 +1,8 @@
 /**
- * src/app/settings/page.tsx — Settings route (server component)
- * TODOs: none here — the practice gaps live in
- * components/settings/AvatarUploader.tsx and components/settings/DeleteAccount.tsx.
- * ProfileForm and PasswordForm are complete reference implementations using
- * React 19 useActionState — deliberately a DIFFERENT form idiom than the
- * controlled-input approach you're practising in AuthForm, so they don't
- * spoil that exercise.
+ * Settings page (server component).
+ *
+ * ProfileForm and PasswordForm use React 19 form actions (useActionState)
+ * with uncontrolled inputs; AuthForm uses controlled inputs instead.
  */
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/api";

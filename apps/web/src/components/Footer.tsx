@@ -1,6 +1,5 @@
 /**
- * src/components/Footer.tsx — site footer
- * TODOs: none — fully implemented scaffold.
+ * Site footer.
  */
 import Link from "next/link";
 

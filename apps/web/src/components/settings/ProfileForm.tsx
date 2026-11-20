@@ -1,12 +1,10 @@
 /**
- * src/components/settings/ProfileForm.tsx — display name / username / bio
- * TODOs: none — complete REFERENCE implementation (study after finishing
- * the AuthForm TODOs, not before).
+ * Display name, username and bio.
  *
  * Uses React 19 form actions + useActionState instead of controlled inputs:
  * the inputs stay uncontrolled, the action receives FormData, and pending/
- * error/success all come from the hook. Try saving with username "admin" to
- * see the API-error path (documented in lib/api.ts).
+ * error/success all come from the hook. The mock API rejects the username
+ * "admin" (see lib/api.ts), to exercise the error path.
  */
 "use client";
 

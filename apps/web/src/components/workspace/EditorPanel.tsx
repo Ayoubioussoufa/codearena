@@ -1,6 +1,5 @@
 /**
- * src/components/workspace/EditorPanel.tsx — right pane: toolbar + editor + output
- * TODOs: none — consumes WorkspaceContext and wires the three children.
+ * Right pane: toolbar, editor and output, wired to WorkspaceContext.
  */
 "use client";
 

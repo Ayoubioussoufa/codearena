@@ -1,8 +1,6 @@
 /**
- * src/app/profile/page.tsx — Profile route (server component)
- * TODOs: none here — the practice gaps live in
- * components/profile/ActivityHeatmap.tsx and components/profile/StreakCards.tsx.
- * Everything else (header, solved bars, submissions table) is complete.
+ * Profile page (server component): header, stat cards, activity heatmap,
+ * solved-by-difficulty bars and recent submissions.
  */
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -49,7 +47,7 @@ export default async function ProfilePage() {
         </Link>
       </header>
 
-      {/* ── Stat cards (streak values are your TODO inside StreakCards) ── */}
+      {/* ── Stat cards ── */}
       <div className="mt-10">
         <StreakCards
           rating={user.rating}

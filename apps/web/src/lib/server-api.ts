@@ -10,8 +10,9 @@
  * request, so there is nothing for a client cache to do.
  */
 import type { Problem } from './types';
+import { API_URL } from './api-url';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
+const BASE = API_URL;
 
 /** One problem by slug, or null when it does not exist. */
 export async function getProblem(slug: string): Promise<Problem | null> {

@@ -10,8 +10,8 @@ services:
       POSTGRES_PASSWORD: codearena
       POSTGRES_DB: codearena
     ports:
-      # Host 5433 → container 5432: a native PostgreSQL service already
-      # occupies 5432 on this machine (WSL systemd postgresql.service).
+      # Host 5433 → container 5432, so it doesn't clash with a local
+      # PostgreSQL on 5432.
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data

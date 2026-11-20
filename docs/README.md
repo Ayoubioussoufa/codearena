@@ -26,7 +26,7 @@ can…") → an answered self-quiz → hands-on exercises → the original readi
 | [Phase 5 — Contests, CQRS & Leaderboard](./phase-5-contests-cqrs-leaderboard.md) | State machines; the read/write tension & CQRS; events & projections; eventual consistency; Redis sorted sets (O(log N)); delta protocol; WebSocket fan-out; frozen scoreboard; batch rating updates; clock skew. Worked example: a leaderboard projector | Phase 5 |
 | [Phase 6 — Analytics, Anti-Cheat & Observability](./phase-6-analytics-anticheat-observability.md) | Materialized views; plagiarism detection (AST tokens → k-grams → Winnowing → Jaccard); the three observability pillars; distributed tracing & OpenTelemetry; trace-context propagation; Prometheus cardinality; RED/USE; alerting. Worked example: a Winnowing fingerprinter | Phase 6 |
 
-The schedule lives outside this repo, in `~/bcgx-prep/SPRINT.md`. Next to these guides:
+Next to these guides:
 
 - [`revision/`](./revision/README.md): the refresher material. Questions about the code you
   actually built, with the answers folded underneath, and the issues found in it.

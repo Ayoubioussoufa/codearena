@@ -2,7 +2,7 @@
   "name": "codearena",
   "version": "0.1.0",
   "private": true,
-  "description": "CodeArena — competitive programming & adaptive learning platform (pnpm monorepo)",
+  "description": "A competitive programming platform with a sandboxed judge",
   "engines": {
     "node": ">=24"
   },
@@ -22,6 +22,7 @@
   "scripts": {
     "dev:api": "pnpm --filter api start:dev",
     "dev:web": "pnpm --filter web dev",
+    "dev:worker": "pnpm --filter worker dev",
     "dev:dojo": "pnpm --filter dojo dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",

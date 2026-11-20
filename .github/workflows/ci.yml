@@ -38,7 +38,12 @@ jobs:
 
       - run: pnpm lint
       - run: pnpm -r typecheck
+      # The web inlines NEXT_PUBLIC_ values at build time and refuses to build
+      # without its API URL (apps/web/src/lib/api-url.ts). Nothing is called
+      # during the build, so the local default is enough here.
       - run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
 
       # Unit tests only: no database, no argon2, no Nest container. They run
       # against fakes behind the ports, so they need nothing from this job.

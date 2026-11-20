@@ -1,7 +1,8 @@
 # Findings reviewed on 2 Nov 2026 and confirmed false positives. Each line is a
 # gitleaks fingerprint (commit:file:rule:line), so only that exact finding is ignored.
+# Rewriting history changes the SHAs: update the fingerprints after any rewrite.
 
 # An expired example JWT in an old study note, not a key.
-2e7ee553b2c53eccb7b1ccef6df17ce858e774c4:WEEK-1-KNOWLEDGE.md:jwt:170
+96d2e2f56d96063012770758f03db83074413517:WEEK-1-KNOWLEDGE.md:jwt:170
 # A placeholder badge token in Nest's boilerplate README.
-377f63d5c23bd45806c83713aa9d996c8d55e01b:apps/api/README.md:generic-api-key:5
+f98a253a0ee1c03fc74afe8b4f5816c094b08ee3:apps/api/README.md:generic-api-key:5

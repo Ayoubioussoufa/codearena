@@ -1,7 +1,5 @@
 /**
- * src/app/page.tsx — Home
- * TODOs: none — stats strip (#1) and features grid (#2) laid out responsively.
- * The hero and CTA sections are complete reference patterns.
+ * Home page: hero, stats strip, features grid and call to action.
  */
 import Link from "next/link";
 

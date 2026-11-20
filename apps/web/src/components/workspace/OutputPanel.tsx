@@ -1,6 +1,5 @@
 /**
- * src/components/workspace/OutputPanel.tsx — run results (presentational)
- * TODOs: none — fully implemented scaffold. Purely props-driven: no state here.
+ * Run results (presentational).
  */
 "use client";
 

@@ -1,10 +1,9 @@
 /*
- * src/app/globals.css — Tailwind v4 entry + dark-mode variant
- * TODOs: none — fully implemented scaffold.
+ * Tailwind v4 entry point.
  *
- * Dark mode is class-based: the `.dark` class on <html> activates every
- * `dark:` utility (toggled by <ThemeToggle>, initialised by the inline
- * script in layout.tsx before first paint).
+ * Dark mode is class-based: the `.dark` class on <html> enables every
+ * `dark:` utility. ThemeToggle switches it, and the inline script in
+ * layout.tsx sets it before first paint.
  */
 @import "tailwindcss";
 

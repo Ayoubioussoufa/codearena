@@ -1,6 +1,5 @@
 /**
- * src/components/workspace/ProblemDescription.tsx — left pane (read-only)
- * TODOs: none — fully implemented scaffold.
+ * Left pane: the problem statement (read-only).
  */
 import type { Problem } from "@/lib/types";
 import { DifficultyBadge } from "@/components/DifficultyBadge";

@@ -1,6 +1,5 @@
 /**
- * src/app/layout.tsx — root layout: fonts, theme bootstrap, navbar/footer shell
- * TODOs: none — fully implemented scaffold.
+ * Root layout: fonts, theme bootstrap, navbar and footer.
  *
  * The inline <script> runs before first paint and applies the `.dark` class
  * from localStorage (falling back to the OS preference), so there is no

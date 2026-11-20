@@ -1,22 +1,14 @@
 "use client";
 /**
- * src/app/problems/page.tsx — Problem list
- * TODOs: 1 — THE ENTIRE PAGE IS YOURS. Nothing here is scaffolded on purpose.
- * Skill target: (practice - React hooks) useState/useEffect for fetching,
- * filtering and sorting data.
+ * Problem list.
  *
- * ─────────────────────────────────────────────────────────────────────────
- * NOTE: You asked me to build this one for you as a reference. I've left
- * "👉 REVIEW" comments on the ideas worth internalizing so next time you can
- * reach for them yourself. The shape to remember for ALL list UIs is:
+ * Problems come from the API through TanStack Query. Search, difficulty,
+ * topic and sort each hold one piece of state, and the visible list is
+ * derived from them on every render, never stored:
  *
- *     raw data (state)  →  filter → filter → sort  →  render
- *                          └────────── derived, recomputed each render ──────┘
+ *     problems  →  filter  →  filter  →  sort  →  render
  *
- * You keep ONE piece of state per control (search / difficulty / tag / sort)
- * and never store the filtered result — you compute it. That's why the
- * controls "combine" for free and never reset each other.
- * ─────────────────────────────────────────────────────────────────────────
+ * That is why the controls combine freely and never reset each other.
  */
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -36,10 +28,8 @@ const SORTS: { key: SortKey; label: string }[] = [
 ];
 
 export default function ProblemsPage() {
-  // 👉 REVIEW: this replaced useState + useEffect + an unmount guard. The
-  // cache is shared, so navigating away and back is a HIT, not a refetch —
-  // watch it happen in the Devtools panel. `data` is undefined while loading,
-  // exactly like the old state, so the skeleton below is unchanged.
+  // The query cache is shared, so navigating away and back is a hit, not a
+  // refetch. `data` is undefined while loading, which shows the skeleton.
   const { data: problems, isError } = useProblems();
 
   // One state per control. They're independent, so they naturally combine.
@@ -48,14 +38,8 @@ export default function ProblemsPage() {
   const [tag, setTag] = useState<string | null>(null); // selected algorithm/topic
   const [sort, setSort] = useState<SortKey>("id");
 
-  // 👉 REVIEW: no unmount guard needed any more. TanStack owns the request
-  // lifecycle, so a response arriving after you navigate away updates the
-  // cache rather than a dead component.
-
-  // 👉 REVIEW: derive the topic list from the DATA, not a hardcoded array.
-  // Add problems (or dojo categories) and these counts update themselves —
-  // that's the "it can be expanded" requirement, for free. useMemo just
-  // avoids recounting 350 problems on every keystroke.
+  // Topics are derived from the data, so new problems update the counts on
+  // their own. useMemo avoids recounting every problem on each keystroke.
   const topics = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of problems ?? []) {
@@ -66,10 +50,8 @@ export default function ProblemsPage() {
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [problems]);
 
-  // 👉 REVIEW: the whole pipeline in one derived value. Note `.slice()` before
-  // `.sort()` — sort mutates in place, and you must never mutate the array
-  // held in state. Filtering first returns a fresh array, so the slice is
-  // belt-and-suspenders / documents the intent.
+  // The whole pipeline in one derived value. `.slice()` before `.sort()`
+  // because sort mutates in place, and the cached array must never change.
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (problems ?? [])
@@ -113,8 +95,7 @@ export default function ProblemsPage() {
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:max-w-xs"
         />
 
-        {/* 👉 REVIEW: a segmented control. Each button just sets its own value —
-            no e.currentTarget.value gymnastics needed when you map literals. */}
+        {/* Segmented control: each button sets its own literal value. */}
         <div className="flex rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
           {DIFFICULTY_FILTERS.map((d) => (
             <button
@@ -177,9 +158,8 @@ export default function ProblemsPage() {
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {visible.map((p) => (
                   <li key={p.slug}>
-                    {/* 👉 REVIEW: the WHOLE row is the link (big tap target),
-                        and the grid template keeps columns aligned across
-                        rows — flex+gap wouldn't line up. */}
+                    {/* The whole row is the link (a large tap target); the
+                        grid template keeps columns aligned across rows. */}
                     <Link
                       href={`/problems/${p.slug}`}
                       className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 bg-white px-4 py-3 transition-colors hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900 sm:grid-cols-[3rem_1fr_6rem_6rem]"
@@ -211,11 +191,10 @@ export default function ProblemsPage() {
   );
 }
 
-/* ── Topic / algorithm list (LeetCode-style, counts derived from data) ──
-   👉 REVIEW: a "controlled" child — it owns no state (except its own expand
-   toggle). It takes the selected tag + an onSelect callback and reports
-   clicks upward. The filter state lives in ONE place (the page); this just
-   renders and notifies. */
+/* Topic list, with counts derived from the data. A controlled component:
+   apart from its expand toggle it owns no state. It receives the selected
+   tag and reports clicks through onSelect; the filter state lives in the
+   page. */
 function TopicList({
   topics,
   selected,

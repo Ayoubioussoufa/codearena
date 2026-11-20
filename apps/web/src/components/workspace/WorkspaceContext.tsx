@@ -1,9 +1,6 @@
 /**
- * src/components/workspace/WorkspaceContext.tsx — shared workspace state
- * TODOs: 1 × (practice - React context) — implement WorkspaceProvider.
- * The context object, value type and hook are given so everything compiles;
- * do this file BEFORE the TODO in EditorPanel.tsx (its hook reads what you
- * provide here).
+ * Shared workspace state (language, code, run output), provided by
+ * WorkspaceProvider.
  */
 "use client";
 
@@ -27,7 +24,7 @@ export interface WorkspaceValue {
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
-/** Null until WorkspaceProvider actually provides a value (your TODO below). */
+/** Null outside a WorkspaceProvider. */
 export function useWorkspace(): WorkspaceValue | null {
   return useContext(WorkspaceContext);
 }

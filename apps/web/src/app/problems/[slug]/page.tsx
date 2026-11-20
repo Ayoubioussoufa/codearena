@@ -1,9 +1,7 @@
 /**
- * src/app/problems/[slug]/page.tsx — Problem detail route (server component)
- * TODOs: none here — the practice gaps live in components/workspace/
- * (WorkspaceContext.tsx and EditorPanel.tsx).
+ * Problem page (server component).
  *
- * Note the Next 16 convention: `params` is a Promise and must be awaited.
+ * In Next 16, `params` is a Promise and must be awaited.
  */
 import { notFound } from "next/navigation";
 import { getProblem } from "@/lib/server-api";

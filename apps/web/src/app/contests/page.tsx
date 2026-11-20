@@ -1,7 +1,6 @@
 /**
- * src/app/contests/page.tsx — Contests route (server component)
- * TODOs: none — fully implemented scaffold (extra page for polish).
- * The live tick happens client-side in components/contests/Countdown.tsx.
+ * Contests page (server component). The countdown ticks on the client, in
+ * components/contests/Countdown.tsx.
  */
 import type { Metadata } from "next";
 import { getContests } from "@/lib/api";

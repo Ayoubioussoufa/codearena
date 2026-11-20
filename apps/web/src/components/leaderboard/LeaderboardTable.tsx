@@ -1,12 +1,12 @@
 /**
- * src/components/leaderboard/LeaderboardTable.tsx — ranked table + summary cards
- * TODOs: none — ranked rows (#1) and summary stats (#2) derived via useMemo.
- * The sort buttons, "force re-render" memo-check harness, and all markup are
- * complete.
+ * Ranked leaderboard table with summary cards.
+ *
+ * Rank is fixed by rating; the sort buttons only change the display order.
+ * Rows and stats are derived from the entries and memoized.
  */
 "use client";
 
-import { useMemo, useReducer, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   LeaderboardEntry,
   LeaderboardSortKey,
@@ -29,14 +29,8 @@ const SORT_VALUE: Record<LeaderboardSortKey, (row: RankedRow) => number> = {
 export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("rating");
 
-  // Memo-check harness: clicking the button re-renders this component with
-  // identical props/state deps. Correctly memoized derivations must NOT
-  // recompute when that happens (prove it to yourself with a console.log
-  // inside the computation).
-  const [renderTick, forceRender] = useReducer((n: number) => n + 1, 0);
-
   // Ranked rows: rank fixed by rating, display ordered by the active sortKey,
-  // memoized so "Force re-render" doesn't recompute (and entries isn't mutated).
+  // memoized, and built from copies so `entries` is never mutated.
   const rows: RankedRow[] = useMemo(() => {
     const PICK = SORT_VALUE[sortKey];
     const ranked = entries
@@ -78,12 +72,10 @@ export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
       },
     };
   }, [entries]);
-  // const stats = null as LeaderboardStats | null;
 
   return (
     <div className="flex flex-col gap-6">
-      <p>{renderTick}</p>
-      {/* ── Summary cards (render "—" until stats is derived) ── */}
+      {/* ── Summary cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Players" value={stats?.totalPlayers} />
         <StatCard label="Problems solved" value={stats?.totalSolved} />
@@ -115,14 +107,6 @@ export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
             {option.label}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={forceRender}
-          title="Re-renders the table with unchanged data — your memoized derivations should not recompute."
-          className="ml-auto rounded-lg border border-dashed border-slate-300 px-3 py-1.5 font-mono text-xs text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-        >
-          Force re-render ({renderTick})
-        </button>
       </div>
 
       {/* ── Table (stacks into cards on phones) ── */}
@@ -177,15 +161,11 @@ export function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
           </tbody>
         </table>
       </div>
-
-      <p className="text-xs text-slate-400 dark:text-slate-500">
-        Note: sorting only takes visible effect once TODO #1 derives the rows.
-      </p>
     </div>
   );
 }
 
-/* ── Presentational helper (complete) ── */
+/* ── Presentational helper ── */
 
 function StatCard({ label, value }: { label: string; value?: number | string | undefined}) {
   return (

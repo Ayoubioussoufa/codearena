@@ -1,9 +1,6 @@
 /**
- * src/components/settings/AvatarUploader.tsx — profile picture picker
- * TODOs: none — ref picker, image/size validation, and object-URL cleanup.
- * The card, <Avatar> preview slot, buttons and hidden file input are all in
- * place — the wiring is yours. This skill is deliberately different from the
- * other form work: DOM refs, the File API and object-URL lifecycle.
+ * Profile picture picker: a hidden file input behind a ref, image type and
+ * size validation, and object-URL cleanup.
  */
 "use client";
 

@@ -1,6 +1,5 @@
 /**
- * src/lib/types.ts — shared domain types for the whole frontend
- * TODOs: none — fully implemented scaffold.
+ * Domain types shared across the frontend.
  */
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
@@ -89,9 +88,8 @@ export interface LeaderboardEntry {
 export type LeaderboardSortKey = "rating" | "solved" | "streak";
 
 /**
- * A leaderboard row enriched with values DERIVED from a LeaderboardEntry.
- * The derived fields are optional so the scaffold renders "—" until the
- * practice TODO in LeaderboardTable.tsx computes them.
+ * A leaderboard row enriched with values derived from a LeaderboardEntry.
+ * The derived fields are optional; a missing one renders as "—".
  */
 export interface RankedRow extends LeaderboardEntry {
   /** 1-based position by rating (highest rating = rank 1), regardless of the active sort. */

@@ -1,6 +1,5 @@
 /**
- * src/components/profile/SubmissionsTable.tsx — recent submissions list
- * TODOs: none — fully implemented scaffold.
+ * Recent submissions list.
  */
 import Link from "next/link";
 import type { Submission, Verdict } from "@/lib/types";

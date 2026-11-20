@@ -1,6 +1,5 @@
 /**
- * src/components/contests/Countdown.tsx — live ticking countdown
- * TODOs: none — fully implemented scaffold.
+ * Live countdown.
  *
  * Renders a placeholder on the server and first paint, then ticks every
  * second on the client (timer callbacks may set state; setting it

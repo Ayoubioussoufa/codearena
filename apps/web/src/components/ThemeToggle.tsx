@@ -1,6 +1,5 @@
 /**
- * src/components/ThemeToggle.tsx — light/dark switch (class strategy + localStorage)
- * TODOs: none — fully implemented scaffold.
+ * Light/dark switch (class strategy + localStorage).
  *
  * Works with the inline script in layout.tsx: that script sets the initial
  * `.dark` class before paint. The current theme is read straight from the DOM

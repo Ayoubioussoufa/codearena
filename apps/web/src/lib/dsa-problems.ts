@@ -1,14 +1,11 @@
 /**
- * src/lib/dsa-problems.ts — AUTO-GENERATED. Do not edit by hand.
+ * Generated file: do not edit by hand.
  *
- * 333 problems imported from the dojo DSA set (apps/dojo) so the
- * problem list mirrors the full NeetCode-style catalog. Slugs that already
- * existed in the hand-authored PROBLEMS set were skipped (8 of them),
- * so /problems/[slug] never has two entries fighting over one route.
- *
- * acceptanceRate + totalSubmissions are deterministically synthesized (seeded
- * by slug) — the dojo problems don't track real judge stats. Regenerate with
- * the generator in scratchpad if the dojo set changes.
+ * 333 practice problems for the mock problem list. Slugs that already exist
+ * in the hand-written PROBLEMS set are skipped, so /problems/[slug] never has
+ * two entries for one route. acceptanceRate and totalSubmissions are
+ * synthesized deterministically (seeded by slug), since these problems have
+ * no real judge stats.
  */
 import type { Problem } from "./types";
 

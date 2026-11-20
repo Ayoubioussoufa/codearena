@@ -1,9 +1,7 @@
 /**
- * src/lib/data.ts — mock dataset (problems + leaderboard) served by lib/api.ts
- * TODOs: none — fully implemented scaffold.
+ * Mock data served by lib/api.ts, for the pages not yet backed by the API.
  *
- * NOTE: LEADERBOARD_ENTRIES is intentionally NOT sorted — ranking/sorting is
- * derived state you compute in LeaderboardTable.tsx.
+ * LEADERBOARD_ENTRIES is deliberately unsorted: LeaderboardTable ranks it.
  */
 
 import type {

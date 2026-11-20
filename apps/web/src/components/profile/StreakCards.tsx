@@ -1,7 +1,6 @@
 /**
- * src/components/profile/StreakCards.tsx — rating/rank/streak stat cards
- * TODOs: none — the two streaks are derived from the activity list.
- * The four cards are complete; rating and rank are passed in ready-made.
+ * Rating, rank and streak cards. Rating and rank arrive ready-made; the
+ * two streaks are derived from the activity list.
  */
 import type { ActivityDay } from "@/lib/types";
 

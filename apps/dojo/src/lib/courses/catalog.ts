@@ -82,7 +82,7 @@ export const TRACKS: Track[] = [
     id: "rust",
     title: "Rust, after the sprint",
     blurb: "The language that ends the memory bugs you fought in C, then the judge rebuilt in it, then the reason Python's AI tools are written in it.",
-    opens: "2026-11-30",
+    opens: "2026-12-07",
   },
 ];
 
@@ -120,7 +120,7 @@ export const LESSONS: Lesson[] = [
   // ── The story ──
   lesson0026,
   lesson0027,
-  // ── Rust, after the sprint (opens 30 Nov) ──
+  // ── Rust, after the sprint (opens 7 Dec) ──
   lesson0028,
   lesson0029,
   lesson0030,
@@ -261,105 +261,119 @@ export const WEEKS: Week[] = [
   },
   {
     number: 4,
-    title: "Ship it",
-    start: "2026-11-16",
-    end: "2026-11-22",
-    goal: "A stranger signs up at your domain over HTTPS, submits code, and watches it judged live.",
+    title: "Ship it, and tell it",
+    start: "2026-11-23",
+    end: "2026-11-29",
+    goal: "A stranger signs up at your domain over HTTPS and watches their code judged live, and you can tell how every part of it works in ten minutes, without notes.",
+    note: "Replanned on 23 Nov: the old week 4 (ship it) and week 5 (sharpen) are one week now, so each day ships one piece and practises telling one. 16–22 Nov went to catching up on week 3 and making the repo public. The AI week follows, and Rust starts a week later, on 7 Dec.",
     doneWhen: [
       "The verdict appears live in the browser",
       "CodeArena runs on its own VM, over HTTPS, at a real domain",
       "Merging to main deploys; you rolled back once on purpose",
-      "Logs, /health, Sentry and a nightly backup work",
+      "Logs, /health, Sentry, and a nightly backup you've restored once",
       "At least 5 real users have submitted code",
+      "Six STAR stories, each 90 seconds out loud",
+      "CodeArena from a blank page in ten minutes, without notes",
     ],
     days: [
-      day("Mon 16 Nov", "2026-11-16", ["0019-nextjs-rendering"], {
-        build: "The problem page and the submit form",
+      day("Mon 23 Nov", "2026-11-23", ["0019-nextjs-rendering", "0020-verdict-live"], {
+        build: "Submit from the browser, and the verdict appears live",
         systemDesign: [sd("Worked design #4: news feed", "worked-design-4--a-news-feed--timeline-the-classic-hard-one")],
         dsa: "Block 09 · Linked Lists & Recursion: course, then Days 1–2",
       }),
-      day("Tue 17 Nov", "2026-11-17", ["0020-verdict-live"], {
-        build: "Submit → the verdict appears live",
-        systemDesign: [sd("Worked design #5: chat", "worked-design-5--a-chat--messaging-system")],
+      day("Tue 24 Nov", "2026-11-24", ["0021-server-from-zero", "0022-compose-in-production"], {
+        build: "I-2, the Dockerfiles, a VM with a firewall, the production Compose file",
+        systemDesign: [sd("Worked design #6: notifications", "worked-design-6--a-notification-system")],
         dsa: "Block 09 · Day 3",
       }),
-      day("Wed 18 Nov", "2026-11-18", ["0021-server-from-zero", "0022-compose-in-production"], {
-        build: "A VM, a firewall, Docker, the production Compose file",
-        systemDesign: [sd("Worked design #6: notifications", "worked-design-6--a-notification-system")],
+      day("Wed 25 Nov", "2026-11-25", ["0023-https", "0026-star-stories"], {
+        build: "A domain and HTTPS with Caddy, real problems seeded · STAR stories 1–3",
+        systemDesign: [sd("Worked design #7: typeahead", "worked-design-7--search-autocomplete-typeahead")],
         dsa: "Block 10 · Trees: course, then Days 1–2",
       }),
-      day("Thu 19 Nov", "2026-11-19", ["0023-https"], {
-        build: "Domain and HTTPS with Caddy, migrations deployed, real problems seeded",
-        systemDesign: [sd("Worked design #7: typeahead", "worked-design-7--search-autocomplete-typeahead")],
+      day("Thu 26 Nov", "2026-11-26", ["0024-ci-cd"], {
+        build: "Deploy on merge, one rollback on purpose · STAR stories 4–6",
+        systemDesign: [sd("Worked design #8: web crawler", "worked-design-8--a-web-crawler")],
         dsa: "Block 10 · Day 3",
       }),
-      day("Fri 20 Nov", "2026-11-20", ["0024-ci-cd", "0025-observability"], {
-        build: "Deploy on merge, logs, /health, Sentry, nightly backup",
-        systemDesign: [sd("Worked design #8: web crawler", "worked-design-8--a-web-crawler")],
+      day("Fri 27 Nov", "2026-11-27", ["0025-observability"], {
+        build: "Logs, /health, Sentry, a nightly backup · the README gets its live link",
+        systemDesign: [{ label: "CS: networking", href: `${CS}#3-networking` }],
         dsa: "Block 11 · Graphs: course, then Days 1–2",
       }),
-      day("Sat 21 Nov", "2026-11-21", [], {
-        build: "Real users in: 10–20 classmates, fix what they break · CV · first applications",
+      day("Sat 28 Nov", "2026-11-28", ["0027-your-system-out-loud"], {
+        build: "Real users in, and fix what they break · your system out loud, recorded",
         systemDesign: [sd("Your system at 100× traffic", "worked-design-2--a-code-submission-judge-your-codearena-story")],
         dsa: "Block 11 · Day 3",
       }),
-      day("Sun 22 Nov", "2026-11-22", [], {
-        build: "Checkpoint · ADR: one VM, the sandbox's blast radius",
+      day("Sun 29 Nov", "2026-11-29", [], {
+        build: "Checkpoint · ADR: one VM, the sandbox's blast radius · six stories, timed",
         dsa: "A contest, then CP checkpoint 4",
+        note: "No new material. Retro on the sprint so far, then send `start week of 30 Nov`.",
       }),
     ],
   },
   {
     number: 5,
-    title: "Sharpen",
-    start: "2026-11-23",
-    end: "2026-11-29",
-    goal: "No new material: you can tell every part of CodeArena as a story, run a design out loud, and pass a mock.",
+    title: "The AI hint",
+    start: "2026-11-30",
+    end: "2026-12-06",
+    goal: "A failed submission gets a hint from a model you host yourself, grounded in your own notes, and evals prove how good the hints are and what retrieval added.",
+    note: "No lessons are written for this week yet: each day links to the primary docs instead. The model runs on Ollama, on your laptop's GPU and on the VM's CPU, so a hint takes seconds to tens of seconds. That's why it goes through the queue, like judging.",
     doneWhen: [
-      "Six STAR stories, each 90 seconds out loud",
-      "CodeArena from a blank page in ten minutes, without notes",
-      "A full 45-minute mock design",
+      "`POST /submissions/:id/hint` answers 202; the worker stores a hint; `GET` returns it",
+      "The model's output is JSON checked by zod, and a daily cap stops abuse",
+      "20 eval cases with hard rules run in CI and fail the build below your threshold",
+      "Two or three models compared on score and speed, and the choice written down",
+      "Your notes chunked, embedded and searched in pgvector, with recall@4 measured",
+      "The hint eval with and without retrieval: the difference, in numbers",
+      "ADR: a self-hosted model behind the queue",
     ],
     days: [
-      day("Mon 23 Nov", "2026-11-23", ["0026-star-stories"], {
-        build: "Fixes from users · STAR stories 1–3",
-        systemDesign: [{ label: "CS: processes, threads, deadlock", href: `${CS}#1-processes-and-threads` }],
+      day("Mon 30 Nov", "2026-11-30", [], {
+        build: "Ollama running, the HintGenerator port, the hint job through the queue",
+        systemDesign: [sd("Task queues & back pressure", "task-queues--back-pressure")],
         dsa: "Block 12 · Heaps & Intervals: course, then Days 1–2",
       }),
-      day("Tue 24 Nov", "2026-11-24", [], {
-        build: "Polish what an interviewer will click · STAR stories 4–6",
-        systemDesign: [{ label: "CS: networking", href: `${CS}#3-networking` }],
+      day("Tue 1 Dec", "2026-12-01", [], {
+        build: "The prompt, JSON checked by zod, the Hint table, a daily cap",
+        systemDesign: [sd("Rate limiting", "rate-limiting")],
         dsa: "Block 12 · Day 3",
       }),
-      day("Wed 25 Nov", "2026-11-25", ["0027-your-system-out-loud"], {
-        build: "Polish",
-        systemDesign: [{ label: "Your weakest design, cold", href: SD }],
+      day("Wed 2 Dec", "2026-12-02", [], {
+        build: "Evals I: 20 cases, hard rules, a baseline score, the CI job",
+        systemDesign: [sd("Back-of-envelope estimation", "back-of-envelope-estimation")],
         dsa: "Block 13 · Dynamic Programming, day 1 of 4",
       }),
-      day("Thu 26 Nov", "2026-11-26", [], {
-        build: "Polish",
-        systemDesign: [sd("Design #1 again, cold, 40-minute timer", "worked-design-1--a-url-shortener-the-canonical-opener")],
+      day("Thu 3 Dec", "2026-12-03", [], {
+        build: "Evals II: a judge model on your GPU, two or three models compared",
+        systemDesign: [sd("Latency numbers every programmer should know", "latency-numbers-every-programmer-should-know")],
         dsa: "Block 13 · DP, day 2 of 4",
       }),
-      day("Fri 27 Nov", "2026-11-27", [], {
-        build: "Feature freeze",
-        systemDesign: [sd("Mastery checklist + self-quiz", "mastery-checklist--you-can")],
+      day("Fri 4 Dec", "2026-12-04", [], {
+        build: "RAG I: pgvector, the ingestion script, the retrieval eval",
+        systemDesign: [sd("Worked design #7: typeahead, a search system", "worked-design-7--search-autocomplete-typeahead")],
         dsa: "Block 13 · DP, day 3 of 4",
       }),
-      day("Sat 28 Nov", "2026-11-28", [], {
-        build: "Stories out loud, timed",
-        systemDesign: [sd("A full 45-minute mock design", "how-to-run-the-40-minute-interview")],
+      day("Sat 5 Dec", "2026-12-05", [], {
+        build: "RAG II: retrieval in the hint job, the eval with and without it",
+        systemDesign: [sd("Caching: a stored hint is a cache", "caching")],
         dsa: "Block 13 · DP, day 4 of 4 (set R13)",
       }),
-      day("Sun 29 Nov", "2026-11-29", [], { build: "Sprint retro: what's next", dsa: "Final review" }),
+      day("Sun 6 Dec", "2026-12-06", [], {
+        build: "Checkpoint · ADR: a self-hosted model behind the queue · the README's AI section",
+        systemDesign: [sd("A full 45-minute mock design", "how-to-run-the-40-minute-interview")],
+        dsa: "Final review",
+        note: "No new material. Retro on the whole sprint: what worked, what didn't, what's next.",
+      }),
     ],
   },
   // ── Rust, after the sprint: three lessons a week, lighter than the sprint, so applications and interviews come first ──
   {
     number: 6,
     title: "Rust: ownership",
-    start: "2026-11-30",
-    end: "2026-12-06",
+    start: "2026-12-07",
+    end: "2026-12-13",
     goal: "You can say who owns every value in a function, and fix a borrow error by reading it rather than by adding clone().",
     note: "After the sprint. Applications and interviews come first: on an interview day, slide the lesson to the next free one.",
     doneWhen: [
@@ -368,17 +382,17 @@ export const WEEKS: Week[] = [
       "The judge's output comparator, in Rust, returning slices instead of copies",
     ],
     days: [
-      day("Mon 30 Nov", "2026-11-30", ["0028-cargo-and-the-compiler"]),
-      day("Wed 2 Dec", "2026-12-02", ["0029-ownership"]),
-      day("Fri 4 Dec", "2026-12-04", ["0030-borrowing"]),
-      day("Sun 6 Dec", "2026-12-06", [], { note: "Review: clear what's due in spaced review, then read The Book's chapter 4 again, start to end." }),
+      day("Mon 7 Dec", "2026-12-07", ["0028-cargo-and-the-compiler"]),
+      day("Wed 9 Dec", "2026-12-09", ["0029-ownership"]),
+      day("Fri 11 Dec", "2026-12-11", ["0030-borrowing"]),
+      day("Sun 13 Dec", "2026-12-13", [], { note: "Review: clear what's due in spaced review, then read The Book's chapter 4 again, start to end." }),
     ],
   },
   {
     number: 7,
     title: "Rust: types that carry meaning",
-    start: "2026-12-07",
-    end: "2026-12-13",
+    start: "2026-12-14",
+    end: "2026-12-20",
     goal: "Verdicts, errors and checkers are types the compiler checks, so the case you forget is a compile error, not a bug report.",
     doneWhen: [
       "Lesson 9's facts-to-verdict logic as an enum and one exhaustive match",
@@ -386,17 +400,17 @@ export const WEEKS: Week[] = [
       "A Checker trait with three implementations, used both through generics and through dyn",
     ],
     days: [
-      day("Mon 7 Dec", "2026-12-07", ["0031-enums-and-match"]),
-      day("Wed 9 Dec", "2026-12-09", ["0032-errors-as-values"]),
-      day("Fri 11 Dec", "2026-12-11", ["0033-traits-and-generics"]),
-      day("Sun 13 Dec", "2026-12-13", [], { note: "Review, then one Codeforces Div. 3 virtual contest in Rust if you want to feel the language under time pressure." }),
+      day("Mon 14 Dec", "2026-12-14", ["0031-enums-and-match"]),
+      day("Wed 16 Dec", "2026-12-16", ["0032-errors-as-values"]),
+      day("Fri 18 Dec", "2026-12-18", ["0033-traits-and-generics"]),
+      day("Sun 20 Dec", "2026-12-20", [], { note: "Review, then one Codeforces Div. 3 virtual contest in Rust if you want to feel the language under time pressure." }),
     ],
   },
   {
     number: 8,
     title: "Rust: zero copies, then processes",
-    start: "2026-12-14",
-    end: "2026-12-20",
+    start: "2026-12-21",
+    end: "2026-12-27",
     goal: "You read lifetimes as promises, write iterator chains fluently, and `run` exists in Rust with lesson 2's behaviour.",
     doneWhen: [
       "A token scanner that borrows from its input and allocates nothing",
@@ -404,17 +418,17 @@ export const WEEKS: Week[] = [
       "`run -t` in Rust: exit, signal and timeout, with the whole process group killed",
     ],
     days: [
-      day("Mon 14 Dec", "2026-12-14", ["0034-lifetimes"]),
-      day("Wed 16 Dec", "2026-12-16", ["0035-iterators-and-maps"]),
-      day("Fri 18 Dec", "2026-12-18", ["0036-processes-in-rust"]),
-      day("Sun 20 Dec", "2026-12-20", [], { note: "Review. Compare your run.c and your Rust run side by side: which bugs could each one still have?" }),
+      day("Mon 21 Dec", "2026-12-21", ["0034-lifetimes"]),
+      day("Wed 23 Dec", "2026-12-23", ["0035-iterators-and-maps"]),
+      day("Fri 25 Dec", "2026-12-25", ["0036-processes-in-rust"]),
+      day("Sun 27 Dec", "2026-12-27", [], { note: "Review. Compare your run.c and your Rust run side by side: which bugs could each one still have?" }),
     ],
   },
   {
     number: 9,
     title: "Rust: systems",
-    start: "2026-12-21",
-    end: "2026-12-27",
+    start: "2026-12-28",
+    end: "2027-01-03",
     goal: "A judge in one binary that walks a tests folder, runs cases in parallel, and an async runner that holds hundreds of jobs on a few threads.",
     doneWhen: [
       "`minijudge` prints a verdict per test, with output capped",
@@ -422,17 +436,17 @@ export const WEEKS: Week[] = [
       "An async runner with a concurrency limit and per-job timeouts, tested on a paused clock",
     ],
     days: [
-      day("Mon 21 Dec", "2026-12-21", ["0037-files-and-io"]),
-      day("Wed 23 Dec", "2026-12-23", ["0038-threads"]),
-      day("Fri 25 Dec", "2026-12-25", ["0039-async-tokio"]),
-      day("Sun 27 Dec", "2026-12-27", [], { note: "Review, and rest." }),
+      day("Mon 28 Dec", "2026-12-28", ["0037-files-and-io"]),
+      day("Wed 30 Dec", "2026-12-30", ["0038-threads"]),
+      day("Fri 1 Jan", "2027-01-01", ["0039-async-tokio"]),
+      day("Sun 3 Jan", "2027-01-03", [], { note: "Review, and rest." }),
     ],
   },
   {
     number: 10,
     title: "Rust for AI infrastructure",
-    start: "2026-12-28",
-    end: "2027-01-03",
+    start: "2027-01-04",
+    end: "2027-01-10",
     goal: "A BPE tokenizer written in Rust, imported from Python, measured against pure Python, and explained in two minutes.",
     doneWhen: [
       "BPE training and encoding in Rust, matching the kit's expected merges",
@@ -440,10 +454,10 @@ export const WEEKS: Week[] = [
       "Batch encoding in parallel with rayon; clippy and fmt clean; your Rust story told out loud",
     ],
     days: [
-      day("Mon 28 Dec", "2026-12-28", ["0040-bpe-tokenizer"]),
-      day("Wed 30 Dec", "2026-12-30", ["0041-pyo3-extension"]),
-      day("Sat 2 Jan", "2027-01-02", ["0042-parallel-and-shipped"]),
-      day("Sun 3 Jan", "2027-01-03", [], { note: "Retro: what Rust changed in how you write C, TypeScript and Python." }),
+      day("Mon 4 Jan", "2027-01-04", ["0040-bpe-tokenizer"]),
+      day("Wed 6 Jan", "2027-01-06", ["0041-pyo3-extension"]),
+      day("Sat 9 Jan", "2027-01-09", ["0042-parallel-and-shipped"]),
+      day("Sun 10 Jan", "2027-01-10", [], { note: "Retro: what Rust changed in how you write C, TypeScript and Python." }),
     ],
   },
 ];

@@ -1,0 +1,114 @@
+<!--
+  Lesson 0043 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Before you build a hint feature, see the machine it runs on. A language model doesn’t “answer questions”: it scores every possible next token, and a few lines of code turn those scores into one choice. Today you write those lines, and every word you’ll ever get from a model makes more sense.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>This week CodeArena gets an AI hint for failed submissions, on a model you host yourself. Every decision this week (the temperature, the prompt, why evals run several times, why RAG works at all) follows from the loop in this lesson.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Text in, tokens in</h2>
+<p>A model doesn’t read characters or words. A <strong>tokenizer</strong> first cuts the text into <strong>tokens</strong>: frequent words become one token, rarer ones several pieces, and each token is an id in a fixed vocabulary of tens of thousands of entries. <code>off-by-one</code> may be four tokens; <code>the</code> is one. Token counts are what limits, prices and speeds are measured in, which is why Ollama reports <code>prompt_eval_count</code> and <code>eval_count</code>, not characters (<a href="https://docs.ollama.com/api/chat">Ollama API</a>).</p>
+<p class="aside">3Blue1Brown’s chapter on GPT shows this step, and what the network then does with each token, in about half an hour of animation (<a href="https://www.3blue1brown.com/lessons/gpt">But what is a GPT?</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. One token at a time</h2>
+<p>Given the tokens so far, the network computes one number per vocabulary token: a <strong>logit</strong>, a raw score for “this comes next”. Then:</p>
+<ol>
+  <li><strong>softmax</strong> turns the logits into probabilities: exponentiate each, divide by the sum (<a href="https://en.wikipedia.org/wiki/Softmax_function">softmax function</a>);</li>
+  <li>a <strong>decoding rule</strong> picks one token from that distribution;</li>
+  <li>the chosen token is appended to the input, and the whole thing runs again.</li>
+</ol>
+<p>That loop, repeated until a stop token or a length limit, is all “generation” is. Two consequences you’ll meet all week: the model has <strong>no memory between calls</strong> (everything it uses must be in the input, up to its <strong>context window</strong>), and its knowledge stops where its training data stopped. Both are why RAG exists: you put the missing knowledge into the input.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Choosing the next token</h2>
+<pre>logits  [3.0, 2.0, 1.0]
+softmax [0.67, 0.24, 0.09]          <span class="c"># temperature 1</span>
+softmax [0.87, 0.12, 0.02]          <span class="c"># temperature 0.5: sharper</span>
+softmax [0.51, 0.31, 0.19]          <span class="c"># temperature 2: flatter</span></pre>
+<ul>
+  <li><strong>Greedy</strong>: always the largest logit. Deterministic, sometimes repetitive.</li>
+  <li><strong>Temperature</strong>: divide every logit by T before softmax. Below 1 the distribution gets sharper, above 1 flatter; as T goes to 0, sampling becomes greedy (<a href="https://huggingface.co/blog/how-to-generate">Hugging Face: how to generate</a>).</li>
+  <li><strong>Top-k</strong>: keep the k likeliest tokens, renormalise, sample.</li>
+  <li><strong>Top-p (nucleus)</strong>: keep the smallest set of likeliest tokens whose probabilities add up to p. Few tokens when the model is sure, many when it isn’t.</li>
+</ul>
+<p>All of these are options of the request, not of the model: Ollama’s <code>/api/chat</code> takes <code>temperature</code>, <code>top_k</code> and <code>top_p</code> in its <code>options</code> (<a href="https://docs.ollama.com/api/chat">Ollama API</a>).</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:next-token -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>sampler.mjs</code></h2>
+<div class="spec">
+  <p>Five pure functions, no model needed: <code>softmax</code> with a temperature, <code>greedy</code>, <code>topK</code>, <code>topP</code> and <code>sample</code>. The contract is in <code>sampler.start.mjs</code>; the checker runs 11 cases, from the textbook numbers to 10,000 draws that must land where the probabilities say.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Softmax that doesn’t overflow</h3>
+    <label><input type="checkbox" data-key="lesson-0043-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0043-what-a-model-does
+cp sampler.start.mjs sampler.mjs
+bash check.sh</pre>
+  <p>Write <code>softmax</code> first. Try it on <code>[1000, 1000, 998]</code> before reading the hint in the contract: what does <code>Math.exp(1000)</code> give?</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Greedy, top-k, top-p</h3>
+    <label><input type="checkbox" data-key="lesson-0043-step-2"> done</label>
+  </div>
+  <p>Never change the input array: return a new one. For top-p, sort a copy of the indices by probability, add them up until you reach p, keep those.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Sample</h3>
+    <label><input type="checkbox" data-key="lesson-0043-step-3"> done</label>
+  </div>
+  <p>The random number is a parameter, so the checker can test it. Walk the running sum; the first index whose sum is greater than <code>r</code> wins. All 11 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: watch a real model do it</h3>
+    <label><input type="checkbox" data-key="lesson-0043-step-4"> done</label>
+  </div>
+  <p>With Ollama running and a small model pulled, ask the same question three times at <code>temperature: 0</code>, then three times at <code>1.5</code>. Write down what changed. That difference is what you’re choosing when you choose the hint’s temperature.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>A hint wants a low temperature.</strong> You want the most likely explanation, not a creative one. Start at 0 or close to it.</li>
+  <li><strong>Even at 0, don’t expect identical runs forever.</strong> Batching and hardware make generation slightly nondeterministic in practice, and you’ll change models and prompts. That’s why lesson 46’s evals run each case several times and report a rate.</li>
+  <li><strong>The model knows nothing about your submission</strong> unless the prompt carries it: the problem, the verdict, the failing test, the code, and, later, your notes.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write down the temperature you’ll start the hint with, and why. Then say, in your own words, why two runs of the same prompt can still give two different hints, and what that means for testing it.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. One sentence each, from memory. When you’re done, the button builds your <code>done</code> message: paste it in the terminal, and the right definitions go into <a href="/courses/glossary">your glossary</a>. The whole track is summed up in the <a href="/courses/reference/ai">AI reference page</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.3blue1brown.com/lessons/gpt">3Blue1Brown: But what is a GPT?</a></strong>, the clearest visual explanation of tokens, embeddings and next-token prediction. Then <a href="https://huggingface.co/blog/how-to-generate">Hugging Face: how to generate text</a> for greedy, temperature, top-k and top-p, with examples side by side.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: why exponentiate, what a logit really is, how a tokenizer is trained, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0043</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

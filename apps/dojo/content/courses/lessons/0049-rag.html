@@ -1,0 +1,113 @@
+<!--
+  Lesson 0049 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">RAG sounds like a framework. It’s three ordinary steps and one discipline: find the passages that matter, put them in the prompt, let the model answer, and measure each step separately. Today you build the half that’s plain code, which is also the half where most RAG systems quietly fail.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Friday and Saturday turn the hint into a RAG system grounded in your own notes, and Saturday’s eval says whether it helped. “Retrieval took the score from X to Y” is the sentence you’re building towards; this lesson gives you the parts that make it true.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Why retrieve at all</h2>
+<p>A model knows what was in its training data, frozen at a date, and nothing about your notes, your problems, or yesterday. <strong>Retrieval-augmented generation (RAG)</strong> fixes that at question time: retrieve the relevant passages from your own store, put them in the prompt, then generate. The original paper combined the model’s own knowledge with a searchable index of documents (<a href="https://arxiv.org/abs/2005.11401">Lewis et al., 2020</a>). The answer is then <strong>grounded</strong>: based on text you can show, not on what the model half-remembers.</p>
+<pre>Ingestion   notes → chunks → embeddings → store          <span class="c"># offline, idempotent</span>
+Query       question → top-k chunks → prompt → model     <span class="c"># per request</span>
+Measure     recall@k, MRR (retrieval)  ·  eval score (the answer)</pre>
+<p class="aside">You may not need it. Anthropic’s guidance: under about 200,000 tokens (some 500 pages), just put the whole knowledge base in the prompt, with prompt caching (<a href="https://www.anthropic.com/news/contextual-retrieval">contextual retrieval</a>). A small local model with a small context is exactly the case where retrieval still earns its place.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Ingestion: chunks that make sense alone</h2>
+<ul>
+  <li><strong>Chunk on structure</strong>, not every N characters: a heading starts a chunk, and a long section splits between paragraphs. A sentence cut in half is retrieved as two useless halves.</li>
+  <li><strong>Each chunk carries its context</strong>: repeat the heading line in it, and keep its source. Anthropic’s <em>contextual retrieval</em> goes further and prepends 50–100 tokens explaining where the chunk comes from; with BM25 added, it cut failed retrievals in their tests by 49% (<a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic</a>).</li>
+  <li><strong>Make it idempotent.</strong> Hash every chunk’s text. On each run, insert new chunks, update changed ones, remove deleted ones, and leave the rest: running it twice re-embeds nothing. It’s <a href="/courses/lessons/0014-idempotency">lesson 14</a>’s idea applied to data.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Measure retrieval, then the answer</h2>
+<p>Write 15 test queries, each labelled with the chunk that <em>should</em> come back. Then:</p>
+<pre>recall@k = queries whose right chunk is in the top k / all queries
+MRR      = average of 1 / rank of the right chunk   (0 if missing)</pre>
+<ul>
+  <li><strong>recall@k</strong> answers “could the model have seen the answer?” If it’s low, no prompt will save you: fix retrieval first.</li>
+  <li><strong>MRR</strong> rewards putting the right chunk first, which matters because models use the start and end of a long context better than the middle (<a href="https://arxiv.org/abs/2307.03172">Lost in the middle</a>).</li>
+  <li><strong>Then the hint eval</strong> from lesson 46, with and without retrieval, on the same model. Two numbers, one story.</li>
+</ul>
+<p>The context block wraps each chunk with its id, in rank order, and stops at the budget without cutting a chunk: the model can cite <code>id</code>s, and a half chunk is worse than none.</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:rag -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>rag.mjs</code></h2>
+<div class="spec">
+  <p>Six functions: <code>chunkMarkdown</code>, <code>hashOf</code>, <code>plan</code>, <code>recallAtK</code>, <code>mrr</code>, <code>buildContext</code>. The checker chunks a real-looking note on two pointers, replays an ingestion with an edit, an addition and a deletion, and scores a small retrieval run.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Chunks</h3>
+    <label><input type="checkbox" data-key="lesson-0049-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0049-rag
+cp rag.start.mjs rag.mjs
+bash check.sh</pre>
+  <p>Walk the lines; a <code>##</code> or <code>###</code> line starts a new section. Split a long section on blank lines, and start every part with the heading line again.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The ingestion plan</h3>
+    <label><input type="checkbox" data-key="lesson-0049-step-2"> done</label>
+  </div>
+  <p><code>hashOf</code> with <code>node:crypto</code>, then <code>plan</code>: new, changed, gone, unchanged. Sort the id lists: a plan that changes order between runs is impossible to diff.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">3</span>
+    <h3>Metrics and the context</h3>
+    <label><input type="checkbox" data-key="lesson-0049-step-3"> done</label>
+  </div>
+  <p>recall@k, MRR, then <code>buildContext</code>: stop at the first chunk that doesn’t fit, rather than skipping it to squeeze in a lower-ranked one. All 13 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: your real notes</h3>
+    <label><input type="checkbox" data-key="lesson-0049-step-4"> done</label>
+  </div>
+  <p>Chunk <code>apps/dojo/content/dsa/dsa-patterns.md</code>, embed the chunks (lesson 48’s challenge), write five queries with their right chunk, and compute recall@4. Change one thing (the chunk size, or the heading repeat) and compute it again.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>What to index:</strong> the DSA patterns notes, each problem’s editorial, and a paragraph of common mistakes per problem. That last one is what retrieval will find most useful: write it.</li>
+  <li><strong>Ingestion is a script</strong> (<code>pnpm --filter api ingest</code>), idempotent, run on deploy. The <code>Chunk</code> table holds the text, source, heading, hash and embedding.</li>
+  <li><strong>The query for retrieval</strong> is built from the verdict, the problem and the failing test, not from the user’s code, which an attacker controls (lesson 45).</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write what you’ll index, your chunking rule and size, how you’ll build the search query, and five of your 15 labelled queries with the chunk each should return.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. The pipeline is on the <a href="/courses/reference/ai">AI reference page</a>; next, <a href="/courses/lessons/0050-better-retrieval">lesson 50</a> makes the retrieval better.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic: Introducing contextual retrieval</a></strong>, a practical, measured walk through chunking, embeddings, BM25 and reranking, with the numbers for each step and the “do you even need RAG?” threshold. Then <a href="https://arxiv.org/abs/2005.11401">Lewis et al., 2020</a> for where the idea started.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how big a chunk should be, how to label queries without bias, what to do when recall is good but hints aren’t, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0049</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

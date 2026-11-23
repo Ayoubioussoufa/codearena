@@ -5,7 +5,7 @@
  * scheduled for spaced review, and listed on the hub.
  */
 
-export type TrackId = "sandbox" | "backend" | "data" | "web" | "ship" | "story" | "rust";
+export type TrackId = "sandbox" | "backend" | "data" | "web" | "ship" | "story" | "ai" | "rust";
 
 export interface Track {
   id: TrackId;

@@ -397,7 +397,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-11-30": {
     title: "A model you host, behind the queue",
     goal: "`POST /submissions/:id/hint` answers 202, a job goes on the queue, and the worker gets a hint from a model on Ollama. On a CPU the model is slow, which is exactly why it goes through the queue.",
-    before: [{ label: "Ollama's API", href: "https://docs.ollama.com/api" }],
+    before: [{ label: "Lesson 43", href: L("0043-what-a-model-does") }, { label: "Lesson 44", href: L("0044-your-own-model") }, { label: "Ollama's API", href: "https://docs.ollama.com/api" }],
     steps: [
       "Run Ollama on your laptop (the 3060), pull two or three small open models (around 3B and 7B), and call `/api/chat` by hand with curl first.",
       "A `HintGenerator` port in the worker, with an `OllamaHintGenerator` adapter and a `FakeHintGenerator` for tests. `OLLAMA_URL` and `HINT_MODEL` go in the env schema: the model is config, not code.",
@@ -416,7 +416,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-01": {
     title: "The prompt, checked output, and a cap",
     goal: "The model's answer is JSON your code has checked, the user's code can't take over the prompt, and nobody can monopolise your GPU.",
-    before: [{ label: "Ollama: structured outputs", href: "https://docs.ollama.com/capabilities/structured-outputs" }],
+    before: [{ label: "Lesson 45", href: L("0045-prompts-and-injection") }, { label: "Ollama: structured outputs", href: "https://docs.ollama.com/capabilities/structured-outputs" }],
     steps: [
       "The prompt: the rules (explain the failure, never write the solution, stay under N sentences), the problem, the verdict and the failing test, then the user's code inside clear tags, marked as data.",
       "Give Ollama a JSON schema (`format`), then validate with zod anyway. One retry on invalid output, then a clean error.",
@@ -434,7 +434,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-02": {
     title: "Evals I: a test set and a baseline",
     goal: "A number for how good the hints are, which CI checks on every change to the prompt or the model.",
-    before: [{ label: "Hamel Husain: Your AI product needs evals", href: "https://hamel.dev/blog/posts/evals/" }],
+    before: [{ label: "Lesson 46", href: L("0046-evals") }, { label: "Hamel Husain: Your AI product needs evals", href: "https://hamel.dev/blog/posts/evals/" }],
     steps: [
       "Write 20 cases in `apps/api/evals/cases/`: a problem, a failed submission, its verdict, and what a good hint must mention. Cover every verdict, and include two prompt-injection attempts.",
       "Hard rules in code, no LLM: no code block longer than a few lines, none of the reference solution's lines, names the failure, under the length limit, valid JSON.",
@@ -452,6 +452,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-03": {
     title: "Evals II: a judge model, and choosing yours",
     goal: "Hard rules catch what's wrong; a judge model scores what's useful. With both, you choose the model on data.",
+    before: [{ label: "Lesson 47", href: L("0047-judges-and-choices") }],
     steps: [
       "A rubric of three to five yes-or-no questions: does it point at the real cause? would it help a beginner? does it give the answer away?",
       "A bigger local model on your GPU answers the rubric for each hint, as JSON. Before trusting it, grade ten hints yourself and compare.",
@@ -468,7 +469,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-04": {
     title: "RAG I: your notes, searchable",
     goal: "Your notes split into chunks, embedded, stored in Postgres with pgvector, and a number for how often search finds the right chunk.",
-    before: [{ label: "pgvector", href: "https://github.com/pgvector/pgvector" }],
+    before: [{ label: "Lesson 48", href: L("0048-embeddings") }, { label: "Lesson 49", href: L("0049-rag") }, { label: "pgvector", href: "https://github.com/pgvector/pgvector" }],
     steps: [
       "Switch the Postgres image to `pgvector/pgvector:pg16` (locally, in CI and in production), and enable the extension in a migration.",
       "A `Chunk` table: the text, its source file and heading, and an embedding column (Prisma's `Unsupported(\"vector(…)\")`), with an HNSW index in raw SQL.",
@@ -486,6 +487,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-05": {
     title: "RAG II: hints grounded in your notes",
     goal: "The hint job retrieves the most relevant chunks first, and the evals say whether that made the hints better.",
+    before: [{ label: "Lesson 50", href: L("0050-better-retrieval") }],
     steps: [
       "In the hint job: build a search query from the verdict, the problem and the failing test, take the top 4 chunks, and put them in the prompt, labelled with their source.",
       "Rerun the hint eval with retrieval on, and compare it with Wednesday's baseline, on the same model.",
@@ -499,6 +501,7 @@ export const TASKS: Record<string, BuildTask> = {
   "2026-12-06": {
     title: "Checkpoint, and the ADR",
     goal: "No new work. Tick the checkpoint, write the decision down, and make the feature visible.",
+    before: [{ label: "Lesson 51", href: L("0051-agents-and-beyond") }],
     steps: [
       "Go through the checkpoint below, honestly.",
       "Write the ADR: a self-hosted model behind the queue. What you rejected (a hosted API, a synchronous call), what it costs in latency and RAM, and the cap.",

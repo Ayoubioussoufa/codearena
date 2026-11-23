@@ -1,0 +1,109 @@
+<!--
+  Lesson 0048 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">“My program is too slow on big inputs” and “time limit exceeded” share no words, yet they mean the same thing. Keyword search can’t see that. Embeddings can: they turn text into points in space, where meaning is a direction. Today you write the maths by hand and run an exact search over 10,000 vectors, then meet the index that makes it fast.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Friday’s build stores your notes as embeddings in Postgres with pgvector. Before you let an index do it for you, do it yourself once: then “cosine distance”, “dimensions” and “HNSW” stop being words in a config file.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. What an embedding is</h2>
+<p>An <strong>embedding</strong> is a list of numbers, a vector, produced by an embedding model from a piece of text. The model is trained so that related meanings land close together (<a href="https://vickiboykis.com/what_are_embeddings/">Vicki Boykis: What are embeddings</a>). The <strong>vector dimension</strong> (how many numbers) is fixed by the model, often a few hundred to about a thousand. Jay Alammar’s illustrated word2vec shows the idea with pictures, from single words up (<a href="https://jalammar.github.io/illustrated-word2vec/">The illustrated word2vec</a>).</p>
+<p>Ollama serves embedding models too: <code>POST /api/embed</code> with <code>{ "model", "input" }</code>, where <code>input</code> is a string or an array, and the answer is <code>embeddings</code>, one vector per input (<a href="https://docs.ollama.com/api/embed">Ollama: /api/embed</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Measuring “close”</h2>
+<pre>a · b        = Σ a[i] × b[i]                 <span class="c"># dot product</span>
+|a|          = √(a · a)                      <span class="c"># length (norm)</span>
+cosine(a, b) = a · b / (|a| × |b|)           <span class="c"># −1 … 1: the angle only</span>
+L2(a, b)     = √Σ (a[i] − b[i])²             <span class="c"># straight-line distance</span></pre>
+<ul>
+  <li><strong>Cosine similarity</strong> compares directions and ignores length: [1, 1] and [10, 10] are identical to it. For text, direction is the meaning, so cosine is the usual choice.</li>
+  <li>On <strong>normalised</strong> vectors (length 1), the dot product <em>is</em> the cosine. That’s why many stores normalise once and use the cheaper inner product.</li>
+  <li>pgvector’s operators: <code>&lt;-&gt;</code> L2, <code>&lt;#&gt;</code> negative inner product, <code>&lt;=&gt;</code> cosine distance (1 − cosine), <code>&lt;+&gt;</code> L1 (<a href="https://github.com/pgvector/pgvector">pgvector</a>).</li>
+  <li><strong>Never mix models.</strong> Each embedding model invents its own space. Vectors from two models, even of the same length, can’t be compared.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Exact search, then approximate</h2>
+<p><strong>Exact search</strong> compares the query with every vector and keeps the k best: perfect results, cost growing with the table. Like a sequential scan in <a href="/courses/lessons/0015-how-an-index-works">lesson 15</a>, it’s fine for thousands of rows and hopeless for millions.</p>
+<p><strong>Approximate nearest-neighbour (ANN)</strong> indexes visit only part of the data and accept missing a few true neighbours. pgvector offers two (<a href="https://github.com/pgvector/pgvector">pgvector</a>):</p>
+<ul>
+  <li><strong>HNSW</strong>, a layered graph of shortcuts (<a href="https://arxiv.org/abs/1603.09320">Malkov &amp; Yashunin</a>): better speed for the same recall than IVFFlat, slower to build, more memory;</li>
+  <li><strong>IVFFlat</strong>: faster to build, less memory, slower queries.</li>
+</ul>
+<pre>CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE chunk (id text PRIMARY KEY, text text, embedding vector(768));
+CREATE INDEX ON chunk USING hnsw (embedding vector_cosine_ops);
+SELECT id FROM chunk ORDER BY embedding &lt;=&gt; $1 LIMIT 4;</pre>
+<p class="aside">An index on a <code>vector</code> column supports up to 2,000 dimensions (<code>halfvec</code>: 4,000). Check your model’s dimension before you write the migration.</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:vectors -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>vectors.mjs</code></h2>
+<div class="spec">
+  <p>Seven small functions and an exact <code>topK</code>. The checker tests the maths with numbers you can verify by hand, checks that mismatched dimensions and zero vectors fail loudly, then searches 10,000 random 384-dimension vectors and times you.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The maths</h3>
+    <label><input type="checkbox" data-key="lesson-0048-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0048-embeddings
+cp vectors.start.mjs vectors.mjs
+bash check.sh</pre>
+  <p>Write <code>dot</code> first and make it throw on different lengths: every other function builds on it, so they all inherit the check.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Exact top-k</h3>
+    <label><input type="checkbox" data-key="lesson-0048-step-2"> done</label>
+  </div>
+  <p>Score every item, sort best first (ties in id order), keep k. Read the time the checker prints for 10,000 vectors, and multiply in your head by a thousand. All 11 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: real embeddings</h3>
+    <label><input type="checkbox" data-key="lesson-0048-step-3"> done</label>
+  </div>
+  <p>Pull an embedding model in Ollama and embed three sentences: “my code is too slow on big inputs”, “time limit exceeded”, and “I forgot to read the input”. Compute the three cosines with your file. Which pair is closest? Was it what you expected?</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>One embedding model, written down.</strong> Its name and dimension go in the env and the migration; changing it means re-embedding everything.</li>
+  <li><strong>pgvector in the Postgres you already run</strong>: the image becomes <code>pgvector/pgvector:pg16</code> (locally, in CI, in production), the column is <code>Unsupported("vector(…)")</code> in Prisma, the search a raw query.</li>
+  <li><strong>Your notes are small</strong> (hundreds of chunks), so exact search would do. Add the HNSW index anyway, and say why in the interview: it’s the one you’d need at a million.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write the embedding model you’ll try, its dimension, the distance you’ll use and its pgvector operator, and whether you’ll add an index now, with why.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. The formulas and operators are on the <a href="/courses/reference/ai">AI reference page</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://vickiboykis.com/what_are_embeddings/">Vicki Boykis: What are embeddings</a></strong>, a free, deep and readable book on where embeddings come from and how they’re used. Then the <a href="https://github.com/pgvector/pgvector">pgvector README</a> for the operators, the two indexes and their tuning.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how an embedding model is trained, why HNSW is a graph, how to put a vector column in Prisma, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0048</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

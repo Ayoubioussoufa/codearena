@@ -1,0 +1,108 @@
+<!--
+  Lesson 0044 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">“A 7B model, quantized to 4 bits” sounds like jargon. It’s arithmetic, and it decides whether the hint runs on your laptop, on your VM, or nowhere. Today you learn to do that arithmetic, then write the client that talks to your own model: one that never trusts what comes back.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>You chose to host the model yourself instead of calling a paid API. That choice comes with three jobs: picking a model that fits the hardware, serving it, and handling its mistakes. This lesson covers all three, and the client you build is the adapter behind CodeArena’s <code>HintGenerator</code> port.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Open weights, and what “7B” means</h2>
+<p>An <strong>open-weights model</strong> is one whose trained numbers you can download and run yourself. Those numbers are its <strong>parameters</strong>: “7B” means about 7 billion of them. Every one is read for every token generated, so they must sit in memory, ideally the GPU’s.</p>
+<p>How much memory is a question of precision. <strong>Quantization</strong> stores each parameter with fewer bits, trading a little quality for a lot of space (<a href="https://huggingface.co/docs/transformers/main/en/quantization/overview">Hugging Face: quantization</a>):</p>
+<pre>weights memory ≈ parameters × bytes per parameter
+7B at 16 bits  ≈ 7 × 2   = 14 GB
+7B at 8 bits   ≈ 7 × 1   =  7 GB
+7B at 4 bits   ≈ 7 × 0.5 = 3.5 GB      <span class="c"># fits a 12 GB GPU with room to spare</span></pre>
+<p>Then add headroom. The context needs memory too (the <strong>KV cache</strong>, which grows with the context length you allow, Ollama’s <code>num_ctx</code> option), and so does the runtime. A rule of thumb: plan for the weights plus a few GB.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Ollama: a model behind an HTTP API</h2>
+<p>Ollama downloads models, loads them on the GPU (or the CPU), and serves them over HTTP on port 11434. The call you’ll use is <code>POST /api/chat</code> (<a href="https://docs.ollama.com/api/chat">Ollama API</a>):</p>
+<pre>{ "model": "&lt;a model you pulled&gt;",
+  "messages": [{ "role": "system", "content": "…" },
+               { "role": "user",   "content": "…" }],
+  "stream": false,                 <span class="c"># default true: chunks as they come</span>
+  "options": { "temperature": 0 },
+  "format": { …a JSON schema… } }</pre>
+<p>The answer carries <code>message.content</code> and counters: <code>prompt_eval_count</code> (tokens read), <code>eval_count</code> (tokens written), and durations <strong>in nanoseconds</strong>: <code>total_duration</code>, <code>load_duration</code>, <code>prompt_eval_duration</code>, <code>eval_duration</code>. <strong>Tokens per second</strong> is <code>eval_count / eval_duration</code>, with the duration converted to seconds.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. JSON you can trust</h2>
+<p><code>format</code> accepts <code>"json"</code> or a JSON schema, and Ollama constrains the output to it (<a href="https://docs.ollama.com/capabilities/structured-outputs">Ollama: structured outputs</a>). Treat that as help, not a guarantee. Your code is the contract the rest of CodeArena relies on, so the client follows lesson 14’s instinct for anything outside your control:</p>
+<ul>
+  <li><strong>Parse and check</strong> every reply against the schema’s required fields.</li>
+  <li><strong>Retry once</strong> on a bad reply: generation is random enough that a second try often succeeds.</li>
+  <li><strong>Then fail cleanly</strong>, with an error that says “invalid output”, so the job records a failure instead of showing garbage.</li>
+  <li><strong>Never retry an HTTP error.</strong> A 404 (model not pulled) or a 500 (out of memory) won’t fix itself in a millisecond: let the queue’s backoff handle it.</li>
+</ul>
+
+<p><strong>Before you build it, practise the arithmetic:</strong></p>
+<!-- drill:own-model -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>ollama-client.mjs</code></h2>
+<div class="spec">
+  <p>The checker starts a fake Ollama: an HTTP server that answers <code>/api/chat</code> like the real one, scripted per model name (good JSON, bad JSON once, bad twice, a missing field, a 404, a 500). It checks what you send, what you return, and how many requests you make. No GPU needed.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The request</h3>
+    <label><input type="checkbox" data-key="lesson-0044-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0044-your-own-model
+cp ollama-client.start.mjs ollama-client.mjs
+bash check.sh</pre>
+  <p>Use <code>fetch</code> with <code>method: "POST"</code>, a JSON content type and a JSON body. Leave <code>format</code> out entirely when there’s no schema.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The response, in seconds</h3>
+    <label><input type="checkbox" data-key="lesson-0044-step-2"> done</label>
+  </div>
+  <p>Map the fields and convert nanoseconds. Then the failure rules: a bad reply gets one more try with the same body; an HTTP error throws at once, with its status in the message. All 10 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: your real model</h3>
+    <label><input type="checkbox" data-key="lesson-0044-step-3"> done</label>
+  </div>
+  <p>Pull a small instruction-tuned model from Ollama’s library, then run <code>OLLAMA_MODEL=&lt;its name&gt; bash check.sh --real</code> (set <code>OLLAMA_URL</code> if Ollama runs on Windows and you’re in WSL). Note the tokens per second. Then try the same model on the CPU only and compare: that ratio is your VM’s future.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Two sizes, one setting.</strong> On your laptop’s GPU, a 7B model at 4 bits answers in a few seconds. On a VM’s CPU, a 3B one is the realistic choice. <code>HINT_MODEL</code> in the env makes that a config change, not a code change.</li>
+  <li><strong>The hint is a job, not a request.</strong> Tens of seconds on a CPU is too long to hold an HTTP request open: <code>POST /submissions/:id/hint</code> answers 202 and enqueues; the worker calls the model.</li>
+  <li><strong>This client is the adapter.</strong> Behind a <code>HintGenerator</code> port, with a fake for unit tests, exactly like the code runner and the queue.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write the two model sizes you’ll try, the memory each needs at 4 bits, and where each runs (your GPU, the VM’s CPU). Then the timeout you’ll give a hint job, and why.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. Formulas and fields are on the <a href="/courses/reference/ai">AI reference page</a>. Back to <a href="/courses/lessons/0043-what-a-model-does">lesson 43</a> if softmax is fuzzy.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://docs.ollama.com/api/chat">Ollama: the /api/chat reference</a></strong>, every request field and every counter in the response. Then <a href="https://docs.ollama.com/capabilities/structured-outputs">structured outputs</a> for the <code>format</code> field, and <a href="https://huggingface.co/docs/transformers/main/en/quantization/overview">Hugging Face on quantization</a> for what you lose and keep at 8 and 4 bits.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how to reach Ollama on Windows from WSL, which model to pull, why 4 bits barely hurts, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0044</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

@@ -1,0 +1,110 @@
+<!--
+  Lesson 0047 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Code can tell you a hint didn’t leak the solution. It can’t tell you the hint is <em>helpful</em>. For that you use a second, stronger model as a judge, and then you face the real question: why should you believe it? Today you learn the numbers that answer it, the biases to design around, and how to pick the model you ship.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Thursday’s build is the judge on your GPU and a table of two or three models. “I chose the 3B model because it scored within a point of the 7B at a fifth of the latency” is the sentence that separates an AI engineer from someone who called an API.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. LLM-as-a-judge, done right</h2>
+<p>An <strong>LLM-as-a-judge</strong> grades another model’s output against a <strong>rubric</strong>, a few questions written in advance. Hamel Husain’s method, from real products (<a href="https://hamel.dev/blog/posts/llm-judge/">Creating an LLM-as-a-judge</a>):</p>
+<ul>
+  <li><strong>One domain expert</strong> (here, you) labels a sample first, pass or fail, with a short written critique of each.</li>
+  <li><strong>Binary, not 1-to-5.</strong> People read the middle of a scale differently; a yes/no forces the decision and makes agreement measurable.</li>
+  <li><strong>Iterate the judge’s prompt</strong>, with your critiques as examples, until it agrees with you. Only then let it grade at scale.</li>
+</ul>
+<pre>Rubric (each yes / no, as JSON):
+  1. Does it name the real cause of the failure?
+  2. Would a beginner know where to look next?
+  3. Does it avoid giving the fix away?</pre>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Is the judge any good?</h2>
+<p>Compare its verdicts with yours on the same hints. With PASS as “positive”:</p>
+<pre>               you: PASS   you: FAIL
+judge: PASS       TP          FP      <span class="c"># FP: a bad hint let through</span>
+judge: FAIL       FN          TN      <span class="c"># FN: a good hint rejected</span>
+
+TPR = TP / (TP + FN)        TNR = TN / (TN + FP)
+κ   = (po − pe) / (1 − pe)  <span class="c"># po: agreement, pe: chance agreement</span></pre>
+<ul>
+  <li><strong>Agreement alone lies.</strong> If 5% of hints are bad, a judge that passes everything agrees 95% of the time and catches nothing.</li>
+  <li><strong>TNR</strong> (true negative rate) is the share of bad hints the judge catches: for a gate, the number that matters most.</li>
+  <li><strong>Cohen’s kappa</strong> removes the agreement chance alone would produce: 0 is no better than chance, 1 is perfect (<a href="https://en.wikipedia.org/wiki/Cohen%27s_kappa">Cohen’s kappa</a>).</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The judge’s biases, and choosing a model</h2>
+<p>The MT-Bench study measured three biases in judge models (<a href="https://arxiv.org/abs/2306.05685">Zheng et al., 2023</a>): <strong>position bias</strong> (preferring the first answer shown), <strong>verbosity bias</strong> (preferring longer answers), and <strong>self-enhancement bias</strong> (preferring its own family’s outputs). It also found strong judges agreeing with humans over 80% of the time, about as often as humans agree with each other. So: swap orders and keep consistent verdicts, cap length with a code rule, and judge with a different model than the one that writes the hints when you can.</p>
+<p>Then the choice. Run the same cases on two or three models and record the score <em>and</em> the latency. Report <strong>p50 and p95</strong> (nearest rank: sort, take the value at position ⌈p/100 × n⌉), not the mean: one slow hint in twenty is what users remember. Decide the rule <em>before</em> you look: “within 2 points of the best score, the lowest p95 wins”.</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:judge-stats -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>judge-stats.mjs</code></h2>
+<div class="spec">
+  <p>Six functions. The checker uses ten hints you “graded”, a lazy judge that passes everything, and three models with realistic latencies, so you see each number do its job.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Agreement, the matrix, the rates, kappa</h3>
+    <label><input type="checkbox" data-key="lesson-0047-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0047-judges-and-choices
+cp judge-stats.start.mjs judge-stats.mjs
+bash check.sh</pre>
+  <p>Watch the lazy-judge case: 90% agreement, TNR 0, kappa 0. That case is the whole lesson in one line.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>Percentiles and the choice</h3>
+    <label><input type="checkbox" data-key="lesson-0047-step-2"> done</label>
+  </div>
+  <p>Never sort the input in place. In <code>chooseModel</code>, filter by tolerance first, then sort by p95, then score, then name. All 10 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: calibrate a real judge</h3>
+    <label><input type="checkbox" data-key="lesson-0047-step-3"> done</label>
+  </div>
+  <p>Grade ten real hints yourself, pass or fail, with one line of critique each. Ask a bigger local model the rubric as JSON. Compute TPR, TNR and kappa with your file. Below 8 of 10 agreement, change the judge’s prompt, not your labels.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>The judge runs on your laptop</strong>, not in CI: CI has no GPU. Commit its results to <code>docs/evals/</code> with the date and the model versions.</li>
+  <li><strong>Hard rules stay the gate in CI</strong>; the judge score is the trend you watch when you change the prompt or the model.</li>
+  <li><strong>The model table</strong> (model, score, p50, p95, memory) and the rule you chose it by go in <code>docs/evals/</code> and in Sunday’s ADR.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write your rubric (three yes/no questions), how many hints you’ll grade by hand to calibrate the judge, and your choice rule: the tolerance and the latency percentile that decide.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. The formulas are on the <a href="/courses/reference/ai">AI reference page</a>; the hard rules came from <a href="/courses/lessons/0046-evals">lesson 46</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://hamel.dev/blog/posts/llm-judge/">Hamel Husain: Creating an LLM-as-a-judge that drives business results</a></strong>, the step-by-step method: one expert, binary verdicts, written critiques, iterate until the judge agrees. Then <a href="https://arxiv.org/abs/2306.05685">Zheng et al., Judging LLM-as-a-judge</a> (sections on biases) for the evidence behind the cautions.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: which judge model to run on a 3060, how to phrase a rubric, why p95 and not the mean, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0047</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

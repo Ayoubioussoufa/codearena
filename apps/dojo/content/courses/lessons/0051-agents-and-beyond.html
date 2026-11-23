@@ -1,0 +1,103 @@
+<!--
+  Lesson 0051 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">“Agent” is the most overloaded word in AI. Underneath, it’s a loop you can write in twenty lines: the model asks for a tool, your code decides whether to run it, the result goes back, repeat. Today you write that loop with the limits that keep it safe, then step back and map the levers beyond RAG, so you can say which one a problem needs.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>The hint doesn’t need an agent, and knowing <em>why</em> is the senior answer. But interviews will ask about agents, tool use, MCP and fine-tuning. This lesson gives you each one in a sentence you can defend, and one you’ve built.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Tool use: the model asks, your code decides</h2>
+<p>With <strong>tool use</strong>, you describe some functions to the model (a name, a description, a JSON schema for the arguments). Instead of text, the model can answer with a request: “call <code>get_failing_test</code> with <code>{"submissionId": "s42"}</code>”. Your code runs it and sends the result back as a new message; the model continues. Ollama’s <code>/api/chat</code> accepts <code>tools</code> and returns <code>tool_calls</code> (<a href="https://docs.ollama.com/api/chat">Ollama API</a>).</p>
+<p>The model never runs anything itself. Every power a tool has, your code granted, which is why OWASP’s layers from <a href="/courses/lessons/0045-prompts-and-injection">lesson 45</a> live here: <strong>least privilege</strong> (read-only tools), and <strong>human approval</strong> for anything risky (<a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">OWASP LLM01</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Workflows and agents</h2>
+<p>Anthropic draws the line clearly (<a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents</a>):</p>
+<ul>
+  <li>a <strong>workflow</strong> runs model calls through steps your code defines: prompt chaining, routing, an evaluator-optimizer loop;</li>
+  <li>an <strong>agent</strong> lets the model choose its own steps and tools, in a loop, until it decides it’s done.</li>
+</ul>
+<p>Their advice is the whole lesson in one line: start with the simplest thing that works, and add agentic complexity only when it’s needed. CodeArena’s hint is a workflow: fetch the facts, retrieve, prompt, validate, store, the same steps every time. An agent earns its cost when the path can’t be written in advance, like debugging a repository you’ve never seen.</p>
+<p>The <strong>Model Context Protocol (MCP)</strong> standardises the tool side: an open protocol for connecting AI applications to tools and data sources, so a tool written once works in any MCP client (<a href="https://modelcontextprotocol.io/introduction">MCP introduction</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. The levers, in the order to pull them</h2>
+<ol>
+  <li><strong>The prompt.</strong> Behaviour you can describe, fix here first, with the eval watching. Cheapest, fastest to change.</li>
+  <li><strong>Context</strong>: under about 200,000 tokens of knowledge, put it all in the prompt (<a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic</a>).</li>
+  <li><strong>Retrieval (RAG)</strong>: knowledge that is large or changes often.</li>
+  <li><strong>Tools</strong>: facts that live in a system (a database, an API) and must be fresh.</li>
+  <li><strong>Fine-tuning</strong>: a consistent style or format that prompting can’t reach, with many good examples. <strong>LoRA</strong> freezes the original weights and trains small added matrices, so it fits on one GPU (<a href="https://arxiv.org/abs/2106.09685">Hu et al., 2021</a>). Last, not first: it’s slow to iterate and easy to overfit.</li>
+</ol>
+<p>Around all of them: <strong>evals</strong> (lessons 46–47) to know a change helped, <strong>guardrails</strong> (output validation, limits, approval) to bound the damage when it didn’t, and <strong>observability</strong> (log every prompt, output, token count and latency) to see what happened in production.</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:agents -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>agent.mjs</code></h2>
+<div class="spec">
+  <p>One function, <code>runAgent</code>. The checker drives it with a scripted fake model: tools that work, a tool that throws, a tool that doesn’t exist, a risky tool a human refuses and one they accept, and a model that never stops.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The loop</h3>
+    <label><input type="checkbox" data-key="lesson-0051-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0051-agents-and-beyond
+cp agent.start.mjs agent.mjs
+bash check.sh</pre>
+  <p>Call the model, append its reply, stop on <code>final</code>, otherwise run the tool and append a <code>tool</code> message whose content is a JSON string.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>The limits</h3>
+    <label><input type="checkbox" data-key="lesson-0051-step-2"> done</label>
+  </div>
+  <p>A thrown error becomes a result the model can read and recover from. An unknown tool is refused. A tool in <code>needsApproval</code> waits for <code>approve</code>, and doesn’t run on a no. After <code>maxSteps</code> model calls, throw. All 10 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a real model at the wheel</h3>
+    <label><input type="checkbox" data-key="lesson-0051-step-3"> done</label>
+  </div>
+  <p>Write a <code>model</code> function that calls Ollama’s <code>/api/chat</code> with one read-only tool (<code>get_failing_test</code>, returning fixed data) and maps <code>tool_calls</code> to this lab’s shape. Does a small model call the tool when it should? How many steps does it take?</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>The hint stays a workflow.</strong> Its steps are known, so code runs them: predictable, testable, and cheap enough for a CPU.</li>
+  <li><strong>If you ever add an agent</strong> (say, an admin assistant over submissions), it gets read-only tools, approval for any write, a step limit, and a log of every call.</li>
+  <li><strong>The next lever is the prompt</strong>, then retrieval quality (lesson 50). Fine-tuning would be the answer only with thousands of graded hints and a style no prompt reaches.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Say in two sentences why the hint is a workflow and not an agent. Then name the next lever you’d pull if Saturday’s eval score disappoints, and the number that would tell you it worked.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. The levers are on the <a href="/courses/reference/ai">AI reference page</a>, and the road after this track, from the basics to free certificates, is in the guide <a href="/guides/ai-learning-path">AI engineering: the learning path</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic: Building effective agents</a></strong>, the patterns (prompt chaining, routing, parallelisation, orchestrator-workers, evaluator-optimizer), when an agent is worth it, and how to design its tools. Then the <a href="https://modelcontextprotocol.io/introduction">MCP introduction</a>.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how a model decides to call a tool, how MCP servers work, when fine-tuning is worth it, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0051</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

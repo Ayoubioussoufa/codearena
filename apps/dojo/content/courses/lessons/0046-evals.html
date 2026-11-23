@@ -1,0 +1,105 @@
+<!--
+  Lesson 0046 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Ask a team how good their AI feature is, and most will show you a demo. Ask how they know, and the good ones show you a number from an eval that runs on every change. Today you build the core of yours: rules written in code, a score over several runs, and a gate that fails the build.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Evals are why you added the AI feature to the sprint: they’re what job descriptions mean by “AI engineering”. Without them, a prompt change is a guess. With them, “the hint got better” is a number in a PR.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Why evals, and what one is</h2>
+<p>An <strong>eval</strong> is a repeatable measurement of an AI feature’s output against criteria you wrote down first (<a href="https://docs.claude.com/en/docs/test-and-evaluate/develop-tests">Anthropic: develop tests</a>). It has three parts:</p>
+<ul>
+  <li>a <strong>test set</strong>: inputs that look like real use, including the hard and the hostile ones;</li>
+  <li><strong>graders</strong>: what decides pass or fail for each output;</li>
+  <li>a <strong>score</strong>, tracked over time, so a change that makes things worse is caught.</li>
+</ul>
+<p>Hamel Husain’s point, from many shipped products: teams that succeed with AI features iterate on evals, not on vibes, and they read the outputs, not just the scores (<a href="https://hamel.dev/blog/posts/evals/">Your AI product needs evals</a>).</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Graders, cheapest first</h2>
+<ol>
+  <li><strong>Code-based graders</strong> wherever the question has an exact answer: valid JSON? at most three sentences? no line of the reference solution? names the failure? Fast, free, never wrong.</li>
+  <li><strong>A judge model</strong> for what code can’t decide, such as “would this help a beginner?”. Lesson 47 is about trusting one.</li>
+  <li><strong>A human</strong> (you) to label the first cases and calibrate both.</li>
+</ol>
+<p>For the hint, the most important rule is a code rule: <em>no line of the solution</em>. Compare with whitespace removed, so re-indenting doesn’t hide a leak, and skip short lines like <code>}</code> or <code>s = 0;</code> that any hint may mention.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. Rates, flaky cases, and the gate</h2>
+<ul>
+  <li><strong>Run each case several times.</strong> The output varies (lesson 43), so one run is an anecdote. Report the <strong>pass rate</strong>: passing runs over all runs.</li>
+  <li><strong>Report per rule</strong>, not just overall: “noSolutionLeak 100%, maxSentences 70%” tells you what to fix.</li>
+  <li><strong>List the flaky cases</strong>: the ones that pass sometimes. They’re where the prompt is on an edge.</li>
+  <li><strong>Gate on a threshold</strong> in CI: below it, the job fails, exactly like a failing test. Run it only when the prompt, the model or the cases change: it’s slow.</li>
+</ul>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:evals -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>graders.mjs</code></h2>
+<div class="spec">
+  <p>Five rules, <code>gradeCase</code>, <code>summarize</code> and <code>gate</code>. Every rule gets a hint that passes it and one that fails it, the way you’ll test your real graders: a grader nobody tested is a second thing that can be wrong.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>The five rules</h3>
+    <label><input type="checkbox" data-key="lesson-0046-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0046-evals
+cp graders.start.mjs graders.mjs
+bash check.sh</pre>
+  <p>Start with <code>validShape</code> and <code>noSolutionLeak</code>: they matter most. A sentence ends with <code>.</code>, <code>!</code> or <code>?</code> followed by a space or the end, so <code>xs.length</code> isn’t two sentences.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>A case, then the set</h3>
+    <label><input type="checkbox" data-key="lesson-0046-step-2"> done</label>
+  </div>
+  <p><code>gradeCase</code> runs the rules; an invalid shape fails all of them. <code>summarize</code> counts runs, not cases, and finds the flaky ones. All 10 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: a real baseline</h3>
+    <label><input type="checkbox" data-key="lesson-0046-step-3"> done</label>
+  </div>
+  <p>Write five real cases (a problem, a wrong submission, its verdict, the reference solution), generate hints with your lesson 44 client and lesson 45 prompt, three runs each, and grade them. Your first score, before any tuning, is the baseline everything this week is compared to.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Cases live in the repo</strong>, in <code>apps/api/evals/cases/</code>: 20 to start, every verdict covered, two injection attempts. Each new bug a user finds becomes a case.</li>
+  <li><strong>The eval is a script</strong> that prints a table and exits non-zero below the threshold, and a CI job that runs it with a small model on the CPU, only when the hint code, the prompt or the cases change.</li>
+  <li><strong>The baseline goes in <code>docs/evals/</code></strong>, with the date and the model. Saturday, you rerun it with RAG and compare.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>List your first five cases in one line each (problem, verdict, what a good hint must mention), the rules you’ll grade with, and the threshold you’ll start at, with why.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. The eval checklist is on the <a href="/courses/reference/ai">AI reference page</a>; the injection cases come from <a href="/courses/lessons/0045-prompts-and-injection">lesson 45</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://hamel.dev/blog/posts/evals/">Hamel Husain: Your AI product needs evals</a></strong>, the case for evals from real products, with the three levels of testing and why reading outputs matters. Then <a href="https://docs.claude.com/en/docs/test-and-evaluate/develop-tests">Anthropic: develop tests</a> for designing cases and choosing graders.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how many cases are enough, how to pick a threshold, how to run the eval in CI without a GPU, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0046</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

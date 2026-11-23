@@ -31,6 +31,15 @@ import { lesson0024 } from "./lessons/0024-ci-cd";
 import { lesson0025 } from "./lessons/0025-observability";
 import { lesson0026 } from "./lessons/0026-star-stories";
 import { lesson0027 } from "./lessons/0027-your-system-out-loud";
+import { lesson0043 } from "./lessons/0043-what-a-model-does";
+import { lesson0044 } from "./lessons/0044-your-own-model";
+import { lesson0045 } from "./lessons/0045-prompts-and-injection";
+import { lesson0046 } from "./lessons/0046-evals";
+import { lesson0047 } from "./lessons/0047-judges-and-choices";
+import { lesson0048 } from "./lessons/0048-embeddings";
+import { lesson0049 } from "./lessons/0049-rag";
+import { lesson0050 } from "./lessons/0050-better-retrieval";
+import { lesson0051 } from "./lessons/0051-agents-and-beyond";
 import { lesson0028 } from "./lessons/0028-cargo-and-the-compiler";
 import { lesson0029 } from "./lessons/0029-ownership";
 import { lesson0030 } from "./lessons/0030-borrowing";
@@ -79,6 +88,11 @@ export const TRACKS: Track[] = [
     blurb: "Turning what you built into interview answers.",
   },
   {
+    id: "ai",
+    title: "AI engineering",
+    blurb: "From what a model computes to a hint you can prove is good: your own model, prompts that resist injection, evals, embeddings, RAG, and agents.",
+  },
+  {
     id: "rust",
     title: "Rust, after the sprint",
     blurb: "The language that ends the memory bugs you fought in C, then the judge rebuilt in it, then the reason Python's AI tools are written in it.",
@@ -120,6 +134,16 @@ export const LESSONS: Lesson[] = [
   // ── The story ──
   lesson0026,
   lesson0027,
+  // ── AI engineering (week 5: the AI hint) ──
+  lesson0043,
+  lesson0044,
+  lesson0045,
+  lesson0046,
+  lesson0047,
+  lesson0048,
+  lesson0049,
+  lesson0050,
+  lesson0051,
   // ── Rust, after the sprint (opens 7 Dec) ──
   lesson0028,
   lesson0029,
@@ -319,7 +343,7 @@ export const WEEKS: Week[] = [
     start: "2026-11-30",
     end: "2026-12-06",
     goal: "A failed submission gets a hint from a model you host yourself, grounded in your own notes, and evals prove how good the hints are and what retrieval added.",
-    note: "No lessons are written for this week yet: each day links to the primary docs instead. The model runs on Ollama, on your laptop's GPU and on the VM's CPU, so a hint takes seconds to tens of seconds. That's why it goes through the queue, like judging.",
+    note: "Nine lessons, the AI engineering track: from what a model computes to agents, each with a lab that runs without a GPU. The model itself runs on Ollama, on your laptop's GPU and on the VM's CPU, so a hint takes seconds to tens of seconds: it goes through the queue, like judging. The road beyond the track, with free certificates, is in the guide \"AI engineering: the learning path\".",
     doneWhen: [
       "`POST /submissions/:id/hint` answers 202; the worker stores a hint; `GET` returns it",
       "The model's output is JSON checked by zod, and a daily cap stops abuse",
@@ -330,41 +354,41 @@ export const WEEKS: Week[] = [
       "ADR: a self-hosted model behind the queue",
     ],
     days: [
-      day("Mon 30 Nov", "2026-11-30", [], {
+      day("Mon 30 Nov", "2026-11-30", ["0043-what-a-model-does", "0044-your-own-model"], {
         build: "Ollama running, the HintGenerator port, the hint job through the queue",
         systemDesign: [sd("Task queues & back pressure", "task-queues--back-pressure")],
         dsa: "Block 12 · Heaps & Intervals: course, then Days 1–2",
       }),
-      day("Tue 1 Dec", "2026-12-01", [], {
+      day("Tue 1 Dec", "2026-12-01", ["0045-prompts-and-injection"], {
         build: "The prompt, JSON checked by zod, the Hint table, a daily cap",
         systemDesign: [sd("Rate limiting", "rate-limiting")],
         dsa: "Block 12 · Day 3",
       }),
-      day("Wed 2 Dec", "2026-12-02", [], {
+      day("Wed 2 Dec", "2026-12-02", ["0046-evals"], {
         build: "Evals I: 20 cases, hard rules, a baseline score, the CI job",
         systemDesign: [sd("Back-of-envelope estimation", "back-of-envelope-estimation")],
         dsa: "Block 13 · Dynamic Programming, day 1 of 4",
       }),
-      day("Thu 3 Dec", "2026-12-03", [], {
+      day("Thu 3 Dec", "2026-12-03", ["0047-judges-and-choices"], {
         build: "Evals II: a judge model on your GPU, two or three models compared",
         systemDesign: [sd("Latency numbers every programmer should know", "latency-numbers-every-programmer-should-know")],
         dsa: "Block 13 · DP, day 2 of 4",
       }),
-      day("Fri 4 Dec", "2026-12-04", [], {
+      day("Fri 4 Dec", "2026-12-04", ["0048-embeddings", "0049-rag"], {
         build: "RAG I: pgvector, the ingestion script, the retrieval eval",
         systemDesign: [sd("Worked design #7: typeahead, a search system", "worked-design-7--search-autocomplete-typeahead")],
         dsa: "Block 13 · DP, day 3 of 4",
       }),
-      day("Sat 5 Dec", "2026-12-05", [], {
+      day("Sat 5 Dec", "2026-12-05", ["0050-better-retrieval"], {
         build: "RAG II: retrieval in the hint job, the eval with and without it",
         systemDesign: [sd("Caching: a stored hint is a cache", "caching")],
         dsa: "Block 13 · DP, day 4 of 4 (set R13)",
       }),
-      day("Sun 6 Dec", "2026-12-06", [], {
+      day("Sun 6 Dec", "2026-12-06", ["0051-agents-and-beyond"], {
         build: "Checkpoint · ADR: a self-hosted model behind the queue · the README's AI section",
         systemDesign: [sd("A full 45-minute mock design", "how-to-run-the-40-minute-interview")],
         dsa: "Final review",
-        note: "No new material. Retro on the whole sprint: what worked, what didn't, what's next.",
+        note: "Lesson 51 is the map beyond RAG: read it after the checkpoint. Then a retro on the whole sprint: what worked, what didn't, what's next.",
       }),
     ],
   },

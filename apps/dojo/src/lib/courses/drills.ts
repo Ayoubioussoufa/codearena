@@ -15,6 +15,7 @@ import { DATA_DRILLS } from "./drills-data";
 import { WEB_DRILLS } from "./drills-web";
 import { SHIP_DRILLS } from "./drills-ship";
 import { RUST_DRILLS } from "./drills-rust";
+import { AI_DRILLS } from "./drills-ai";
 
 export type { Drill };
 
@@ -386,7 +387,7 @@ const nodeFacts: Drill = {
   ],
 };
 
-export const DRILLS: Drill[] = [statusDecoder, whoSurvives, pipeOrDeadlock, nodeFacts, ...SANDBOX_DRILLS, ...BACKEND_DRILLS, ...DATA_DRILLS, ...WEB_DRILLS, ...SHIP_DRILLS, ...RUST_DRILLS];
+export const DRILLS: Drill[] = [statusDecoder, whoSurvives, pipeOrDeadlock, nodeFacts, ...SANDBOX_DRILLS, ...BACKEND_DRILLS, ...DATA_DRILLS, ...WEB_DRILLS, ...SHIP_DRILLS, ...AI_DRILLS, ...RUST_DRILLS];
 
 export function getDrill(id: string): Drill | undefined {
   return DRILLS.find((d) => d.id === id);

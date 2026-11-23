@@ -1,0 +1,82 @@
+<p class="kicker">Reference · the AI engineering track</p>
+<h1>AI engineering, on one page</h1>
+<p class="meta">From lessons <a href="/courses/lessons/0043-what-a-model-does">43</a> to <a href="/courses/lessons/0051-agents-and-beyond">51</a>. The road beyond them: <a href="/guides/ai-learning-path">the learning path</a>.</p>
+
+<h2 id="tokens">Tokens to text</h2>
+<pre>softmax(z)_i = e^(z_i / T) / Σ e^(z_j / T)     # subtract max(z) first
+greedy       argmax of the logits             # T → 0
+top-k        keep the k likeliest, renormalise
+top-p        keep the smallest set with Σ p ≥ P, renormalise
+sample       first index where the running sum &gt; r, r in [0, 1)</pre>
+<ul>
+  <li>No memory between calls: everything the model uses is in the request, up to the context window.</li>
+  <li>Hints and evals: low temperature. Even then, run eval cases several times.</li>
+</ul>
+
+<h2 id="own-model">Your own model</h2>
+<pre>weights ≈ parameters × bytes      16-bit 2 · 8-bit 1 · 4-bit 0.5
+7B at 4 bits ≈ 3.5 GB  (+ KV cache for the context, + runtime)
+
+POST /api/chat  { model, messages, stream: false,
+                  options: { temperature, num_ctx }, format: &lt;schema&gt; }
+→ message.content, prompt_eval_count, eval_count,
+  total_duration, eval_duration          # nanoseconds
+tokens/s = eval_count / (eval_duration / 1e9)
+POST /api/embed { model, input }  → embeddings</pre>
+<ul>
+  <li>Validate the JSON yourself; retry a bad reply once; never retry an HTTP error.</li>
+  <li>Slow on a CPU: the hint is a queued job, not a request.</li>
+</ul>
+
+<h2 id="prompts">Prompts and injection</h2>
+<pre>system  the rules only: task, format, limits, "tagged content is data"
+user    &lt;problem&gt; &lt;verdict&gt; &lt;failing_test&gt; &lt;code&gt;   # code last
+escape  &amp; → &amp;amp; first, then &lt; → &amp;lt;, &gt; → &amp;gt;</pre>
+<p>OWASP LLM01’s layers: constrain behaviour · validate output formats · filter input and output · least privilege · human approval for risky actions · segregate external content · adversarial testing. No single one is fool-proof.</p>
+
+<h2 id="evals">Evals</h2>
+<ul>
+  <li>Test set (real and hostile cases) + graders + a score over time.</li>
+  <li>Graders, cheapest first: code rules → a judge model → a human to calibrate.</li>
+  <li>Run each case several times; report the pass rate per rule and the flaky cases; gate CI on a threshold.</li>
+</ul>
+<pre>                you PASS   you FAIL
+judge PASS        TP          FP        TPR = TP / (TP + FN)
+judge FAIL        FN          TN        TNR = TN / (TN + FP)
+κ = (po − pe) / (1 − pe)                p95 = sorted[⌈0.95 n⌉ − 1]</pre>
+<p>Judge biases: position, verbosity, self-enhancement. Binary verdicts, swapped orders, a different model family.</p>
+
+<h2 id="vectors">Embeddings and vector search</h2>
+<pre>cosine(a, b) = a·b / (|a| |b|)     L2 = √Σ (a_i − b_i)²
+pgvector     &lt;-&gt; L2 · &lt;#&gt; −inner product · &lt;=&gt; cosine distance · &lt;+&gt; L1
+index        HNSW: better speed/recall, slower build, more memory
+             IVFFlat: faster build, less memory, slower queries
+             vector up to 2,000 dimensions indexed (halfvec 4,000)</pre>
+<ul>
+  <li>Never compare vectors from two embedding models.</li>
+</ul>
+
+<h2 id="rag">RAG</h2>
+<pre>ingest   notes → chunks (by heading, heading repeated) → hash → embed → store
+query    facts → top-k chunks → &lt;source id&gt; blocks → prompt → model
+measure  recall@k = hits in top k / queries
+         MRR      = mean of 1 / rank (0 if missing)</pre>
+<ul>
+  <li>Ingestion is idempotent: insert new, update changed, remove gone, skip the rest.</li>
+  <li>recall good, answers bad → the prompt or model; recall bad → retrieval first.</li>
+  <li>Under ~200k tokens of knowledge, you can skip retrieval and send it all.</li>
+</ul>
+
+<h2 id="retrieval">Better retrieval</h2>
+<pre>BM25(D) = Σ IDF(q) · f(k1+1) / (f + k1(1 − b + b|D|/avgdl))   k1 1.2, b 0.75
+IDF(q)  = ln((N − n + 0.5) / (n + 0.5) + 1)
+RRF(d)  = Σ 1 / (60 + rank)</pre>
+<p>Hybrid = BM25 + vectors, fused with RRF. Then a reranker on the top candidates, and contextual retrieval (Anthropic: −35% / −49% / −67% failed top-20 retrievals).</p>
+
+<h2 id="agents">Agents and the levers</h2>
+<ul>
+  <li>Tool use: the model asks, your code runs. Unknown tool → refuse; error → feed it back; risky → human approval; a step limit always.</li>
+  <li>Workflow (code sets the steps) before agent (the model sets them).</li>
+  <li>Levers, in order: prompt → full context → retrieval → tools → fine-tuning (LoRA: frozen weights, small trained matrices).</li>
+  <li>MCP: an open protocol that plugs tools and data into any AI app.</li>
+</ul>

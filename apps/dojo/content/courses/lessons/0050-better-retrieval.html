@@ -1,0 +1,103 @@
+<!--
+  Lesson 0050 · body only. Markers: warmup, drill, quiz, words.
+-->
+<p class="lede">Ask vector search for “TLE on n = 10^5” and it finds notes about slowness in general, missing the one that says <code>10^5</code>. Ask keyword search for “my code is too slow” and it misses “time limit exceeded”. Each is blind where the other sees. Today you build the keyword half from its formula, then fuse the two.</p>
+
+<div class="callout">
+  <span class="label">Why this matters</span>
+  <p>Saturday’s stretch goal is hybrid search. Even if you don’t ship it, “why not just vectors?” is the first follow-up question on any RAG system, and BM25 plus RRF is the standard answer.</p>
+</div>
+
+<!-- warmup -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>1. Keywords, scored properly: BM25</h2>
+<p><strong>BM25</strong> scores a document for a query by summing, over the query’s words, how much each match is worth (<a href="https://en.wikipedia.org/wiki/Okapi_BM25">Okapi BM25</a>):</p>
+<pre>score(D) = Σ  IDF(q) · f · (k1 + 1) / (f + k1 · (1 − b + b · |D| / avgdl))
+IDF(q)   = ln((N − n(q) + 0.5) / (n(q) + 0.5) + 1)</pre>
+<ul>
+  <li><strong>IDF</strong> (inverse document frequency): a word in few documents is worth a lot; one in every document is worth almost nothing.</li>
+  <li><strong>f and k1</strong>: more occurrences help, with diminishing returns. k1 (often 1.2) sets how fast it saturates.</li>
+  <li><strong>|D|, avgdl and b</strong>: a long document isn’t better for being long; b (often 0.75) sets how much its length counts against it.</li>
+</ul>
+<p>Postgres has keyword search built in (<code>tsvector</code>, <code>ts_rank</code>), with its own ranking functions (<a href="https://www.postgresql.org/docs/current/textsearch-controls.html">PostgreSQL: text search</a>); writing BM25 yourself once is how you understand what any of them weigh.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>2. Fusing two rankings: RRF</h2>
+<p>BM25 scores and cosines live on different scales, so adding them is meaningless. <strong>Reciprocal Rank Fusion</strong> keeps only the ranks (<a href="https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf">Cormack, Clarke &amp; Büttcher, 2009</a>):</p>
+<pre>RRF(d) = Σ over each ranking   1 / (k + rank of d)     <span class="c"># k = 60, rank from 1</span></pre>
+<p>A document high in both lists wins; one high in a single list still counts; one missing from a list just gets nothing from it. k = 60 was fixed in the original paper and has stayed the usual default. This is <strong>hybrid search</strong>: run both, fuse, take the top k.</p>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>3. On top: reranking and contextual retrieval</h2>
+<ul>
+  <li><strong>A reranker</strong> is a model that reads the query and each candidate <em>together</em> and rescores it: slower than an embedding, much sharper. Retrieve 50 fast, rerank, keep 4.</li>
+  <li><strong>Contextual retrieval</strong> prepends to each chunk a short explanation of where it sits in its document, before embedding it and before indexing it for BM25.</li>
+</ul>
+<p>Anthropic measured the steps on top-20 retrieval failures (<a href="https://www.anthropic.com/news/contextual-retrieval">contextual retrieval</a>): contextual embeddings alone, −35%; plus contextual BM25, −49%; plus reranking, −67%. Each layer earns its place with a number. Yours should too.</p>
+
+<p><strong>Before you build it, practise it:</strong></p>
+<!-- drill:fusion -->
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>4. Build <code>fuse.mjs</code></h2>
+<div class="spec">
+  <p>A tokenizer, BM25 from the formula, RRF, and <code>hybrid</code>. The BM25 numbers in the checker were computed independently from the same formula, so a wrong IDF or a missing length normalisation shows up in the fourth decimal.</p>
+</div>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">1</span>
+    <h3>Tokenize, then BM25</h3>
+    <label><input type="checkbox" data-key="lesson-0050-step-1"> done</label>
+  </div>
+  <pre>cd ~/CODEARENA/apps/dojo/labs/0050-better-retrieval
+cp fuse.start.mjs fuse.mjs
+bash check.sh</pre>
+  <p>Tokenize every document once. Compute N, avgdl and each term’s document count, then the sum. Skip documents that score 0.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">2</span>
+    <h3>RRF and hybrid</h3>
+    <label><input type="checkbox" data-key="lesson-0050-step-2"> done</label>
+  </div>
+  <p>A <code>Map</code> from id to score, one pass per list. Ranks start at 1. Then <code>hybrid</code> is two lines. All 11 cases should pass.</p>
+</section>
+<section class="step">
+  <div class="step-head">
+    <span class="step-num">★</span>
+    <h3>Challenge: three ways on your notes</h3>
+    <label><input type="checkbox" data-key="lesson-0050-step-3"> done</label>
+  </div>
+  <p>With lesson 49’s chunks and labelled queries, compute recall@4 for vectors alone, BM25 alone, and hybrid. Which queries did each one miss? That table is a paragraph of your ADR.</p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────── -->
+<h2>5. What this means for CodeArena</h2>
+<ul>
+  <li><strong>Hybrid in one query</strong>: Postgres full-text search on a <code>tsvector</code> column next to the pgvector search, fused with RRF in the worker. Your queries mention verdicts and limits like <code>TLE</code> and <code>10^5</code>: exactly where keywords win.</li>
+  <li><strong>Measure before you keep it.</strong> If recall@4 doesn’t move, ship the simpler system and say so.</li>
+  <li><strong>Reranking and contextual retrieval</strong> are the next steps if recall still falls short: name them in the ADR as what you’d add, with Anthropic’s numbers.</li>
+</ul>
+<div class="callout">
+  <span class="label">Your turn, in CodeArena</span>
+  <p>Write three hint queries where keywords should win and three where vectors should, then your plan: hybrid now or later, and the recall@4 change that would make you keep it.</p>
+</div>
+
+<h2>6. Check yourself</h2>
+<p>From memory. Your answers go into spaced review.</p>
+<!-- quiz -->
+
+<h2>7. Say it in your own words</h2>
+<p>Your answer to section 5, then a definition for each term. The button builds your <code>done</code> message; the right definitions go into <a href="/courses/glossary">your glossary</a>. BM25 and RRF are on the <a href="/courses/reference/ai">AI reference page</a>.</p>
+<!-- words -->
+
+<div class="source">
+  <span class="label">Primary source</span>
+  <p><strong><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic: Introducing contextual retrieval</a></strong>, read again with this lesson’s eyes: BM25, contextual embeddings, reranking, and the measured effect of each. Then the two-page <a href="https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf">RRF paper</a>: short, and the source of k = 60.</p>
+</div>
+
+<div class="ask">
+  <p><strong>Stuck, or something doesn’t click?</strong> Ask me in the terminal: how ts_rank differs from BM25, how to weight the two lists, which reranker runs locally, anything at all.</p>
+  <p>When the checker is green, copy your <strong><code>done 0050</code></strong> message from section 7 and paste it in the terminal.</p>
+</div>

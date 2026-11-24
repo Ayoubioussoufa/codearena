@@ -14,6 +14,15 @@ This guide is the mechanics.
 ---
 
 
+## 🕹️ Play your way through
+
+**Nine stations are waiting below**, where you are the container, the router or the pipeline. Each has a goal; meet it and
+it gets a stamp. Nothing is timed, and nothing can be lost: a wrong move tells you why.
+
+```sim
+map
+```
+
 ---
 
 ## ⌨️ This guide is interactive
@@ -218,6 +227,10 @@ Three files. `CatsModule` must then appear in `AppModule`'s `imports`, or none o
 > **Every module must be reachable from `AppModule`, directly or through a chain of imports.** A
 > module nobody imports is dead code that silently does nothing.
 
+```sim
+di
+```
+
 ---
 
 # Part 4 — Modules, completely
@@ -354,6 +367,10 @@ dynamic-module
 modules
 ```
 
+```sim
+modules
+```
+
 ---
 
 # Part 5 — Providers, completely
@@ -475,6 +492,14 @@ the cycle.
 providers
 ```
 
+```sim
+providers
+```
+
+```sim
+leak
+```
+
 ---
 
 # Part 6 — Controllers and routing
@@ -552,6 +577,10 @@ job, and staying out of it is what keeps controllers testable.
 status-codes
 ```
 
+
+```sim
+routes
+```
 
 ---
 
@@ -698,6 +727,10 @@ login-dto
 dtos
 ```
 
+```sim
+validation
+```
+
 ---
 
 # Part 9 — The request lifecycle, in full
@@ -752,6 +785,10 @@ pipeline-order
 
 ```check
 lifecycle
+```
+
+```sim
+pipeline
 ```
 
 ---
@@ -996,6 +1033,10 @@ is running — middleware runs too early to know.
 
 ```check
 wrappers
+```
+
+```sim
+placement
 ```
 
 ---
@@ -1263,6 +1304,10 @@ resolve-dependencies
 
 ```check
 testing
+```
+
+```sim
+clinic
 ```
 
 ---

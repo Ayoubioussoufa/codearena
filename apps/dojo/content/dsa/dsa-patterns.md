@@ -8,6 +8,15 @@ cleverness. Almost every problem is a re-skin of one of about twenty templates. 
 We assume **no background.** §0 defines every data structure and every scary word from scratch — read
 it first and the rest stops looking like a foreign language.
 
+### 🕹️ Play your way through
+
+**Sixteen stations are waiting below**, and in most of them you are the algorithm. Each has a goal; meet it and
+it gets a stamp. Nothing is timed, and nothing can be lost: a wrong move tells you why.
+
+```sim
+map
+```
+
 ### What's in here
 
 | Part | What it does |
@@ -183,6 +192,10 @@ Two habits that instantly make you sound senior: **say the Big-O of your idea ou
 ask, and it catches an accidental "oops, that's O(n²)" early), and if a simple greedy/one-pass idea has
 a counter-example, **escalate to Dynamic Programming.**
 
+```sim
+pattern
+```
+
 ## A Big-O refresher
 
 **Big-O** measures how the work *grows* as the input `n` gets big, ignoring constants (full from-zero
@@ -255,6 +268,10 @@ Find your `n`, read across. The right-hand column is what the setter almost cert
 - **n ≤ 5,000 → O(n²) is *intended*, not a fallback.** Don't burn twenty minutes hunting for an
   O(n log n) trick. The setter allowed quadratic on purpose. Conversely at **n ≤ 10⁵**, O(n²) = 10¹⁰
   and is instant death — that gap between 5,000 and 100,000 is where most TLEs live.
+
+```sim
+budget
+```
 
 ### Reading it backwards — inferring the algorithm
 
@@ -648,6 +665,10 @@ class SegTree {
 for grouping, a running total for subarrays); JS `Set` compares objects/arrays by *reference*, not
 contents; and reaching for a sort (O(n log n)) when a hash pass (O(n)) would do.
 
+```sim
+hashing
+```
+
 ## Two Pointers
 
 ### 🔍 Recognise it
@@ -751,6 +772,10 @@ flowchart TD
 **Watch out for** being able to *justify* each move (why is it safe to skip `a[l]`? — because it's the
 smallest and even paired with the largest it's too small); de-duplicating results (3Sum) by skipping
 equal neighbours; and accidentally mutating the input when a copy was expected.
+
+```sim
+pointers
+```
 
 ## Sliding Window
 
@@ -882,6 +907,10 @@ to a rule); recomputing the summary from scratch instead of nudging it as you ad
 
 ```check
 arrays
+```
+
+```sim
+window
 ```
 
 ## Linked List
@@ -1057,6 +1086,10 @@ class LRUCache {
 to simplify inserting/deleting at the front; and composing the primitives (find middle → reverse half →
 merge) for reorder/palindrome problems.
 
+```sim
+reverse
+```
+
 ## Stack
 
 ### 🔍 Recognise it
@@ -1229,6 +1262,10 @@ store *indices* whenever age/position matters; and remember popped elements can 
 
 ```check
 linear
+```
+
+```sim
+nextgreater
 ```
 
 ## Binary Search
@@ -1435,6 +1472,10 @@ range. That pairing is load-bearing — `l < r` with `r = m` terminates, `l <= r
 search
 ```
 
+```sim
+bsearch
+```
+
 ## Recursion & Backtracking
 
 ### 🔍 Recognise it
@@ -1626,6 +1667,10 @@ function closestSubsetSum(nums, goal) {
 (combinations, no reuse) vs `used`-array (permutations) vs same-`i` (reuse allowed) distinction;
 de-duplicating with "sort, then skip equal siblings at the same depth"; and restoring shared state
 (grid cells) on the way back up.
+
+```sim
+queens
+```
 
 ## Sorting & Selection
 
@@ -1906,6 +1951,10 @@ level by level: `1`, then `2, 3`, then `4, 5`.
 *tightening (lo, hi) range*, not just parent-vs-child; and folding two answers into one pass
 (height + is-balanced together) to avoid an O(n²) re-walk.
 
+```sim
+tree
+```
+
 ## DFS (Depth-First Search)
 
 ### 🔍 Recognise it
@@ -2089,6 +2138,10 @@ leaf".
 
 ```check
 traversal
+```
+
+```sim
+bfs
 ```
 
 ## Tries
@@ -2331,6 +2384,10 @@ siblings.
 
 ```check
 structures
+```
+
+```sim
+heap
 ```
 
 ## Graphs
@@ -2597,6 +2654,14 @@ extra "in-progress vs done" colouring needed to detect cycles in a *directed* gr
 graphs
 ```
 
+```sim
+dijkstra
+```
+
+```sim
+topo
+```
+
 ## Intervals
 
 ### 🔍 Recognise it
@@ -2691,6 +2756,10 @@ flowchart LR
 **Watch out for** sorting by the *right* key — by **start** to merge; by **end** for "keep the most /
 remove the fewest" (activity selection); and the "max concurrent" pattern (separate and sort the starts
 and ends, then sweep) which is secretly a heap.
+
+```sim
+intervals
+```
 
 ## Greedy
 
@@ -3011,6 +3080,10 @@ state; collapse the memory when only the last few states matter.
 
 
 ```check
+dp
+```
+
+```sim
 dp
 ```
 

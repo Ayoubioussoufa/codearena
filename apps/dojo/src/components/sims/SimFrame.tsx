@@ -1,14 +1,15 @@
 "use client";
 /** The card around every station: number, goal, stamp, takeaway, next one. */
 import { useEffect, type ReactNode } from "react";
-import { SIMS, getSim, simIndex, type SimId } from "@/lib/sims/catalog";
+import { getSim, routeOf, type SimId } from "@/lib/sims/catalog";
 import { stamp, useStamps } from "@/lib/sims/progress";
 
 export function SimFrame({ id, won, onReset, children }: { id: SimId; won: boolean; onReset: () => void; children: ReactNode }) {
   const sim = getSim(id);
-  const n = simIndex(id);
+  const { sims } = routeOf(id);
+  const n = sims.findIndex((s) => s.id === id);
   const stamped = useStamps()[id] !== undefined;
-  const next = SIMS[n + 1];
+  const next = sims[n + 1];
 
   useEffect(() => {
     if (won) stamp(id);
@@ -23,7 +24,7 @@ export function SimFrame({ id, won, onReset, children }: { id: SimId; won: boole
     >
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-slate-100/70 px-4 py-3 sm:px-5 dark:border-slate-800 dark:bg-slate-900">
         <span className="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-xs text-white dark:bg-slate-200 dark:text-slate-900">
-          {n + 1}/{SIMS.length}
+          {n + 1}/{sims.length}
         </span>
         <h4 className="m-0 text-lg">{sim.title}</h4>
         <span className="ml-auto flex items-center gap-3">

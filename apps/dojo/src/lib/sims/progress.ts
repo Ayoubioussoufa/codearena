@@ -63,6 +63,8 @@ export function stamp(id: SimId) {
   write({ ...prev, [id]: new Date().toISOString().slice(0, 10) });
 }
 
-export function clearStamps() {
-  write({});
+export function clearStamps(ids: readonly SimId[]) {
+  const next = { ...read() };
+  for (const id of ids) delete next[id];
+  write(next);
 }

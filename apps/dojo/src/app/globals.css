@@ -250,7 +250,7 @@
   border-color: var(--color-slate-800);
 }
 
-/* ── System design stations (components/sims) ── */
+/* ── Playable stations (components/sims) ── */
 .sim-dot {
   transform: translate(var(--x1), var(--y1));
   animation: sim-travel 900ms cubic-bezier(0.4, 0, 0.2, 1);

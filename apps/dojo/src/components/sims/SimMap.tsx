@@ -1,29 +1,30 @@
 "use client";
 /** The route through the guide: every station, stamped or not, and your rank. */
 import { useState } from "react";
-import { SIMS, rankFor } from "@/lib/sims/catalog";
+import { rankFor, type Route } from "@/lib/sims/catalog";
 import { clearStamps, useStamps } from "@/lib/sims/progress";
 
-export function SimMap() {
+export function SimMap({ route }: { route: Route }) {
+  const sims = route.sims;
   const stamps = useStamps();
   const [asking, setAsking] = useState(false);
-  const cleared = SIMS.filter((s) => stamps[s.id]).length;
-  const next = SIMS.find((s) => !stamps[s.id]);
+  const cleared = sims.filter((s) => stamps[s.id]).length;
+  const next = sims.find((s) => !stamps[s.id]);
   return (
-    <section aria-label="Station map" className="not-prose my-8 rounded-2xl border-2 border-slate-300 bg-slate-50/60 p-4 text-slate-800 sm:p-5 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-950/30">
+    <section aria-label={`${route.name}: station map`} className="not-prose my-8 rounded-2xl border-2 border-slate-300 bg-slate-50/60 p-4 text-slate-800 sm:p-5 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-950/30">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-lg">
-          Rank: <strong className="text-cyan-700 dark:text-cyan-300">{rankFor(cleared)}</strong>
+          Rank: <strong className="text-cyan-700 dark:text-cyan-300">{rankFor(route, cleared)}</strong>
         </p>
         <p className="font-mono text-sm text-slate-500 dark:text-slate-400">
-          {cleared} of {SIMS.length} cleared
+          {cleared} of {sims.length} cleared
         </p>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${(cleared / SIMS.length) * 100}%` }} />
+        <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${(cleared / sims.length) * 100}%` }} />
       </div>
       <ol className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {SIMS.map((s, i) => {
+        {sims.map((s, i) => {
           const done = stamps[s.id] !== undefined;
           const here = s.id === next?.id;
           return (
@@ -50,7 +51,7 @@ export function SimMap() {
           (asking ? (
             <span className="flex gap-3">
               Clear all {cleared}?
-              <button type="button" className="font-semibold text-rose-700 underline dark:text-rose-400" onClick={() => { clearStamps(); setAsking(false); }}>
+              <button type="button" className="font-semibold text-rose-700 underline dark:text-rose-400" onClick={() => { clearStamps(sims.map((s) => s.id)); setAsking(false); }}>
                 Yes, start over
               </button>
               <button type="button" className="underline" onClick={() => setAsking(false)}>

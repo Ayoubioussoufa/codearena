@@ -12,6 +12,15 @@ The one idea that makes everything else click: **Git stores snapshots, and commi
 
 ---
 
+## 🕹️ Play your way through
+
+**Nine stations are waiting below**, with real situations and a history you can break safely. Each has a goal; meet it and
+it gets a stamp. Nothing is timed, and nothing can be lost: a wrong move tells you why.
+
+```sim
+map
+```
+
 ---
 
 ## ⌨️ This guide is interactive
@@ -197,6 +206,10 @@ In a diff, `-` lines were removed, `+` added; a header `@@ -a,b +c,d @@` marks t
 model
 ```
 
+```sim
+places
+```
+
 # Part 4 — Merge vs rebase
 
 Both bring branch A's work into branch B. They differ in **the shape of the history they leave**.
@@ -320,6 +333,10 @@ pick h7i8j9k fix another typo
 
 **When:** before opening a PR, to turn "add login / fix typo / fix typo again" into one clean commit.
 
+```sim
+graph
+```
+
 ---
 
 # Part 5 — Conflicts
@@ -362,6 +379,10 @@ flowchart TD
 conflict-resolution
 ```
 
+
+```sim
+conflict
+```
 
 ---
 
@@ -471,6 +492,10 @@ recover-reset-hard
 history
 ```
 
+```sim
+undo
+```
+
 # Part 7 — Stashing
 
 ```bash
@@ -548,6 +573,10 @@ force-with-lease
 
 > **Caveat:** the lease compares your remote-*tracking* ref, which a background fetch (including your IDE's) can silently update. The airtight form names the hash: `--force-with-lease=main:<hash>`.
 
+```sim
+lease
+```
+
 ---
 
 # Part 9 — Reading history
@@ -606,6 +635,10 @@ find-the-breakage
 find-deleted-code
 ```
 
+
+```sim
+bisect
+```
 
 ---
 
@@ -854,6 +887,14 @@ Run `git status -sb` and `git log --oneline --all` first. Then:
 
 Only the last row is real loss. **Everything Git has ever committed is recoverable**; only the working tree is fragile. That asymmetry is the argument for committing early and often, even messily — you can always tidy history later with `rebase -i`, but you cannot recover a file Git never saw.
 
+```sim
+sync
+```
+
+```sim
+rescue
+```
+
 ---
 
 # Part 14 — Setup and config
@@ -931,6 +972,10 @@ lost-work-triage
 
 ```check
 remotes
+```
+
+```sim
+danger
 ```
 
 ## Mastery checklist — you can…

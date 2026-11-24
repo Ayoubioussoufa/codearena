@@ -101,7 +101,7 @@ export function MarkdownView({
               // ```sim fences hold a station id, or "map": playable simulations
               // defined in src/lib/sims and checked by scripts/check-sims.ts.
               if (className?.includes("language-sim")) {
-                return <SimBlock id={textOf(children).trim()} />;
+                return <SimBlock id={textOf(children).trim()} guide={guideSlug} />;
               }
               // ```exercise fences hold an exercise id; the definition lives in
               // src/lib/guide-exercises so its checks can be real code and the

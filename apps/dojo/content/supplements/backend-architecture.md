@@ -13,6 +13,15 @@ applies in Spring, .NET, Django, Rails, or plain Express. The names change. The 
 
 Everything else is a consequence.
 
+## 🕹️ Play your way through
+
+**Ten stations are waiting below**, where you move the code, cut the power and name the culprits. Each has a goal; meet it and
+it gets a stamp. Nothing is timed, and nothing can be lost: a wrong move tells you why.
+
+```sim
+map
+```
+
 ---
 
 ## ⌨️ This guide is interactive
@@ -212,6 +221,14 @@ The swap is a bonus. The vocabulary boundary is the point.
 
 ```check
 rule
+```
+
+```sim
+blast
+```
+
+```sim
+arrows
 ```
 
 ---
@@ -446,6 +463,10 @@ http-thin
 layers
 ```
 
+```sim
+boundary
+```
+
 ---
 
 # Part 4 — Domain modelling: the vocabulary you'll be asked about
@@ -521,6 +542,10 @@ type names, your model has drifted from the thing it models.
 
 ```check
 domain
+```
+
+```sim
+invariant
 ```
 
 ---
@@ -660,6 +685,10 @@ audit-command
 ports
 ```
 
+```sim
+whereto
+```
+
 ---
 
 # Part 7 — Errors deserve their own architecture
@@ -742,6 +771,10 @@ silent-catch
 errors
 ```
 
+```sim
+errors
+```
+
 ---
 
 # Part 8 — Transactions, and why they're architecturally awkward
@@ -797,6 +830,10 @@ operation is idempotent.
 That's Week 4 material. For now, the rule that will keep you safe:
 
 > **Database work inside the transaction. Network calls outside it.**
+
+```sim
+outbox
+```
 
 ---
 
@@ -1024,6 +1061,10 @@ know what varies** — and the abstraction you build will fit.
 
 Two data points define infinite lines. Three constrain the shape.
 
+```sim
+worthit
+```
+
 ---
 
 # Part 13 — How you actually get here (the evolution)
@@ -1135,6 +1176,10 @@ they're covered by e2e tests. Both are legitimate. Mocking the driver is not.
 | "Cursor paging has no duplicates" | e2e |
 | "limit=99999 gets a 400" | e2e |
 
+```sim
+whichtest
+```
+
 ---
 
 # Part 15 — The anti-pattern gallery
@@ -1189,6 +1234,10 @@ The bug is now invisible and permanent.
 
 ```check
 testing
+```
+
+```sim
+villains
 ```
 
 ---

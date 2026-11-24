@@ -11,4 +11,6 @@ export interface Situation {
   /** Index of the best move. */
   best: number;
   lesson: string;
+  /** An error message or a piece of code, shown as it is. */
+  exhibit?: string;
 }

@@ -12,6 +12,7 @@ import rehypeHighlight from "rehype-highlight";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { GuideExercise } from "./GuideExercise";
 import { getGuideExercise } from "@/lib/guide-exercises";
+import { SimBlock } from "./sims/SimBlock";
 import { GuideCheckBlock } from "./courses/GuideCheckBlock";
 import { getGuideCheck } from "@/lib/guide-checks";
 
@@ -96,6 +97,11 @@ export function MarkdownView({
                     </div>
                   </details>
                 );
+              }
+              // ```sim fences hold a station id, or "map": playable simulations
+              // defined in src/lib/sims and checked by scripts/check-sims.ts.
+              if (className?.includes("language-sim")) {
+                return <SimBlock id={textOf(children).trim()} />;
               }
               // ```exercise fences hold an exercise id; the definition lives in
               // src/lib/guide-exercises so its checks can be real code and the

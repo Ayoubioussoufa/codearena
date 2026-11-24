@@ -249,3 +249,30 @@
 .dark .prose :where(hr):not(:where(.not-prose *)) {
   border-color: var(--color-slate-800);
 }
+
+/* ── System design stations (components/sims) ── */
+.sim-dot {
+  transform: translate(var(--x1), var(--y1));
+  animation: sim-travel 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes sim-travel {
+  from {
+    transform: translate(var(--x0), var(--y0));
+  }
+}
+.sim-stamp {
+  transform: rotate(-4deg);
+  animation: sim-stamp 320ms ease-out;
+}
+@keyframes sim-stamp {
+  from {
+    transform: rotate(-14deg) scale(2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-dot,
+  .sim-stamp {
+    animation: none;
+  }
+}

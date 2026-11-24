@@ -173,6 +173,9 @@ jobs:
       # mustn't give the answer away), links that resolve, labs that exist,
       # warm-ups that point at real questions.
       - run: pnpm --filter dojo test:courses
+      # The system design stations: every goal reachable, none already met,
+      # each placed once in the guide.
+      - run: pnpm --filter dojo test:sims
 
   commits:
     name: Commit messages

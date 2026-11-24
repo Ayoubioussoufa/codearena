@@ -15,12 +15,17 @@ to reason.** Interviewers grade your reasoning, not a magic diagram.
 
 ---
 
+## 🕹️ Play your way through
 
----
+**Fourteen stations are waiting below**, each one a small system you can push until it breaks. A station
+has a goal; meet it and it gets a stamp. Nothing is timed, nothing can be lost, and losing is usually the
+fastest way to see why a tool exists.
 
-## ⌨️ This guide is interactive
+```sim
+map
+```
 
-**Ten exercises are embedded below.** System design is answered out loud, so most of these are
+**Ten written exercises** sit between them. System design is answered out loud, so most of these are
 reasoning drills: estimate, choose, and justify.
 
 **The number is never the point** — reaching one and defending the trade-off behind it is. Several
@@ -55,6 +60,10 @@ scaling a website is genuinely like scaling a restaurant.
 That's the vocabulary. Now the method.
 
 ---
+
+```sim
+journey
+```
 
 ## A framework for any design question
 
@@ -127,6 +136,10 @@ envelope-estimate
 framework
 ```
 
+```sim
+napkin
+```
+
 ## Latency numbers every programmer should know
 
 Different kinds of storage and network hops are *wildly* different speeds — and knowing the rough
@@ -168,6 +181,10 @@ The three ratios that actually decide designs:
 latency-ordering
 ```
 
+```sim
+latency
+```
+
 ## Availability: measuring uptime in "nines"
 
 **Availability** is the % of time the system is up. It's quoted in "nines", and the jump between each
@@ -199,6 +216,10 @@ Two facts interviewers love, because they explain *why* redundancy works:
 
 ```check
 latency
+```
+
+```sim
+nines
 ```
 
 ## Caching
@@ -242,6 +263,10 @@ sequenceDiagram
 
 ---
 
+```sim
+cache
+```
+
 ## Cache update patterns — who writes to the cache, and when
 
 "Add a cache" raises a follow-up: *how do the cache and the database stay in step?* There are five
@@ -279,6 +304,10 @@ cache-strategy
 caching
 ```
 
+```sim
+stampede
+```
+
 ## Load balancing & stateless services
 
 A **load balancer** (LB) is the traffic cop that sits in front of your servers and spreads incoming
@@ -299,6 +328,10 @@ at the least-busy section.) It can spread by simple rotation (**round-robin**), 
 > one box with no backup — that's the SPOF, and removing it is a reliable interview point.
 
 ---
+
+```sim
+balancer
+```
 
 ## DNS — the internet's phone book (as a building block)
 
@@ -402,6 +435,10 @@ flowchart TD
 > writes = split the load into separate pieces.
 
 ---
+
+```sim
+scaledb
+```
 
 ## Database replication: master-slave vs master-master
 
@@ -516,6 +553,10 @@ flowchart TD
 cap-tradeoff
 ```
 
+```sim
+cap
+```
+
 ## Consistency patterns (weak → eventual → strong)
 
 CAP forces a choice; *consistency patterns* are the three concrete levels of "how fresh is a read
@@ -626,6 +667,10 @@ idempotency-key
 queues
 ```
 
+```sim
+queue
+```
+
 ## Rate limiting
 
 **Rate limiting** = capping how many requests one client (or API key) may make in a window, to protect
@@ -644,6 +689,10 @@ you from abuse and overload. ("Max 100 requests per minute.")
 
 ```exercise
 rate-limit-algorithm
+```
+
+```sim
+ratelimit
 ```
 
 ## Communication: how the pieces talk to each other
@@ -726,6 +775,10 @@ flowchart TD
 
 ```check
 apis
+```
+
+```sim
+ring
 ```
 
 ## Worked design #1 — a URL shortener (the canonical opener)
@@ -868,6 +921,10 @@ database.
 
 ---
 
+```sim
+judge
+```
+
 ## Worked design #3 — an API rate limiter (short, sharp)
 
 Often a focused 15-minute question: "limit each API key to 100 requests/minute."
@@ -1004,6 +1061,10 @@ This is a real thing you built — say so, and walk your actual choices.
 
 ```check
 designs
+```
+
+```sim
+oncall
 ```
 
 ## Daily self-drill — how to practise one design each morning
